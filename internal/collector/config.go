@@ -1,8 +1,8 @@
-package db
+package collector
 
 import (
 	"github.com/mcuadros/go-defaults"
-	"github.com/steromano87/harkonnen/v1/pkg/runtime"
+	"github.com/steromano87/harkonnen/v1/pkg/project"
 )
 
 const (
@@ -17,7 +17,7 @@ type Config struct {
 	DSN  string `yaml:"dsn" default:"results/results.db"`
 }
 
-func NewConfig(ctx runtime.Context) Config {
+func NewConfig(ctx project.Context) Config {
 	config := Config{}
 	defaults.SetDefaults(&config)
 
