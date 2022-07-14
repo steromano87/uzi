@@ -273,6 +273,63 @@ func (s *ClientTestSuite) TestDeleteNoBody() {
 	}
 }
 
+func (s *ClientTestSuite) TestHeadNoBody() {
+	if assert.NotPanics(s.T(), func() {
+		s.client.Execute(rest.Head(s.testServer.URL, "", nil))
+	}) {
+		if assert.Equal(s.T(), 1, len(s.sampleWriter.Samples)) {
+			if assert.IsType(s.T(), model.Sample{}, s.sampleWriter.Samples[0]) {
+				sample := s.sampleWriter.Samples[0]
+				sampleData := sample.Data.(rest.SampleData)
+				assert.Equal(s.T(), rest.HEAD, sampleData.Method)
+				assert.Equal(s.T(), s.testServer.URL, sampleData.URL.String())
+				assert.Equal(s.T(), s.testServer.URL, sample.Name)
+				assert.Greater(s.T(), sample.SentBytes, uint64(0))
+				assert.Greater(s.T(), sample.ReceivedBytes, uint64(0))
+			}
+		}
+
+		assert.IsType(s.T(), &http.Response{}, s.client.LastResponse())
+		responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+		defer func() {
+			_ = s.client.LastResponse().Body.Close()
+		}()
+		responseBody := string(responseBodyBytes)
+
+		assert.Empty(s.T(), responseBody, "HEAD body must be empty")
+	}
+}
+
+func (s *ClientTestSuite) TestOptionsNoBody() {
+	if assert.NotPanics(s.T(), func() {
+		s.client.Execute(rest.Options(s.testServer.URL, "", nil))
+	}) {
+		if assert.Equal(s.T(), 1, len(s.sampleWriter.Samples)) {
+			if assert.IsType(s.T(), model.Sample{}, s.sampleWriter.Samples[0]) {
+				sample := s.sampleWriter.Samples[0]
+				sampleData := sample.Data.(rest.SampleData)
+				assert.Equal(s.T(), rest.OPTIONS, sampleData.Method)
+				assert.Equal(s.T(), s.testServer.URL, sampleData.URL.String())
+				assert.Equal(s.T(), s.testServer.URL, sample.Name)
+				assert.Greater(s.T(), sample.SentBytes, uint64(0))
+				assert.Greater(s.T(), sample.ReceivedBytes, uint64(0))
+			}
+		}
+
+		assert.IsType(s.T(), &http.Response{}, s.client.LastResponse())
+		responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+		defer func() {
+			_ = s.client.LastResponse().Body.Close()
+		}()
+		responseBody := string(responseBodyBytes)
+
+		assert.Contains(s.T(), responseBody, "Request method: 'OPTIONS'")
+		assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
+		assert.Contains(s.T(), responseBody, "Request partial URL: '/'")
+		assert.Contains(s.T(), responseBody, "Request body: ''")
+	}
+}
+
 func (s *ClientTestSuite) TestPostFormRequest() {
 	values := url.Values{}
 	values.Set("test", "example")

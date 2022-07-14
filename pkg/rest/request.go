@@ -11,13 +11,13 @@ import (
 type Method string
 
 const (
-	GET    = Method("GET")
-	POST   = Method("POST")
-	PUT    = Method("PUT")
-	PATCH  = Method("PATCH")
-	DELETE = Method("DELETE")
-	HEAD   = Method("HEAD")
-	OPTION = Method("OPTION")
+	GET     = Method("GET")
+	POST    = Method("POST")
+	PUT     = Method("PUT")
+	PATCH   = Method("PATCH")
+	DELETE  = Method("DELETE")
+	HEAD    = Method("HEAD")
+	OPTIONS = Method("OPTIONS")
 )
 
 type Request struct {
@@ -82,6 +82,26 @@ func Patch(url string, contentType string, body []byte) Request {
 func Delete(url string, contentType string, body []byte) Request {
 	return Request{
 		Method:      "DELETE",
+		Url:         url,
+		Parameters:  nil,
+		ContentType: contentType,
+		RawBody:     body,
+	}
+}
+
+func Head(url string, contentType string, body []byte) Request {
+	return Request{
+		Method:      "HEAD",
+		Url:         url,
+		Parameters:  nil,
+		ContentType: contentType,
+		RawBody:     body,
+	}
+}
+
+func Options(url string, contentType string, body []byte) Request {
+	return Request{
+		Method:      "OPTIONS",
 		Url:         url,
 		Parameters:  nil,
 		ContentType: contentType,
