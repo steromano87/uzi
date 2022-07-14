@@ -1,44 +1,54 @@
 package rest_test
 
 import (
-	"context"
 	"fmt"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/pkgerrors"
-	"github.com/steromano87/harkonnen/rest"
-	"github.com/steromano87/harkonnen/shooter"
-	"github.com/steromano87/harkonnen/telemetry"
+	"github.com/steromano87/harkonnen/v1/pkg/loading"
+	"github.com/steromano87/harkonnen/v1/pkg/model"
+	"github.com/steromano87/harkonnen/v1/pkg/project"
+	"github.com/steromano87/harkonnen/v1/pkg/rest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"testing"
 )
 
-type ClientTestSuite struct {
-	suite.Suite
-	settings   *rest.Settings
-	context    shooter.Context
-	client     *rest.Client
-	testServer *httptest.Server
-	logger     zerolog.Logger
-	shooterID  string
+type MockedSampleWriter struct {
+	Samples []model.Sample
 }
 
-func (suite *ClientTestSuite) SetupTest() {
-	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	suite.settings = rest.NewSettings()
-	suite.logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
-	suite.shooterID = "1"
-	suite.context = shooter.NewContext(context.Background(), suite.logger, suite.shooterID)
-	suite.client = rest.NewClient(suite.context, suite.settings)
+func (w *MockedSampleWriter) Write(sample model.Sample) error {
+	w.Samples = append(w.Samples, sample)
+	return nil
+}
+
+type ClientTestSuite struct {
+	suite.Suite
+	l            loading.L
+	client       *rest.Client
+	testServer   *httptest.Server
+	sampleWriter *MockedSampleWriter
+}
+
+func (s *ClientTestSuite) SetupTest() {
+	logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
+	s.sampleWriter = &MockedSampleWriter{
+		Samples: []model.Sample{},
+	}
+
+	s.l = loading.L{
+		Logger:       &logger,
+		Config:       project.NewEmptyConfig(),
+		Variables:    loading.NewVariables(),
+		SampleWriter: s.sampleWriter,
+	}
+
+	s.client = rest.NewClient(s.l)
 
 	handler := http.NewServeMux()
-
 	handler.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		bodyBytes, _ := ioutil.ReadAll(r.Body)
 		body := string(bodyBytes)
@@ -64,324 +74,310 @@ func (suite *ClientTestSuite) SetupTest() {
 		_, _ = fmt.Fprintf(w, "Request body: '%s'\n", body)
 	})
 
-	suite.testServer = httptest.NewServer(handler)
+	s.testServer = httptest.NewServer(handler)
 }
 
-func (suite *ClientTestSuite) TearDownTest() {
-	suite.testServer.Close()
+func (s *ClientTestSuite) TearDownTest() {
+	s.testServer.Close()
 }
 
-func (suite *ClientTestSuite) TestNewSampler() {
-	assert.IsType(suite.T(), &rest.Client{}, suite.client)
+func (s *ClientTestSuite) TestNewSampler() {
+	assert.IsType(s.T(), &rest.Client{}, s.client)
 }
 
-func (suite *ClientTestSuite) TestGetRequest() {
-	suite.client.Execute(rest.Get(suite.testServer.URL, nil))
+func (s *ClientTestSuite) TestGetRequest() {
+	if assert.NotPanics(s.T(), func() {
+		s.client.Execute(rest.Get(s.testServer.URL, nil))
+	}) {
+		if assert.Equal(s.T(), 1, len(s.sampleWriter.Samples)) {
 
-	collectedSamples := suite.context.SampleCollector().Flush()
-
-	if assert.Equal(suite.T(), 1, len(collectedSamples)) {
-		assert.Implements(suite.T(), (*telemetry.Sample)(nil), collectedSamples[0])
-
-		if assert.IsType(suite.T(), rest.Sample{}, collectedSamples[0]) {
-			sample := collectedSamples[0].(rest.Sample)
-			assert.Equal(suite.T(), "GET", sample.Method)
-			assert.Equal(suite.T(), suite.testServer.URL, sample.URL.String())
-			assert.Equal(suite.T(), suite.testServer.URL, sample.Name())
-			assert.Equal(suite.T(), url.Values{}, sample.Parameters)
-			assert.Greater(suite.T(), sample.SentBytes(), int64(0))
-			assert.Greater(suite.T(), sample.ReceivedBytes(), int64(0))
+			if assert.IsType(s.T(), model.Sample{}, s.sampleWriter.Samples[0]) {
+				sample := s.sampleWriter.Samples[0]
+				sampleData := sample.Data.(rest.SampleData)
+				assert.Equal(s.T(), rest.GET, sampleData.Method)
+				assert.Equal(s.T(), s.testServer.URL, sampleData.URL.String())
+				assert.Equal(s.T(), s.testServer.URL, sample.Name)
+				assert.Equal(s.T(), url.Values{}, sampleData.Parameters)
+				assert.Greater(s.T(), sample.SentBytes, uint64(0))
+				assert.Greater(s.T(), sample.ReceivedBytes, uint64(0))
+			}
 		}
+
+		assert.IsType(s.T(), &http.Response{}, s.client.LastResponse())
+		responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+		defer func() {
+			_ = s.client.LastResponse().Body.Close()
+		}()
+		responseBody := string(responseBodyBytes)
+
+		assert.Contains(s.T(), responseBody, "Request method: 'GET'")
+		assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
+		assert.Contains(s.T(), responseBody, "Request partial URL: '/'")
+		assert.Contains(s.T(), responseBody, "Request body: ''")
 	}
-
-	assert.IsType(suite.T(), &http.Response{}, suite.client.LastResponse())
-	responseBodyBytes, _ := ioutil.ReadAll(suite.client.LastResponse().Body)
-	defer func() {
-		_ = suite.client.LastResponse().Body.Close()
-	}()
-	responseBody := string(responseBodyBytes)
-
-	assert.Contains(suite.T(), responseBody, "Request method: 'GET'")
-	assert.Contains(suite.T(), responseBody, fmt.Sprintf("Request host: '%s'", suite.testServer.URL))
-	assert.Contains(suite.T(), responseBody, "Request partial URL: '/'")
-	assert.Contains(suite.T(), responseBody, "Request body: ''")
 }
 
-func (suite *ClientTestSuite) TestGetRequestWithQueryString() {
+func (s *ClientTestSuite) TestGetRequestWithQueryString() {
 	parameters := url.Values{}
 	parameters.Set("key1", "value1")
 	parameters.Set("key2", "1")
-	suite.client.Execute(rest.Get(suite.testServer.URL, &parameters))
 
-	collectedSamples := suite.context.SampleCollector().Flush()
-
-	if assert.Equal(suite.T(), 1, len(collectedSamples)) {
-		assert.Implements(suite.T(), (*telemetry.Sample)(nil), collectedSamples[0])
-
-		if assert.IsType(suite.T(), rest.Sample{}, collectedSamples[0]) {
-			sample := collectedSamples[0].(rest.Sample)
-			assert.Equal(suite.T(), "GET", sample.Method)
-			assert.Equal(suite.T(), suite.testServer.URL, sample.URL.String())
-			assert.Equal(suite.T(), parameters, sample.Parameters)
-			assert.Equal(suite.T(), suite.testServer.URL, sample.Name())
-			assert.Greater(suite.T(), sample.SentBytes(), int64(0))
-			assert.Greater(suite.T(), sample.ReceivedBytes(), int64(0))
+	if assert.NotPanics(s.T(), func() {
+		s.client.Execute(rest.Get(s.testServer.URL, &parameters))
+	}) {
+		if assert.Equal(s.T(), 1, len(s.sampleWriter.Samples)) {
+			if assert.IsType(s.T(), model.Sample{}, s.sampleWriter.Samples[0]) {
+				sample := s.sampleWriter.Samples[0]
+				sampleData := sample.Data.(rest.SampleData)
+				assert.Equal(s.T(), rest.GET, sampleData.Method)
+				assert.Equal(s.T(), s.testServer.URL, sampleData.URL.String())
+				assert.Equal(s.T(), parameters, sampleData.Parameters)
+				assert.Equal(s.T(), s.testServer.URL, sample.Name)
+				assert.Greater(s.T(), sample.SentBytes, uint64(0))
+				assert.Greater(s.T(), sample.ReceivedBytes, uint64(0))
+			}
 		}
+
+		assert.IsType(s.T(), &http.Response{}, s.client.LastResponse())
+		responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+		defer func() {
+			_ = s.client.LastResponse().Body.Close()
+		}()
+		responseBody := string(responseBodyBytes)
+
+		assert.Contains(s.T(), responseBody, "Request method: 'GET'")
+		assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
+		assert.Contains(s.T(), responseBody, fmt.Sprintf("Request partial URL: '/?%s'", parameters.Encode()))
+		assert.Contains(s.T(), responseBody, "Request body: ''")
 	}
-
-	assert.IsType(suite.T(), &http.Response{}, suite.client.LastResponse())
-	responseBodyBytes, _ := ioutil.ReadAll(suite.client.LastResponse().Body)
-	defer func() {
-		_ = suite.client.LastResponse().Body.Close()
-	}()
-	responseBody := string(responseBodyBytes)
-
-	assert.Contains(suite.T(), responseBody, "Request method: 'GET'")
-	assert.Contains(suite.T(), responseBody, fmt.Sprintf("Request host: '%s'", suite.testServer.URL))
-	assert.Contains(suite.T(), responseBody, fmt.Sprintf("Request partial URL: '/?%s'", parameters.Encode()))
-	assert.Contains(suite.T(), responseBody, "Request body: ''")
 }
 
-func (suite *ClientTestSuite) TestPostNoBody() {
-	suite.client.Execute(rest.Post(suite.testServer.URL, "", nil))
-
-	collectedSamples := suite.context.SampleCollector().Flush()
-
-	if assert.Equal(suite.T(), 1, len(collectedSamples)) {
-		assert.Implements(suite.T(), (*telemetry.Sample)(nil), collectedSamples[0])
-
-		if assert.IsType(suite.T(), rest.Sample{}, collectedSamples[0]) {
-			sample := collectedSamples[0].(rest.Sample)
-			assert.Equal(suite.T(), "POST", sample.Method)
-			// TODO: check if it is better to separate URL from querystring in the BaseSample
-			assert.Equal(suite.T(), suite.testServer.URL, sample.URL.String())
-			assert.Equal(suite.T(), suite.testServer.URL, sample.Name())
-			assert.Greater(suite.T(), sample.SentBytes(), int64(0))
-			assert.Greater(suite.T(), sample.ReceivedBytes(), int64(0))
+func (s *ClientTestSuite) TestPostNoBody() {
+	if assert.NotPanics(s.T(), func() {
+		s.client.Execute(rest.Post(s.testServer.URL, "", nil))
+	}) {
+		if assert.Equal(s.T(), 1, len(s.sampleWriter.Samples)) {
+			if assert.IsType(s.T(), model.Sample{}, s.sampleWriter.Samples[0]) {
+				sample := s.sampleWriter.Samples[0]
+				sampleData := sample.Data.(rest.SampleData)
+				assert.Equal(s.T(), rest.POST, sampleData.Method)
+				assert.Equal(s.T(), s.testServer.URL, sampleData.URL.String())
+				assert.Equal(s.T(), s.testServer.URL, sample.Name)
+				assert.Greater(s.T(), sample.SentBytes, uint64(0))
+				assert.Greater(s.T(), sample.ReceivedBytes, uint64(0))
+			}
 		}
+
+		assert.IsType(s.T(), &http.Response{}, s.client.LastResponse())
+		responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+		defer func() {
+			_ = s.client.LastResponse().Body.Close()
+		}()
+		responseBody := string(responseBodyBytes)
+
+		assert.Contains(s.T(), responseBody, "Request method: 'POST'")
+		assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
+		assert.Contains(s.T(), responseBody, "Request partial URL: '/'")
+		assert.Contains(s.T(), responseBody, "Request body: ''")
 	}
-
-	assert.IsType(suite.T(), &http.Response{}, suite.client.LastResponse())
-	responseBodyBytes, _ := ioutil.ReadAll(suite.client.LastResponse().Body)
-	defer func() {
-		_ = suite.client.LastResponse().Body.Close()
-	}()
-	responseBody := string(responseBodyBytes)
-
-	assert.Contains(suite.T(), responseBody, "Request method: 'POST'")
-	assert.Contains(suite.T(), responseBody, fmt.Sprintf("Request host: '%s'", suite.testServer.URL))
-	assert.Contains(suite.T(), responseBody, "Request partial URL: '/'")
-	assert.Contains(suite.T(), responseBody, "Request body: ''")
 }
 
-func (suite *ClientTestSuite) TestPutNoBody() {
-	suite.client.Execute(rest.Put(suite.testServer.URL, "", nil))
+func (s *ClientTestSuite) TestPutNoBody() {
+	if assert.NotPanics(s.T(), func() {
+		s.client.Execute(rest.Put(s.testServer.URL, "", nil))
+	}) {
+		if assert.Equal(s.T(), 1, len(s.sampleWriter.Samples)) {
 
-	collectedSamples := suite.context.SampleCollector().Flush()
-
-	if assert.Equal(suite.T(), 1, len(collectedSamples)) {
-		assert.Implements(suite.T(), (*telemetry.Sample)(nil), collectedSamples[0])
-
-		if assert.IsType(suite.T(), rest.Sample{}, collectedSamples[0]) {
-			sample := collectedSamples[0].(rest.Sample)
-			assert.Equal(suite.T(), "PUT", sample.Method)
-			assert.Equal(suite.T(), suite.testServer.URL, sample.URL.String())
-			assert.Equal(suite.T(), suite.testServer.URL, sample.Name())
-			assert.Greater(suite.T(), sample.SentBytes(), int64(0))
-			assert.Greater(suite.T(), sample.ReceivedBytes(), int64(0))
+			if assert.IsType(s.T(), model.Sample{}, s.sampleWriter.Samples[0]) {
+				sample := s.sampleWriter.Samples[0]
+				sampleData := sample.Data.(rest.SampleData)
+				assert.Equal(s.T(), rest.PUT, sampleData.Method)
+				assert.Equal(s.T(), s.testServer.URL, sampleData.URL.String())
+				assert.Equal(s.T(), s.testServer.URL, sample.Name)
+				assert.Greater(s.T(), sample.SentBytes, uint64(0))
+				assert.Greater(s.T(), sample.ReceivedBytes, uint64(0))
+			}
 		}
+
+		assert.IsType(s.T(), &http.Response{}, s.client.LastResponse())
+		responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+		defer func() {
+			_ = s.client.LastResponse().Body.Close()
+		}()
+		responseBody := string(responseBodyBytes)
+
+		assert.Contains(s.T(), responseBody, "Request method: 'PUT'")
+		assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
+		assert.Contains(s.T(), responseBody, "Request partial URL: '/'")
+		assert.Contains(s.T(), responseBody, "Request body: ''")
 	}
-
-	assert.IsType(suite.T(), &http.Response{}, suite.client.LastResponse())
-	responseBodyBytes, _ := ioutil.ReadAll(suite.client.LastResponse().Body)
-	defer func() {
-		_ = suite.client.LastResponse().Body.Close()
-	}()
-	responseBody := string(responseBodyBytes)
-
-	assert.Contains(suite.T(), responseBody, "Request method: 'PUT'")
-	assert.Contains(suite.T(), responseBody, fmt.Sprintf("Request host: '%s'", suite.testServer.URL))
-	assert.Contains(suite.T(), responseBody, "Request partial URL: '/'")
-	assert.Contains(suite.T(), responseBody, "Request body: ''")
 }
 
-func (suite *ClientTestSuite) TestPatchNoBody() {
-	suite.client.Execute(rest.Patch(suite.testServer.URL, "", nil))
-
-	collectedSamples := suite.context.SampleCollector().Flush()
-
-	if assert.Equal(suite.T(), 1, len(collectedSamples)) {
-		assert.Implements(suite.T(), (*telemetry.Sample)(nil), collectedSamples[0])
-
-		if assert.IsType(suite.T(), rest.Sample{}, collectedSamples[0]) {
-			sample := collectedSamples[0].(rest.Sample)
-			assert.Equal(suite.T(), "PATCH", sample.Method)
-			assert.Equal(suite.T(), suite.testServer.URL, sample.URL.String())
-			assert.Equal(suite.T(), suite.testServer.URL, sample.Name())
-			assert.Greater(suite.T(), sample.SentBytes(), int64(0))
-			assert.Greater(suite.T(), sample.ReceivedBytes(), int64(0))
+func (s *ClientTestSuite) TestPatchNoBody() {
+	if assert.NotPanics(s.T(), func() {
+		s.client.Execute(rest.Patch(s.testServer.URL, "", nil))
+	}) {
+		if assert.Equal(s.T(), 1, len(s.sampleWriter.Samples)) {
+			if assert.IsType(s.T(), model.Sample{}, s.sampleWriter.Samples[0]) {
+				sample := s.sampleWriter.Samples[0]
+				sampleData := sample.Data.(rest.SampleData)
+				assert.Equal(s.T(), rest.PATCH, sampleData.Method)
+				assert.Equal(s.T(), s.testServer.URL, sampleData.URL.String())
+				assert.Equal(s.T(), s.testServer.URL, sample.Name)
+				assert.Greater(s.T(), sample.SentBytes, uint64(0))
+				assert.Greater(s.T(), sample.ReceivedBytes, uint64(0))
+			}
 		}
+
+		assert.IsType(s.T(), &http.Response{}, s.client.LastResponse())
+		responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+		defer func() {
+			_ = s.client.LastResponse().Body.Close()
+		}()
+		responseBody := string(responseBodyBytes)
+
+		assert.Contains(s.T(), responseBody, "Request method: 'PATCH'")
+		assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
+		assert.Contains(s.T(), responseBody, "Request partial URL: '/'")
+		assert.Contains(s.T(), responseBody, "Request body: ''")
 	}
-
-	assert.IsType(suite.T(), &http.Response{}, suite.client.LastResponse())
-	responseBodyBytes, _ := ioutil.ReadAll(suite.client.LastResponse().Body)
-	defer func() {
-		_ = suite.client.LastResponse().Body.Close()
-	}()
-	responseBody := string(responseBodyBytes)
-
-	assert.Contains(suite.T(), responseBody, "Request method: 'PATCH'")
-	assert.Contains(suite.T(), responseBody, fmt.Sprintf("Request host: '%s'", suite.testServer.URL))
-	assert.Contains(suite.T(), responseBody, "Request partial URL: '/'")
-	assert.Contains(suite.T(), responseBody, "Request body: ''")
 }
 
-func (suite *ClientTestSuite) TestDeleteNoBody() {
-	suite.client.Execute(rest.Delete(suite.testServer.URL, "", nil))
-
-	collectedSamples := suite.context.SampleCollector().Flush()
-
-	if assert.Equal(suite.T(), 1, len(collectedSamples)) {
-		assert.Implements(suite.T(), (*telemetry.Sample)(nil), collectedSamples[0])
-
-		if assert.IsType(suite.T(), rest.Sample{}, collectedSamples[0]) {
-			sample := collectedSamples[0].(rest.Sample)
-			assert.Equal(suite.T(), "DELETE", sample.Method)
-			assert.Equal(suite.T(), suite.testServer.URL, sample.URL.String())
-			assert.Equal(suite.T(), suite.testServer.URL, sample.Name())
-			assert.Greater(suite.T(), sample.SentBytes(), int64(0))
-			assert.Greater(suite.T(), sample.ReceivedBytes(), int64(0))
+func (s *ClientTestSuite) TestDeleteNoBody() {
+	if assert.NotPanics(s.T(), func() {
+		s.client.Execute(rest.Delete(s.testServer.URL, "", nil))
+	}) {
+		if assert.Equal(s.T(), 1, len(s.sampleWriter.Samples)) {
+			if assert.IsType(s.T(), model.Sample{}, s.sampleWriter.Samples[0]) {
+				sample := s.sampleWriter.Samples[0]
+				sampleData := sample.Data.(rest.SampleData)
+				assert.Equal(s.T(), rest.DELETE, sampleData.Method)
+				assert.Equal(s.T(), s.testServer.URL, sampleData.URL.String())
+				assert.Equal(s.T(), s.testServer.URL, sample.Name)
+				assert.Greater(s.T(), sample.SentBytes, uint64(0))
+				assert.Greater(s.T(), sample.ReceivedBytes, uint64(0))
+			}
 		}
+
+		assert.IsType(s.T(), &http.Response{}, s.client.LastResponse())
+		responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+		defer func() {
+			_ = s.client.LastResponse().Body.Close()
+		}()
+		responseBody := string(responseBodyBytes)
+
+		assert.Contains(s.T(), responseBody, "Request method: 'DELETE'")
+		assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
+		assert.Contains(s.T(), responseBody, "Request partial URL: '/'")
+		assert.Contains(s.T(), responseBody, "Request body: ''")
 	}
-
-	assert.IsType(suite.T(), &http.Response{}, suite.client.LastResponse())
-	responseBodyBytes, _ := ioutil.ReadAll(suite.client.LastResponse().Body)
-	defer func() {
-		_ = suite.client.LastResponse().Body.Close()
-	}()
-	responseBody := string(responseBodyBytes)
-
-	assert.Contains(suite.T(), responseBody, "Request method: 'DELETE'")
-	assert.Contains(suite.T(), responseBody, fmt.Sprintf("Request host: '%s'", suite.testServer.URL))
-	assert.Contains(suite.T(), responseBody, "Request partial URL: '/'")
-	assert.Contains(suite.T(), responseBody, "Request body: ''")
 }
 
-func (suite *ClientTestSuite) TestPostFormRequest() {
+func (s *ClientTestSuite) TestPostFormRequest() {
 	values := url.Values{}
 	values.Set("test", "example")
-	suite.client.Execute(rest.PostForm(suite.testServer.URL, values))
 
-	collectedSamples := suite.context.SampleCollector().Flush()
-
-	if assert.Equal(suite.T(), 1, len(collectedSamples)) {
-		assert.Implements(suite.T(), (*telemetry.Sample)(nil), collectedSamples[0])
-
-		if assert.IsType(suite.T(), rest.Sample{}, collectedSamples[0]) {
-			sample := collectedSamples[0].(rest.Sample)
-			assert.Equal(suite.T(), "POST", sample.Method)
-			assert.Equal(suite.T(), suite.testServer.URL, sample.URL.String())
-			assert.Equal(suite.T(), suite.testServer.URL, sample.Name())
-			assert.Greater(suite.T(), sample.SentBytes(), int64(0))
-			assert.Greater(suite.T(), sample.ReceivedBytes(), int64(0))
+	if assert.NotPanics(s.T(), func() {
+		s.client.Execute(rest.PostForm(s.testServer.URL, values))
+	}) {
+		if assert.Equal(s.T(), 1, len(s.sampleWriter.Samples)) {
+			if assert.IsType(s.T(), model.Sample{}, s.sampleWriter.Samples[0]) {
+				sample := s.sampleWriter.Samples[0]
+				sampleData := sample.Data.(rest.SampleData)
+				assert.Equal(s.T(), rest.POST, sampleData.Method)
+				assert.Equal(s.T(), s.testServer.URL, sampleData.URL.String())
+				assert.Equal(s.T(), s.testServer.URL, sample.Name)
+				assert.Greater(s.T(), sample.SentBytes, uint64(0))
+				assert.Greater(s.T(), sample.ReceivedBytes, uint64(0))
+			}
 		}
+
+		assert.IsType(s.T(), &http.Response{}, s.client.LastResponse())
+		responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+		defer func() {
+			_ = s.client.LastResponse().Body.Close()
+		}()
+		responseBody := string(responseBodyBytes)
+
+		assert.Contains(s.T(), responseBody, "Request method: 'POST'")
+		assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
+		assert.Contains(s.T(), responseBody, "Request partial URL: '/'")
+		assert.Contains(s.T(), responseBody, fmt.Sprintf("Request body: '%s'", values.Encode()))
 	}
-
-	assert.IsType(suite.T(), &http.Response{}, suite.client.LastResponse())
-	responseBodyBytes, _ := ioutil.ReadAll(suite.client.LastResponse().Body)
-	defer func() {
-		_ = suite.client.LastResponse().Body.Close()
-	}()
-	responseBody := string(responseBodyBytes)
-
-	assert.Contains(suite.T(), responseBody, "Request method: 'POST'")
-	assert.Contains(suite.T(), responseBody, fmt.Sprintf("Request host: '%s'", suite.testServer.URL))
-	assert.Contains(suite.T(), responseBody, "Request partial URL: '/'")
-	assert.Contains(suite.T(), responseBody, fmt.Sprintf("Request body: '%s'", values.Encode()))
 }
 
-func (suite *ClientTestSuite) TestRequestMalformedUrl() {
+func (s *ClientTestSuite) TestRequestMalformedUrl() {
 	malformedUrl := "http:// invalid url"
 
-	assert.Panics(suite.T(), func() {
-		suite.client.Execute(rest.Get(malformedUrl, nil))
+	assert.Panics(s.T(), func() {
+		s.client.Execute(rest.Get(malformedUrl, nil))
 	})
 }
 
-func (suite *ClientTestSuite) TestRequestInvalidPartialUrl() {
-	settings := rest.NewSettings()
-	settings.BaseUrl, _ = url.Parse(suite.testServer.URL)
-	suite.client.UpdateSettings(settings)
+func (s *ClientTestSuite) TestRequestInvalidPartialUrl() {
+	baseUrl, _ := url.Parse(s.testServer.URL)
+	s.T().Setenv("HARK_CLIENT_REST_BASEURL", baseUrl.String())
+	s.l.Config.AutomaticEnv()
 
 	invalidPartialUrl := "test"
 
-	assert.Panics(suite.T(), func() {
-		suite.client.Execute(rest.Get(invalidPartialUrl, nil))
+	assert.Panics(s.T(), func() {
+		s.client.Execute(rest.Get(invalidPartialUrl, nil))
 	})
 }
 
-func (suite *ClientTestSuite) TestRequestPartialMalformedUrl() {
-	settings := rest.NewSettings()
-	settings.BaseUrl, _ = url.Parse("https:// my malformed base URL")
-	suite.client.UpdateSettings(settings)
+func (s *ClientTestSuite) TestRequestWithRedirect_WithoutRedirectSetting() {
+	s.T().Setenv("HARK_CLIENT_REST_FOLLOWREDIRECTS", "false")
+	baseUrl, _ := url.Parse(s.testServer.URL)
+	s.T().Setenv("HARK_CLIENT_REST_BASEURL", baseUrl.String())
 
-	malformedPartialUrl := "/test"
+	if assert.NotPanics(s.T(), func() {
+		s.client.Execute(rest.Get("/redirect", nil))
+	}) {
+		if assert.Equal(s.T(), 1, len(s.sampleWriter.Samples)) {
+			sample := s.sampleWriter.Samples[0]
+			sampleData := sample.Data.(rest.SampleData)
+			assert.Equal(s.T(), s.testServer.URL+"/redirect", sampleData.URL.String())
+			assert.False(s.T(), sampleData.IsRedirect)
+			assert.Equal(s.T(), sampleData.URL.String(), sampleData.FinalURL.String())
 
-	assert.Panics(suite.T(), func() {
-		suite.client.Execute(rest.Get(malformedPartialUrl, nil))
-	})
-}
+			responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+			defer func() {
+				_ = s.client.LastResponse().Body.Close()
+			}()
+			responseBody := string(responseBodyBytes)
 
-func (suite *ClientTestSuite) TestRequestWithRedirect_WithoutRedirectSetting() {
-	settings := rest.NewSettings()
-	settings.FollowRedirects = false
-	settings.BaseUrl, _ = url.Parse(suite.testServer.URL)
-	suite.client.UpdateSettings(settings)
-
-	suite.client.Execute(rest.Get("/redirect", nil))
-
-	collectedSamples := suite.context.SampleCollector().Flush()
-
-	if assert.Equal(suite.T(), 1, len(collectedSamples)) {
-		sample := collectedSamples[0].(rest.Sample)
-		assert.Equal(suite.T(), suite.testServer.URL+"/redirect", sample.URL.String())
-
-		responseBodyBytes, _ := ioutil.ReadAll(suite.client.LastResponse().Body)
-		defer func() {
-			_ = suite.client.LastResponse().Body.Close()
-		}()
-		responseBody := string(responseBodyBytes)
-
-		assert.Empty(suite.T(), responseBody)
+			assert.Empty(s.T(), responseBody)
+		}
 	}
 }
 
-func (suite *ClientTestSuite) TestRequestWithRedirect_WithRedirectSetting() {
-	settings := rest.NewSettings()
-	settings.FollowRedirects = true
-	settings.BaseUrl, _ = url.Parse(suite.testServer.URL)
-	suite.client.UpdateSettings(settings)
+func (s *ClientTestSuite) TestRequestWithRedirect_WithRedirectSetting() {
+	s.T().Setenv("HARK_CLIENT_REST_FOLLOWREDIRECTS", "true")
+	baseUrl, _ := url.Parse(s.testServer.URL)
+	s.T().Setenv("HARK_CLIENT_REST_BASEURL", baseUrl.String())
 
-	suite.client.Execute(rest.Get("/redirect", nil))
+	if assert.NotPanics(s.T(), func() {
+		s.client.Execute(rest.Get("/redirect", nil))
+	}) {
+		if assert.Equal(s.T(), 1, len(s.sampleWriter.Samples)) {
+			sample := s.sampleWriter.Samples[0]
+			sampleData := sample.Data.(rest.SampleData)
+			assert.Equal(s.T(), s.testServer.URL+"/redirect", sampleData.URL.String())
+			assert.True(s.T(), sampleData.IsRedirect)
+			assert.Equal(s.T(), s.testServer.URL+"/redirected", sampleData.FinalURL.String())
 
-	collectedSamples := suite.context.SampleCollector().Flush()
+			responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+			defer func() {
+				_ = s.client.LastResponse().Body.Close()
+			}()
+			responseBody := string(responseBodyBytes)
 
-	if assert.Equal(suite.T(), 1, len(collectedSamples)) {
-		sample := collectedSamples[0].(rest.Sample)
-		assert.Equal(suite.T(), suite.testServer.URL+"/redirect", sample.URL.String())
-		assert.True(suite.T(), sample.IsRedirect)
-		assert.Equal(suite.T(), suite.testServer.URL+"/redirected", sample.FinalURL.String())
-
-		responseBodyBytes, _ := ioutil.ReadAll(suite.client.LastResponse().Body)
-		defer func() {
-			_ = suite.client.LastResponse().Body.Close()
-		}()
-		responseBody := string(responseBodyBytes)
-
-		assert.Contains(suite.T(), responseBody, "Request method: 'GET'")
-		assert.Contains(suite.T(), responseBody, fmt.Sprintf("Request host: '%s'", suite.testServer.URL))
-		assert.Contains(suite.T(), responseBody, "Request partial URL: '/redirected'")
-		assert.Contains(suite.T(), responseBody, "Request body: ''")
+			assert.Contains(s.T(), responseBody, "Request method: 'GET'")
+			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
+			assert.Contains(s.T(), responseBody, "Request partial URL: '/redirected'")
+			assert.Contains(s.T(), responseBody, "Request body: ''")
+		}
 	}
 }
 

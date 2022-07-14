@@ -1,18 +1,32 @@
 package rest
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 )
 
+type Method string
+
+const (
+	GET    = Method("GET")
+	POST   = Method("POST")
+	PUT    = Method("PUT")
+	PATCH  = Method("PATCH")
+	DELETE = Method("DELETE")
+	HEAD   = Method("HEAD")
+	OPTION = Method("OPTION")
+)
+
 type Request struct {
-	Method      string
+	Method
 	Url         string
 	Parameters  *url.Values
 	ContentType string
-	Body        io.Reader
+	Body        string
+	RawBody     []byte
 }
 
 func Get(url string, parameters *url.Values) Request {
@@ -21,17 +35,17 @@ func Get(url string, parameters *url.Values) Request {
 		Url:         url,
 		Parameters:  parameters,
 		ContentType: "",
-		Body:        nil,
+		Body:        "",
 	}
 }
 
-func Post(url string, contentType string, body io.Reader) Request {
+func Post(url string, contentType string, body []byte) Request {
 	return Request{
 		Method:      "POST",
 		Url:         url,
 		Parameters:  nil,
 		ContentType: contentType,
-		Body:        body,
+		RawBody:     body,
 	}
 }
 
@@ -41,37 +55,37 @@ func PostForm(url string, formValues url.Values) Request {
 		Url:         url,
 		Parameters:  nil,
 		ContentType: "application/x-www-form-urlencoded",
-		Body:        strings.NewReader(formValues.Encode()),
+		Body:        formValues.Encode(),
 	}
 }
 
-func Put(url string, contentType string, body io.Reader) Request {
+func Put(url string, contentType string, body []byte) Request {
 	return Request{
 		Method:      "PUT",
 		Url:         url,
 		Parameters:  nil,
 		ContentType: contentType,
-		Body:        body,
+		RawBody:     body,
 	}
 }
 
-func Patch(url string, contentType string, body io.Reader) Request {
+func Patch(url string, contentType string, body []byte) Request {
 	return Request{
 		Method:      "PATCH",
 		Url:         url,
 		Parameters:  nil,
 		ContentType: contentType,
-		Body:        body,
+		RawBody:     body,
 	}
 }
 
-func Delete(url string, contentType string, body io.Reader) Request {
+func Delete(url string, contentType string, body []byte) Request {
 	return Request{
 		Method:      "DELETE",
 		Url:         url,
 		Parameters:  nil,
 		ContentType: contentType,
-		Body:        body,
+		RawBody:     body,
 	}
 }
 
@@ -83,12 +97,20 @@ func (r *Request) Build(baseUrl *url.URL) (*http.Request, error) {
 	}
 
 	completeUrl = r.composeQueryString(completeUrl, r.Parameters)
-	request, err := http.NewRequest(r.Method, completeUrl.String(), r.Body)
+	request, err := http.NewRequest(string(r.Method), completeUrl.String(), r.Payload())
 	if r.ContentType != "" {
 		request.Header.Set("Content-Type", r.ContentType)
 	}
 
 	return request, nil
+}
+
+func (r *Request) Payload() io.Reader {
+	if r.Body != "" {
+		return bytes.NewBufferString(r.Body)
+	}
+
+	return bytes.NewBuffer(r.RawBody)
 }
 
 func (r *Request) composeUrl(baseUrl *url.URL, relativeUrl string) (*url.URL, error) {

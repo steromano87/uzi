@@ -1,13 +1,13 @@
-package runtime_test
+package loading_test
 
 import (
-	"github.com/steromano87/harkonnen/v1/pkg/runtime"
+	"github.com/steromano87/harkonnen/v1/pkg/loading"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestErrBadVariableCast_Error(t *testing.T) {
-	myError := &runtime.ErrBadVariableCast{
+	myError := &loading.BadVariableCastError{
 		Name:     "variableName",
 		CastType: "int",
 		RawValue: "true",

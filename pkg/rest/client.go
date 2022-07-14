@@ -2,8 +2,8 @@ package rest
 
 import (
 	"bytes"
+	"github.com/steromano87/harkonnen/v1/pkg/loading"
 	"github.com/steromano87/harkonnen/v1/pkg/model"
-	"github.com/steromano87/harkonnen/v1/pkg/runtime"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -14,24 +14,19 @@ import (
 )
 
 type Client struct {
-	context      *runtime.Context
+	l            loading.L
 	config       Config
 	innerClient  http.Client
 	lastResponse *http.Response
 }
 
-func NewClient(ctx *runtime.Context) *Client {
+func NewClient(l loading.L) *Client {
 	client := new(Client)
-	client.context = ctx
-	client.config = NewConfig(ctx)
+	client.l = l
+	client.config = NewConfig(l)
 	client.buildInnerClient()
 
 	return client
-}
-
-func (c *Client) UpdateSettings(settings Config) {
-	c.config = settings
-	c.buildInnerClient()
 }
 
 func (c *Client) LastResponse() *http.Response {
@@ -39,14 +34,16 @@ func (c *Client) LastResponse() *http.Response {
 }
 
 func (c *Client) Execute(request Request, options ...Option) {
+	c.setRedirectsFromConfig()
+
 	// Generate the raw request
 	var baseUrl *url.URL
 	var err error
 
-	if c.config.BaseUrl != "" {
-		baseUrl, err = url.Parse(c.config.BaseUrl)
+	if c.config.BaseUrl() != "" {
+		baseUrl, err = url.Parse(c.config.BaseUrl())
 		if err != nil {
-			c.context.OnUnrecoverableError(err)
+			c.l.OnUnrecoverableError(err)
 		}
 	} else {
 		baseUrl = nil
@@ -55,8 +52,15 @@ func (c *Client) Execute(request Request, options ...Option) {
 	rawRequest, err := request.Build(baseUrl)
 
 	if err != nil {
-		c.context.OnUnrecoverableError(err)
+		c.l.OnUnrecoverableError(err)
 		return
+	}
+
+	// If option is present, allow redirects
+	if HasOption(options, FollowRedirects) {
+		c.enableRedirects()
+	} else if HasOption(options, NoFollowRedirects) {
+		c.disableRedirects()
 	}
 
 	// Perform the request and track the elapsed time
@@ -65,12 +69,12 @@ func (c *Client) Execute(request Request, options ...Option) {
 	endTime := time.Now()
 
 	if err != nil {
-		c.context.OnUnrecoverableError(err)
+		c.l.OnUnrecoverableError(err)
 		return
 	}
 
-	if !HasOption(options, AllowUnsuccessfulStatuses) {
-		c.context.OnUnrecoverableError(ErrBadHTTPStatus{Status: response.Status})
+	if response.StatusCode >= 400 && !HasOption(options, AllowUnsuccessfulStatuses) {
+		c.l.OnUnrecoverableError(ErrBadHTTPStatus{Status: response.Status})
 		return
 	}
 
@@ -106,7 +110,7 @@ func (c *Client) Execute(request Request, options ...Option) {
 	}
 	sample.Timestamp = startTime
 
-	c.context.OnNewSample(sample)
+	c.l.OnNewSample(sample)
 	c.lastResponse = response
 }
 
@@ -117,7 +121,7 @@ func (c *Client) calculateSentReceivedBytes(response *http.Response) (uint64, ui
 	// Calculate request header size in bytes
 	requestHeader, err := httputil.DumpRequestOut(request, false)
 	if err != nil {
-		c.context.OnUnrecoverableError(err)
+		c.l.OnUnrecoverableError(err)
 	}
 
 	requestHeaderSize := uint64(len(requestHeader))
@@ -134,7 +138,7 @@ func (c *Client) calculateSentReceivedBytes(response *http.Response) (uint64, ui
 		temp, err := io.Copy(io.Discard, countWriter)
 
 		if err != nil {
-			c.context.OnUnrecoverableError(err)
+			c.l.OnUnrecoverableError(err)
 		}
 
 		request.Body = backupWriter
@@ -144,7 +148,7 @@ func (c *Client) calculateSentReceivedBytes(response *http.Response) (uint64, ui
 	// Calculate response header size in bytes
 	responseHeader, err := httputil.DumpResponse(response, false)
 	if err != nil {
-		c.context.OnUnrecoverableError(err)
+		c.l.OnUnrecoverableError(err)
 	}
 
 	responseHeaderSize := uint64(len(responseHeader))
@@ -160,7 +164,7 @@ func (c *Client) calculateSentReceivedBytes(response *http.Response) (uint64, ui
 		temp, err := io.Copy(io.Discard, countWriter)
 
 		if err != nil {
-			c.context.OnUnrecoverableError(err)
+			c.l.OnUnrecoverableError(err)
 		}
 
 		response.Body = backupWriter
@@ -173,29 +177,42 @@ func (c *Client) calculateSentReceivedBytes(response *http.Response) (uint64, ui
 func (c *Client) buildInnerClient() {
 	client := http.Client{}
 
-	if c.config.KeepCookies {
+	if c.config.KeepCookies() {
 		client.Jar, _ = cookiejar.New(&cookiejar.Options{})
 	}
 
-	if !c.config.FollowRedirects {
-		client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		}
-	}
-
-	client.Timeout = c.config.Timeout
+	client.Timeout = c.config.Timeout()
 
 	transport := http.Transport{
-		TLSHandshakeTimeout:   c.config.TLSHandshakeTimeout,
-		DisableKeepAlives:     !c.config.EnableKeepAlive,
-		DisableCompression:    !c.config.EnableCompression,
-		MaxIdleConns:          c.config.MaxIdleConnections,
-		MaxIdleConnsPerHost:   c.config.MaxIdleConnectionsPerHost,
-		MaxConnsPerHost:       c.config.MaxConnectionsPerHost,
-		IdleConnTimeout:       c.config.IdleConnectionTimeout,
-		ResponseHeaderTimeout: c.config.ResponseHeaderTimeout,
+		TLSHandshakeTimeout:   c.config.TLSHandshakeTimeout(),
+		DisableKeepAlives:     !c.config.EnableKeepAlive(),
+		DisableCompression:    !c.config.EnableCompression(),
+		MaxIdleConns:          c.config.MaxIdleConnections(),
+		MaxIdleConnsPerHost:   c.config.MaxIdleConnectionsPerHost(),
+		MaxConnsPerHost:       c.config.MaxConnectionsPerHost(),
+		IdleConnTimeout:       c.config.IdleConnectionTimeout(),
+		ResponseHeaderTimeout: c.config.ResponseHeaderTimeout(),
 	}
 
 	client.Transport = &transport
 	c.innerClient = client
+	c.setRedirectsFromConfig()
+}
+
+func (c *Client) enableRedirects() {
+	c.innerClient.CheckRedirect = nil
+}
+
+func (c *Client) disableRedirects() {
+	c.innerClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+}
+
+func (c *Client) setRedirectsFromConfig() {
+	if c.config.FollowRedirects() {
+		c.enableRedirects()
+	} else {
+		c.disableRedirects()
+	}
 }

@@ -9,7 +9,7 @@ const SampleType = "REST"
 type SampleData struct {
 	URL        *url.URL
 	Parameters url.Values
-	Method     string
+	Method
 	IsRedirect bool
 	FinalURL   *url.URL
 }

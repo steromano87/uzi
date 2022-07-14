@@ -13,21 +13,14 @@ type Config struct {
 }
 
 func NewConfig(projectDir string) (*Config, error) {
-	config := new(Config)
+	config := NewEmptyConfig()
+
 	absoluteProjectDir, err := filepath.Abs(projectDir)
 	if err != nil {
 		return nil, err
 	}
 
 	config.ProjectDir = absoluteProjectDir
-
-	config.Viper = viper.New()
-	config.SetConfigName("harkonnen")
-	config.SetConfigType("yaml")
-	config.SetEnvPrefix("HARK")
-	config.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	config.AutomaticEnv()
-
 	config.AddConfigPath(config.ProjectDir)
 
 	err = config.ReadInConfig()
@@ -36,6 +29,13 @@ func NewConfig(projectDir string) (*Config, error) {
 	}
 
 	return config, nil
+}
+
+func NewEmptyConfig() *Config {
+	config := new(Config)
+	config.viperSetup()
+
+	return config
 }
 
 func (c *Config) GetOrDefault(key string, defaultValue interface{}) interface{} {
@@ -124,4 +124,13 @@ func (c *Config) GetDurationOrDefault(key string, defaultValue time.Duration) ti
 	}
 
 	return defaultValue
+}
+
+func (c *Config) viperSetup() {
+	c.Viper = viper.New()
+	c.SetConfigName("harkonnen")
+	c.SetConfigType("yaml")
+	c.SetEnvPrefix("HARK")
+	c.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	c.AutomaticEnv()
 }
