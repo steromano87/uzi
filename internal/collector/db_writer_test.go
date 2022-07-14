@@ -85,7 +85,12 @@ func (s *ManagerTestSuite) TestConnectOnMySQLDatabase() {
 		Started:          true,
 	})
 
-	defer container.Terminate(ctx)
+	defer func(container testcontainers.Container, ctx context.Context) {
+		err := container.Terminate(ctx)
+		if err != nil {
+			println("Error terminating container: " + err.Error())
+		}
+	}(container, ctx)
 
 	if assert.NoError(s.T(), err) {
 		port, _ := container.MappedPort(ctx, "3306")
