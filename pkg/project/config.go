@@ -1,6 +1,7 @@
 package project
 
 import (
+	"errors"
 	"github.com/spf13/viper"
 	"path/filepath"
 	"strings"
@@ -124,6 +125,33 @@ func (c *Config) GetDurationOrDefault(key string, defaultValue time.Duration) ti
 	}
 
 	return defaultValue
+}
+
+func (c *Config) GetSlice(key string) []any {
+	result, ok := c.Get(key).([]any)
+	if !ok {
+		return nil
+	}
+	return result
+}
+
+func (c *Config) GetSliceOrDefault(key string, defaultValue []any) []any {
+	if c.IsSet(key) {
+		return c.GetSlice(key)
+	}
+	return defaultValue
+}
+
+func (c *Config) SubConfig(key string) (*Config, error) {
+	if c.IsSet(key) {
+		viperConfig := c.Sub(key)
+		return &Config{
+			viperConfig,
+			c.ProjectDir,
+		}, nil
+	}
+
+	return nil, errors.New(key + " key not found, cannot extract subconfiguration")
 }
 
 func (c *Config) viperSetup() {
