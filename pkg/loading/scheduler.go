@@ -8,7 +8,7 @@ import (
 
 type Scheduler struct {
 	Profile   Profiler
-	Injectors map[string]InjectorRemoteReference
+	Injectors []InjectorRemoteReference
 }
 
 func (s Scheduler) Schedule(elapsed time.Duration) error {
@@ -17,31 +17,24 @@ func (s Scheduler) Schedule(elapsed time.Duration) error {
 	return s.sendShooterQuotasUpdate(shooterQuotas)
 }
 
-func (s Scheduler) assignShootersQuota(totalShooters int) map[string]int {
-	quotas := map[string]int{}
+func (s Scheduler) assignShootersQuota(totalShooters int) []int {
+	quotas := make([]int, len(s.Injectors))
 	remainingShooters := totalShooters
 
-	// Manually perform a deep copy of the original list
-	remainingInjectors := map[string]InjectorRemoteReference{}
-	for key, val := range s.Injectors {
-		remainingInjectors[key] = val
-	}
-
 	for injectorID, remoteReference := range s.Injectors {
-		remainingInjectorsWeight := totalInjectorsWeight(remainingInjectors)
+		remainingInjectorsWeight := totalInjectorsWeight(s.Injectors[injectorID:])
 		currentQuota := int(math.Floor(float64(remainingShooters) * float64(remoteReference.Weight) / float64(remainingInjectorsWeight)))
 		quotas[injectorID] = currentQuota
 		remainingShooters -= currentQuota
-		delete(remainingInjectors, injectorID)
 	}
 
 	return quotas
 }
 
-func (s Scheduler) sendShooterQuotasUpdate(shooterQuotas map[string]int) error {
+func (s Scheduler) sendShooterQuotasUpdate(shooterQuotas []int) error {
 	for injectorID, quota := range shooterQuotas {
 		message := network.NewMessage(network.ShooterQuotaUpdate, map[string]any{
-			"injectorID": injectorID,
+			"injectorID": s.Injectors[injectorID].Name,
 			"newQuota":   quota,
 		})
 		messageType, packedMessage, err := network.PackMessage(message)
@@ -58,7 +51,7 @@ func (s Scheduler) sendShooterQuotasUpdate(shooterQuotas map[string]int) error {
 	return nil
 }
 
-func totalInjectorsWeight(shooters map[string]InjectorRemoteReference) int {
+func totalInjectorsWeight(shooters []InjectorRemoteReference) int {
 	weight := 0
 	for _, reference := range shooters {
 		weight += reference.Weight

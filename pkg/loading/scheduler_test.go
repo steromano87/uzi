@@ -51,8 +51,9 @@ func (s *SchedulerTestSuite) SetupTest() {
 }
 
 func (s *SchedulerTestSuite) TestSingleInjectorQuota() {
-	injectorReferences := map[string]loading.InjectorRemoteReference{
-		"first": {
+	injectorReferences := []loading.InjectorRemoteReference{
+		{
+			Name:      "first",
 			Weight:    1,
 			Messenger: &s.messenger,
 		},
@@ -83,12 +84,14 @@ func (s *SchedulerTestSuite) TestSingleInjectorQuota() {
 }
 
 func (s *SchedulerTestSuite) TestTwoInjectorsWithSameWeight() {
-	injectorReferences := map[string]loading.InjectorRemoteReference{
-		"first": {
+	injectorReferences := []loading.InjectorRemoteReference{
+		{
+			Name:      "first",
 			Weight:    1,
 			Messenger: &s.messenger,
 		},
-		"second": {
+		{
+			Name:      "second",
 			Weight:    1,
 			Messenger: &s.messenger,
 		},
@@ -129,12 +132,14 @@ func (s *SchedulerTestSuite) TestTwoInjectorsWithSameWeight() {
 }
 
 func (s *SchedulerTestSuite) TestTwoInjectorsWithDifferentWeight() {
-	injectorReferences := map[string]loading.InjectorRemoteReference{
-		"first": {
+	injectorReferences := []loading.InjectorRemoteReference{
+		{
+			Name:      "first",
 			Weight:    8,
 			Messenger: &s.messenger,
 		},
-		"second": {
+		{
+			Name:      "second",
 			Weight:    2,
 			Messenger: &s.messenger,
 		},
@@ -175,16 +180,19 @@ func (s *SchedulerTestSuite) TestTwoInjectorsWithDifferentWeight() {
 }
 
 func (s *SchedulerTestSuite) TestThreeInjectorsWithDifferentWeight() {
-	injectorReferences := map[string]loading.InjectorRemoteReference{
-		"first": {
+	injectorReferences := []loading.InjectorRemoteReference{
+		{
+			Name:      "first",
 			Weight:    8,
 			Messenger: &s.messenger,
 		},
-		"second": {
+		{
+			Name:      "second",
 			Weight:    2,
 			Messenger: &s.messenger,
 		},
-		"third": {
+		{
+			Name:      "third",
 			Weight:    2,
 			Messenger: &s.messenger,
 		},
