@@ -9,7 +9,7 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/rest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -50,7 +50,7 @@ func (s *ClientTestSuite) SetupTest() {
 
 	handler := http.NewServeMux()
 	handler.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		bodyBytes, _ := ioutil.ReadAll(r.Body)
+		bodyBytes, _ := io.ReadAll(r.Body)
 		body := string(bodyBytes)
 
 		_, _ = fmt.Fprintf(w, "Request method: '%s'\n", r.Method)
@@ -65,7 +65,7 @@ func (s *ClientTestSuite) SetupTest() {
 	})
 
 	handler.HandleFunc("/redirected", func(w http.ResponseWriter, r *http.Request) {
-		bodyBytes, _ := ioutil.ReadAll(r.Body)
+		bodyBytes, _ := io.ReadAll(r.Body)
 		body := string(bodyBytes)
 
 		_, _ = fmt.Fprintf(w, "Request method: '%s'\n", r.Method)
@@ -104,7 +104,7 @@ func (s *ClientTestSuite) TestGetRequest() {
 		}
 
 		assert.IsType(s.T(), &http.Response{}, s.client.LastResponse())
-		responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+		responseBodyBytes, _ := io.ReadAll(s.client.LastResponse().Body)
 		defer func() {
 			_ = s.client.LastResponse().Body.Close()
 		}()
@@ -139,7 +139,7 @@ func (s *ClientTestSuite) TestGetRequestWithQueryString() {
 		}
 
 		assert.IsType(s.T(), &http.Response{}, s.client.LastResponse())
-		responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+		responseBodyBytes, _ := io.ReadAll(s.client.LastResponse().Body)
 		defer func() {
 			_ = s.client.LastResponse().Body.Close()
 		}()
@@ -169,7 +169,7 @@ func (s *ClientTestSuite) TestPostNoBody() {
 		}
 
 		assert.IsType(s.T(), &http.Response{}, s.client.LastResponse())
-		responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+		responseBodyBytes, _ := io.ReadAll(s.client.LastResponse().Body)
 		defer func() {
 			_ = s.client.LastResponse().Body.Close()
 		}()
@@ -200,7 +200,7 @@ func (s *ClientTestSuite) TestPutNoBody() {
 		}
 
 		assert.IsType(s.T(), &http.Response{}, s.client.LastResponse())
-		responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+		responseBodyBytes, _ := io.ReadAll(s.client.LastResponse().Body)
 		defer func() {
 			_ = s.client.LastResponse().Body.Close()
 		}()
@@ -230,7 +230,7 @@ func (s *ClientTestSuite) TestPatchNoBody() {
 		}
 
 		assert.IsType(s.T(), &http.Response{}, s.client.LastResponse())
-		responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+		responseBodyBytes, _ := io.ReadAll(s.client.LastResponse().Body)
 		defer func() {
 			_ = s.client.LastResponse().Body.Close()
 		}()
@@ -260,7 +260,7 @@ func (s *ClientTestSuite) TestDeleteNoBody() {
 		}
 
 		assert.IsType(s.T(), &http.Response{}, s.client.LastResponse())
-		responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+		responseBodyBytes, _ := io.ReadAll(s.client.LastResponse().Body)
 		defer func() {
 			_ = s.client.LastResponse().Body.Close()
 		}()
@@ -290,7 +290,7 @@ func (s *ClientTestSuite) TestHeadNoBody() {
 		}
 
 		assert.IsType(s.T(), &http.Response{}, s.client.LastResponse())
-		responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+		responseBodyBytes, _ := io.ReadAll(s.client.LastResponse().Body)
 		defer func() {
 			_ = s.client.LastResponse().Body.Close()
 		}()
@@ -317,7 +317,7 @@ func (s *ClientTestSuite) TestOptionsNoBody() {
 		}
 
 		assert.IsType(s.T(), &http.Response{}, s.client.LastResponse())
-		responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+		responseBodyBytes, _ := io.ReadAll(s.client.LastResponse().Body)
 		defer func() {
 			_ = s.client.LastResponse().Body.Close()
 		}()
@@ -350,7 +350,7 @@ func (s *ClientTestSuite) TestPostFormRequest() {
 		}
 
 		assert.IsType(s.T(), &http.Response{}, s.client.LastResponse())
-		responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+		responseBodyBytes, _ := io.ReadAll(s.client.LastResponse().Body)
 		defer func() {
 			_ = s.client.LastResponse().Body.Close()
 		}()
@@ -398,7 +398,7 @@ func (s *ClientTestSuite) TestRequestWithRedirect_WithoutRedirectSetting() {
 			assert.False(s.T(), sampleData.IsRedirect)
 			assert.Equal(s.T(), sampleData.URL.String(), sampleData.FinalURL.String())
 
-			responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+			responseBodyBytes, _ := io.ReadAll(s.client.LastResponse().Body)
 			defer func() {
 				_ = s.client.LastResponse().Body.Close()
 			}()
@@ -424,7 +424,7 @@ func (s *ClientTestSuite) TestRequestWithRedirect_WithRedirectSetting() {
 			assert.True(s.T(), sampleData.IsRedirect)
 			assert.Equal(s.T(), s.testServer.URL+"/redirected", sampleData.FinalURL.String())
 
-			responseBodyBytes, _ := ioutil.ReadAll(s.client.LastResponse().Body)
+			responseBodyBytes, _ := io.ReadAll(s.client.LastResponse().Body)
 			defer func() {
 				_ = s.client.LastResponse().Body.Close()
 			}()

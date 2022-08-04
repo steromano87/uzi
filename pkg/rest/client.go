@@ -5,7 +5,6 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/loading"
 	"github.com/steromano87/harkonnen/v1/pkg/model"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httputil"
@@ -131,9 +130,9 @@ func (c *Client) calculateSentReceivedBytes(response *http.Response) (uint64, ui
 	// See https://stackoverflow.com/a/23077519
 	requestBodySize := uint64(0)
 	if request.Body != nil {
-		bodyBuffer, err := ioutil.ReadAll(request.Body)
-		countWriter := ioutil.NopCloser(bytes.NewBuffer(bodyBuffer))
-		backupWriter := ioutil.NopCloser(bytes.NewBuffer(bodyBuffer))
+		bodyBuffer, err := io.ReadAll(request.Body)
+		countWriter := io.NopCloser(bytes.NewBuffer(bodyBuffer))
+		backupWriter := io.NopCloser(bytes.NewBuffer(bodyBuffer))
 
 		temp, err := io.Copy(io.Discard, countWriter)
 
@@ -158,9 +157,9 @@ func (c *Client) calculateSentReceivedBytes(response *http.Response) (uint64, ui
 	// See https://stackoverflow.com/a/23077519
 	responseBodySize := uint64(0)
 	if response.Body != nil {
-		bodyBuffer, err := ioutil.ReadAll(response.Body)
-		countWriter := ioutil.NopCloser(bytes.NewBuffer(bodyBuffer))
-		backupWriter := ioutil.NopCloser(bytes.NewBuffer(bodyBuffer))
+		bodyBuffer, err := io.ReadAll(response.Body)
+		countWriter := io.NopCloser(bytes.NewBuffer(bodyBuffer))
+		backupWriter := io.NopCloser(bytes.NewBuffer(bodyBuffer))
 		temp, err := io.Copy(io.Discard, countWriter)
 
 		if err != nil {
