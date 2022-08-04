@@ -1,6 +1,7 @@
 package loading
 
 import (
+	"context"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/io"
 	"github.com/steromano87/harkonnen/v1/pkg/model"
@@ -11,6 +12,7 @@ import (
 // L is, like T for the testing package, the object holding the state of the load test.
 // Each instance of L is assigned to a specific script runner
 type L struct {
+	context.Context
 	Logger       *zerolog.Logger
 	Config       *project.Config
 	Variables    Variables
@@ -31,12 +33,16 @@ func (l L) OnNewSample(sample model.Sample) {
 }
 
 func (l L) OnError(err error) {
-	l.contextLogger().Error().Stack().Err(err)
+	l.contextLogger().Error().Stack().Err(err).Msg("Execution received an error")
 }
 
 func (l L) FailIteration(err error) {
 	l.OnError(err)
 	runtime.Goexit()
+}
+
+func (l L) OnForcedShutdown() {
+	l.contextLogger().Panic().Msg("Forced shutdown requested")
 }
 
 func (l L) OnUnrecoverableError(err error) {
@@ -49,6 +55,10 @@ func (l L) OnIterationStart(counter int) {
 
 func (l L) OnIterationEnd(counter int) {
 	l.contextLogger().Debug().Int("iteration", counter).Msg("Iteration ended")
+}
+
+func (l L) NextLoop() <-chan struct{} {
+	return make(chan struct{})
 }
 
 func (l L) contextLogger() *zerolog.Logger {
