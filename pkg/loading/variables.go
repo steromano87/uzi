@@ -8,28 +8,55 @@ import (
 )
 
 type Variables struct {
-	Values  map[string]any
-	Globals map[string]any
+	VariableSet
+	globals VariableSet
 }
 
 func NewVariables() Variables {
 	return Variables{
-		Values:  map[string]any{},
-		Globals: map[string]any{},
+		VariableSet: VariableSet{},
+		globals:     VariableSet{},
 	}
 }
 
-func (v Variables) Set(name string, value any) {
-	v.Values[name] = value
+func (v Variables) Globals() VariableSet {
+	return v.globals
 }
 
-func (v Variables) GetString(name string) (string, error) {
-	value, err := v.Get(name)
+func (v Variables) Render(t string) (string, error) {
+	parsedTemplate, err := template.New("variables").Funcs(sprig.FuncMap()).Parse(t)
+	if err != nil {
+		return "", err
+	}
+
+	var output bytes.Buffer
+	renderingVars := struct {
+		Values  map[string]any
+		Globals map[string]any
+	}{
+		Values:  v.VariableSet,
+		Globals: v.globals,
+	}
+	if err = parsedTemplate.Execute(&output, renderingVars); err != nil {
+		return "", err
+	}
+
+	return output.String(), nil
+}
+
+type VariableSet map[string]any
+
+func (vs VariableSet) Set(name string, value any) {
+	vs[name] = value
+}
+
+func (vs VariableSet) GetString(name string) (string, error) {
+	value, err := vs.Get(name)
 	return fmt.Sprintf("%v", value), err
 }
 
-func (v Variables) GetInt(name string) (int, error) {
-	value, err := v.Get(name)
+func (vs VariableSet) GetInt(name string) (int, error) {
+	value, err := vs.Get(name)
 	if err != nil {
 		return 0, err
 	}
@@ -47,8 +74,8 @@ func (v Variables) GetInt(name string) (int, error) {
 	return convertedValue, nil
 }
 
-func (v Variables) GetBool(name string) (bool, error) {
-	value, err := v.Get(name)
+func (vs VariableSet) GetBool(name string) (bool, error) {
+	value, err := vs.Get(name)
 	if err != nil {
 		return false, err
 	}
@@ -66,8 +93,8 @@ func (v Variables) GetBool(name string) (bool, error) {
 	return convertedValue, nil
 }
 
-func (v Variables) Get(name string) (any, error) {
-	value, isPresent := v.Values[name]
+func (vs VariableSet) Get(name string) (any, error) {
+	value, isPresent := vs[name]
 
 	if !isPresent {
 		err := VariableNotFoundError{Name: name}
@@ -77,20 +104,6 @@ func (v Variables) Get(name string) (any, error) {
 	return value, nil
 }
 
-func (v Variables) Delete(name string) {
-	delete(v.Values, name)
-}
-
-func (v Variables) Render(t string) (string, error) {
-	parsedTemplate, err := template.New("variables").Funcs(template.FuncMap(sprig.FuncMap())).Parse(t)
-	if err != nil {
-		return "", err
-	}
-
-	var output bytes.Buffer
-	if err = parsedTemplate.Execute(&output, v); err != nil {
-		return "", err
-	}
-
-	return output.String(), nil
+func (vs VariableSet) Delete(name string) {
+	delete(vs, name)
 }
