@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/loading"
 )
 
 type Log struct {
@@ -13,24 +12,24 @@ type Log struct {
 	message string
 }
 
-func (log *Log) Run(l loading.L) error {
+func (log *Log) Run(ctx Context) error {
 	var partialLogger *zerolog.Event
 
 	switch log.level {
 	case "error":
-		partialLogger = l.Logger.Error()
+		partialLogger = ctx.Logger.Error()
 
 	case "warning":
-		partialLogger = l.Logger.Warn()
+		partialLogger = ctx.Logger.Warn()
 
 	case "info":
-		partialLogger = l.Logger.Info()
+		partialLogger = ctx.Logger.Info()
 
 	case "debug":
-		partialLogger = l.Logger.Debug()
+		partialLogger = ctx.Logger.Debug()
 
 	case "trace":
-		partialLogger = l.Logger.Trace()
+		partialLogger = ctx.Logger.Trace()
 
 	default:
 		return errors.New(fmt.Sprintf("%s is not a valid log level", log.level))

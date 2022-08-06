@@ -2,16 +2,15 @@ package pipeline
 
 import (
 	"github.com/hashicorp/hcl/v2"
-	"github.com/steromano87/harkonnen/v1/pkg/loading"
 )
 
 type Setup struct {
 	steps []Step
 }
 
-func (s *Setup) Run(l loading.L) error {
+func (s *Setup) Run(ctx Context) error {
 	for _, step := range s.steps {
-		err := step.Run(l)
+		err := step.Run(ctx)
 		if err != nil {
 			return err
 		}

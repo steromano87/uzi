@@ -1,9 +1,5 @@
 package pipeline
 
-import (
-	"github.com/steromano87/harkonnen/v1/pkg/loading"
-)
-
 type Pipeline struct {
 	MaxIterations int64
 
@@ -16,19 +12,19 @@ type Pipeline struct {
 	scheduledForGracefulShutdown bool
 }
 
-func (p Pipeline) Run(l loading.L) error {
+func (p Pipeline) Run(ctx Context) error {
 	var err error
-	err = p.setup.Run(l)
+	err = p.setup.Run(ctx)
 	if err != nil {
 		return err
 	}
 
-	err = p.main.Run(l)
+	err = p.main.Run(ctx)
 	if err != nil {
 		return err
 	}
 
-	err = p.teardown.Run(l)
+	err = p.teardown.Run(ctx)
 	if err != nil {
 		return err
 	}

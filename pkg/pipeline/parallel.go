@@ -2,7 +2,6 @@ package pipeline
 
 import (
 	"github.com/hashicorp/hcl/v2"
-	"github.com/steromano87/harkonnen/v1/pkg/loading"
 	"strconv"
 )
 
@@ -11,10 +10,10 @@ type Parallel struct {
 	steps          []Step
 }
 
-func (p *Parallel) Run(l loading.L) error {
+func (p *Parallel) Run(ctx Context) error {
 	// TODO: make it really parallel...
 	for _, step := range p.steps {
-		err := step.Run(l)
+		err := step.Run(ctx)
 		if err != nil {
 			return err
 		}
