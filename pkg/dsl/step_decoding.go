@@ -2,21 +2,6 @@ package dsl
 
 import "github.com/hashicorp/hcl/v2"
 
-var allowedSteps = []hcl.BlockHeaderSchema{
-	{
-		Type:       transactionType,
-		LabelNames: transactionLabels,
-	},
-	{
-		Type:       parallelType,
-		LabelNames: parallelLabels,
-	},
-	{
-		Type:       logType,
-		LabelNames: logLabels,
-	},
-}
-
 func DecodeStepBlocks(ctx *hcl.EvalContext, blocks []*hcl.Block) ([]Step, error) {
 	steps := make([]Step, 0)
 

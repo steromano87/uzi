@@ -13,7 +13,7 @@ var (
 
 	transactionSchema = &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{},
-		Blocks:     allowedSteps,
+		Blocks:     baseSteps,
 	}
 )
 

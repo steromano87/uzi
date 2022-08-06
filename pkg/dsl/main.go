@@ -12,7 +12,7 @@ var (
 
 	mainSchema = &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{},
-		Blocks:     allowedSteps,
+		Blocks:     baseSteps,
 	}
 )
 
