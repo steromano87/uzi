@@ -26,15 +26,26 @@ var (
 )
 
 type Pipeline struct {
-	steps []Step
+	setup    Setup
+	main     Main
+	teardown Teardown
 }
 
 func (p Pipeline) Run(l loading.L) error {
-	for _, step := range p.steps {
-		err := step.Run(l)
-		if err != nil {
-			return err
-		}
+	var err error
+	err = p.setup.Run(l)
+	if err != nil {
+		return err
+	}
+
+	err = p.main.Run(l)
+	if err != nil {
+		return err
+	}
+
+	err = p.teardown.Run(l)
+	if err != nil {
+		return err
 	}
 
 	return nil

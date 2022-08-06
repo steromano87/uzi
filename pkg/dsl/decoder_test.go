@@ -78,9 +78,39 @@ main {}
 	}
 }
 
-func (s *DecoderTestSuite) TestInvalidDslFileParsing() {
+func (s *DecoderTestSuite) TestMalformedDslFileParsing() {
 	tempScriptContent := `
 main {
+`
+	tempScript := filet.TmpFile(s.T(), s.tempProjectDir, tempScriptContent)
+	defer filet.CleanUp(s.T())
+	s.config.Set(dsl.ConfigKey+"script", path.Join(s.tempProjectDir, tempScript.Name()))
+
+	decoder := dsl.NewDecoder(s.l)
+	_, err := decoder.Decode()
+
+	assert.Error(s.T(), err)
+}
+
+func (s *DecoderTestSuite) TestInvalidDslFileWithTwoSetupsParsing() {
+	tempScriptContent := `
+setup {}
+
+setup {}
+`
+	tempScript := filet.TmpFile(s.T(), s.tempProjectDir, tempScriptContent)
+	defer filet.CleanUp(s.T())
+	s.config.Set(dsl.ConfigKey+"script", path.Join(s.tempProjectDir, tempScript.Name()))
+
+	decoder := dsl.NewDecoder(s.l)
+	_, err := decoder.Decode()
+
+	assert.Error(s.T(), err)
+}
+
+func (s *DecoderTestSuite) TestInvalidDslFileWithZeroMainsParsing() {
+	tempScriptContent := `
+
 `
 	tempScript := filet.TmpFile(s.T(), s.tempProjectDir, tempScriptContent)
 	defer filet.CleanUp(s.T())
