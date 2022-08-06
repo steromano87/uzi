@@ -5,6 +5,6 @@ import (
 )
 
 type Step interface {
-	Run(ctx Context) error
+	Run(ctx *Context) error
 	DecodeFromHCLBlock(ctx *hcl.EvalContext, block *hcl.Block) error
 }

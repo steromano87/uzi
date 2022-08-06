@@ -4,29 +4,10 @@ import (
 	"errors"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
-	"github.com/steromano87/harkonnen/v1/pkg/loading"
-	"os"
 )
 
-type Decoder struct {
-	l      loading.L
-	config DecoderConfig
-}
-
-func NewDecoder(l loading.L) *Decoder {
-	decoder := new(Decoder)
-	decoder.l = l
-	decoder.config = NewConfig(l)
-	return decoder
-}
-
-func (d Decoder) Decode() (*Pipeline, error) {
-	dslFileContent, err := os.ReadFile(d.config.PipelineFile())
-	if err != nil {
-		return nil, err
-	}
-
-	parsedFile, diagnostics := hclsyntax.ParseConfig(dslFileContent, d.config.PipelineFile(), hcl.Pos{
+func Decode(dslFileContent []byte, dslFilePath string) (*Pipeline, error) {
+	parsedFile, diagnostics := hclsyntax.ParseConfig(dslFileContent, dslFilePath, hcl.Pos{
 		Line:   1,
 		Column: 1,
 		Byte:   0,
@@ -36,7 +17,7 @@ func (d Decoder) Decode() (*Pipeline, error) {
 		return nil, diagnostics.Errs()[0]
 	}
 
-	pipeline, err := d.decodeBody(&hcl.EvalContext{}, parsedFile.Body)
+	pipeline, err := decodeBody(&hcl.EvalContext{}, parsedFile.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +25,7 @@ func (d Decoder) Decode() (*Pipeline, error) {
 	return pipeline, nil
 }
 
-func (d Decoder) decodeBody(ctx *hcl.EvalContext, body hcl.Body) (*Pipeline, error) {
+func decodeBody(ctx *hcl.EvalContext, body hcl.Body) (*Pipeline, error) {
 	pipeline := &Pipeline{
 		setup:    Setup{},
 		main:     Main{},
@@ -90,15 +71,15 @@ func (d Decoder) decodeBody(ctx *hcl.EvalContext, body hcl.Body) (*Pipeline, err
 	}
 
 	if setupCount > 1 {
-		return nil, errors.New("only zero or one 'setup' block is allowed in a pipeline body")
+		return nil, errors.New("only zero or one 'setup' block is allowed in a Pipeline body")
 	}
 
 	if mainCount != 1 {
-		return nil, errors.New("exactly one 'main' block is required in a pipeline body")
+		return nil, errors.New("exactly one 'main' block is required in a Pipeline body")
 	}
 
 	if teardownCount > 1 {
-		return nil, errors.New("only zero or one 'teardown' block is allowed in a pipeline body")
+		return nil, errors.New("only zero or one 'teardown' block is allowed in a Pipeline body")
 	}
 
 	return pipeline, nil

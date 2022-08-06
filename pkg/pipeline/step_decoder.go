@@ -15,6 +15,14 @@ func DecodeStepBlocks(ctx *hcl.EvalContext, blocks []*hcl.Block) ([]Step, error)
 				return nil, err
 			}
 			steps = append(steps, &transaction)
+
+		case logType:
+			log := Log{}
+			err := log.DecodeFromHCLBlock(ctx, block)
+			if err != nil {
+				return nil, err
+			}
+			steps = append(steps, &log)
 		}
 	}
 

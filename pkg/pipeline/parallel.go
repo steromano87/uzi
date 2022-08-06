@@ -10,7 +10,7 @@ type Parallel struct {
 	steps          []Step
 }
 
-func (p *Parallel) Run(ctx Context) error {
+func (p *Parallel) Run(ctx *Context) error {
 	// TODO: make it really parallel...
 	for _, step := range p.steps {
 		err := step.Run(ctx)

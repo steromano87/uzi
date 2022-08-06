@@ -1,15 +1,64 @@
 package pipeline
 
 import (
+	"fmt"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/rs/zerolog"
+	"runtime"
 )
 
-func (m *Main) Run(ctx Context) error {
-	for _, step := range m.steps {
-		err := step.Run(ctx)
-		if err != nil {
-			return err
+type Main struct {
+	steps                        []Step
+	maxIterations                int64
+	scheduledForGracefulShutdown bool
+}
+
+func (m *Main) Run(ctx *Context) error {
+	for !m.scheduledForGracefulShutdown && (ctx.TotalIterations() < m.maxIterations || m.maxIterations == 0) {
+		var err error
+
+		for _, step := range m.steps {
+			select {
+			case <-ctx.PlannedShutdownChan:
+				m.contextLogger(ctx).Info().Msg("Planned shutdown requested")
+				m.scheduledForGracefulShutdown = true
+
+			case <-ctx.GracefulShutdownChan:
+				m.contextLogger(ctx).Info().Msg("Graceful shutdown requested")
+				ctx.UpdateStatus(GracefullyShuttingDown)
+				m.scheduledForGracefulShutdown = true
+
+			case <-ctx.TerminationChan:
+				m.contextLogger(ctx).Warn().Msg("Forced termination requested, exiting immediately...")
+				ctx.UpdateStatus(ForcefullyStopping)
+				runtime.Goexit()
+
+			case <-ctx.Done():
+				m.contextLogger(ctx).Warn().Msg("Context canceled, exiting immediately...")
+				ctx.UpdateStatus(ForcefullyStopping)
+				runtime.Goexit()
+
+			default:
+				err = step.Run(ctx)
+				if err != nil {
+					break
+				}
+			}
 		}
+
+		ctx.AddIteration()
+		if err == nil {
+			ctx.AddSuccessfulIteration()
+		}
+	}
+
+	if m.scheduledForGracefulShutdown {
+		m.contextLogger(ctx).Info().Msg("Shutdown requested, exiting main loop")
+	}
+
+	if ctx.TotalIterations() >= m.maxIterations {
+		m.contextLogger(ctx).Info().Msg(
+			fmt.Sprintf("Maximum iterations reached (%d), exiting main loop", ctx.TotalIterations()))
 	}
 
 	return nil
@@ -29,4 +78,9 @@ func (m *Main) DecodeFromHCLBlock(ctx *hcl.EvalContext, block *hcl.Block) error 
 	m.steps = decodedSteps
 
 	return nil
+}
+
+func (m *Main) contextLogger(ctx *Context) *zerolog.Logger {
+	logger := ctx.Logger.With().Str("component", "Main step").Logger()
+	return &logger
 }

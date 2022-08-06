@@ -12,7 +12,3 @@ var (
 		Blocks:     baseSteps,
 	}
 )
-
-type Main struct {
-	steps []Step
-}

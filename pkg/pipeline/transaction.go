@@ -12,7 +12,7 @@ type Transaction struct {
 	end   time.Time
 }
 
-func (t *Transaction) Run(ctx Context) error {
+func (t *Transaction) Run(ctx *Context) error {
 	t.start = time.Now()
 	defer func() {
 		t.end = time.Now()

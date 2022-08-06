@@ -12,7 +12,7 @@ type Log struct {
 	message string
 }
 
-func (log *Log) Run(ctx Context) error {
+func (log *Log) Run(ctx *Context) error {
 	var partialLogger *zerolog.Event
 
 	switch log.level {
@@ -63,7 +63,7 @@ func (log *Log) DecodeFromHCLBlock(ctx *hcl.EvalContext, block *hcl.Block) error
 			if diagnostics.HasErrors() {
 				continue
 			}
-			log.level = value.AsString()
+			log.message = value.AsString()
 		}
 	}
 
