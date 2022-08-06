@@ -1,20 +1,9 @@
-package dsl
+package pipeline
 
 import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/steromano87/harkonnen/v1/pkg/loading"
 	"strconv"
-)
-
-var (
-	parallelType = "parallel"
-
-	parallelLabels = []string{"threadPoolSize"}
-
-	parallelSchema = &hcl.BodySchema{
-		Attributes: []hcl.AttributeSchema{},
-		Blocks:     baseSteps,
-	}
 )
 
 type Parallel struct {

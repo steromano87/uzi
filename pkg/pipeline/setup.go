@@ -1,19 +1,8 @@
-package dsl
+package pipeline
 
 import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/steromano87/harkonnen/v1/pkg/loading"
-)
-
-var (
-	setupType = "setup"
-
-	setupLabels []string
-
-	setupSchema = &hcl.BodySchema{
-		Attributes: []hcl.AttributeSchema{},
-		Blocks:     baseSteps,
-	}
 )
 
 type Setup struct {
@@ -32,7 +21,7 @@ func (s *Setup) Run(l loading.L) error {
 }
 
 func (s *Setup) DecodeFromHCLBlock(ctx *hcl.EvalContext, block *hcl.Block) error {
-	body, diagnostics := block.Body.Content(parallelSchema)
+	body, diagnostics := block.Body.Content(setupSchema)
 	if diagnostics != nil && diagnostics.HasErrors() {
 		return diagnostics.Errs()[0]
 	}

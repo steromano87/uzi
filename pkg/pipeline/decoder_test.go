@@ -1,11 +1,11 @@
-package dsl_test
+package pipeline_test
 
 import (
 	"github.com/Flaque/filet"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/dsl"
 	"github.com/steromano87/harkonnen/v1/pkg/loading"
 	"github.com/steromano87/harkonnen/v1/pkg/model"
+	"github.com/steromano87/harkonnen/v1/pkg/pipeline"
 	"github.com/steromano87/harkonnen/v1/pkg/project"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -55,11 +55,11 @@ main {}
 `
 	tempScript := filet.TmpFile(s.T(), s.tempProjectDir, tempScriptContent)
 	defer filet.CleanUp(s.T())
-	s.config.Set(dsl.ConfigKey+"script", tempScript)
+	s.config.Set(pipeline.ConfigKey+"script", tempScript)
 
-	decoder := dsl.NewDecoder(s.l)
+	decoder := pipeline.NewDecoder(s.l)
 
-	assert.IsType(s.T(), &dsl.Decoder{}, decoder)
+	assert.IsType(s.T(), &pipeline.Decoder{}, decoder)
 }
 
 func (s *DecoderTestSuite) TestValidDslFileParsing() {
@@ -68,13 +68,13 @@ main {}
 `
 	tempScript := filet.TmpFile(s.T(), s.tempProjectDir, tempScriptContent)
 	defer filet.CleanUp(s.T())
-	s.config.Set(dsl.ConfigKey+".script", path.Base(tempScript.Name()))
+	s.config.Set(pipeline.ConfigKey+".script", path.Base(tempScript.Name()))
 
-	decoder := dsl.NewDecoder(s.l)
-	pipeline, err := decoder.Decode()
+	decoder := pipeline.NewDecoder(s.l)
+	decodedPipeline, err := decoder.Decode()
 
 	if assert.NoError(s.T(), err) {
-		assert.IsType(s.T(), &dsl.Pipeline{}, pipeline)
+		assert.IsType(s.T(), &pipeline.Pipeline{}, decodedPipeline)
 	}
 }
 
@@ -84,9 +84,9 @@ main {
 `
 	tempScript := filet.TmpFile(s.T(), s.tempProjectDir, tempScriptContent)
 	defer filet.CleanUp(s.T())
-	s.config.Set(dsl.ConfigKey+"script", path.Join(s.tempProjectDir, tempScript.Name()))
+	s.config.Set(pipeline.ConfigKey+"script", path.Join(s.tempProjectDir, tempScript.Name()))
 
-	decoder := dsl.NewDecoder(s.l)
+	decoder := pipeline.NewDecoder(s.l)
 	_, err := decoder.Decode()
 
 	assert.Error(s.T(), err)
@@ -100,9 +100,9 @@ setup {}
 `
 	tempScript := filet.TmpFile(s.T(), s.tempProjectDir, tempScriptContent)
 	defer filet.CleanUp(s.T())
-	s.config.Set(dsl.ConfigKey+"script", path.Join(s.tempProjectDir, tempScript.Name()))
+	s.config.Set(pipeline.ConfigKey+"script", path.Join(s.tempProjectDir, tempScript.Name()))
 
-	decoder := dsl.NewDecoder(s.l)
+	decoder := pipeline.NewDecoder(s.l)
 	_, err := decoder.Decode()
 
 	assert.Error(s.T(), err)
@@ -114,9 +114,9 @@ func (s *DecoderTestSuite) TestInvalidDslFileWithZeroMainsParsing() {
 `
 	tempScript := filet.TmpFile(s.T(), s.tempProjectDir, tempScriptContent)
 	defer filet.CleanUp(s.T())
-	s.config.Set(dsl.ConfigKey+"script", path.Join(s.tempProjectDir, tempScript.Name()))
+	s.config.Set(pipeline.ConfigKey+"script", path.Join(s.tempProjectDir, tempScript.Name()))
 
-	decoder := dsl.NewDecoder(s.l)
+	decoder := pipeline.NewDecoder(s.l)
 	_, err := decoder.Decode()
 
 	assert.Error(s.T(), err)

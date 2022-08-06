@@ -1,34 +1,19 @@
-package dsl
+package pipeline
 
 import (
-	"github.com/hashicorp/hcl/v2"
 	"github.com/steromano87/harkonnen/v1/pkg/loading"
 )
 
-var (
-	pipelineSchema = &hcl.BodySchema{
-		Attributes: []hcl.AttributeSchema{},
-		Blocks: []hcl.BlockHeaderSchema{
-			{
-				Type:       setupType,
-				LabelNames: setupLabels,
-			},
-			{
-				Type:       mainType,
-				LabelNames: mainLabels,
-			},
-			{
-				Type:       teardownType,
-				LabelNames: teardownLabels,
-			},
-		},
-	}
-)
-
 type Pipeline struct {
+	MaxIterations int64
+
+	ShooterChan chan struct{}
+
 	setup    Setup
 	main     Main
 	teardown Teardown
+
+	scheduledForGracefulShutdown bool
 }
 
 func (p Pipeline) Run(l loading.L) error {

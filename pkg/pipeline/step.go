@@ -1,4 +1,4 @@
-package dsl
+package pipeline
 
 import (
 	"github.com/hashicorp/hcl/v2"

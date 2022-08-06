@@ -1,4 +1,4 @@
-package dsl
+package pipeline
 
 import (
 	"github.com/steromano87/harkonnen/v1/pkg/loading"

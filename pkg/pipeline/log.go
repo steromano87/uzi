@@ -1,4 +1,4 @@
-package dsl
+package pipeline
 
 import (
 	"errors"
@@ -6,26 +6,6 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/loading"
-)
-
-var (
-	logType = "log"
-
-	logLabels []string
-
-	logSchema = &hcl.BodySchema{
-		Attributes: []hcl.AttributeSchema{
-			{
-				Name:     "level",
-				Required: false,
-			},
-			{
-				Name:     "message",
-				Required: true,
-			},
-		},
-		Blocks: []hcl.BlockHeaderSchema{},
-	}
 )
 
 type Log struct {

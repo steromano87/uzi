@@ -1,19 +1,8 @@
-package dsl
+package pipeline
 
 import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/steromano87/harkonnen/v1/pkg/loading"
-)
-
-var (
-	teardownType = "teardown"
-
-	teardownLabels []string
-
-	teardownSchema = &hcl.BodySchema{
-		Attributes: []hcl.AttributeSchema{},
-		Blocks:     baseSteps,
-	}
 )
 
 type Teardown struct {
@@ -32,7 +21,7 @@ func (t *Teardown) Run(l loading.L) error {
 }
 
 func (t *Teardown) DecodeFromHCLBlock(ctx *hcl.EvalContext, block *hcl.Block) error {
-	body, diagnostics := block.Body.Content(parallelSchema)
+	body, diagnostics := block.Body.Content(teardownSchema)
 	if diagnostics != nil && diagnostics.HasErrors() {
 		return diagnostics.Errs()[0]
 	}

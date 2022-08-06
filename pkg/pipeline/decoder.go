@@ -1,4 +1,4 @@
-package dsl
+package pipeline
 
 import (
 	"errors"
