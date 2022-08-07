@@ -117,7 +117,7 @@ teardown {
 	decodedPipeline.Wait()
 
 	if assert.Equal(s.T(), pipeline.Completed, s.ctx.Status()) {
-		assert.Less(s.T(), s.ctx.TotalIterations(), int64(400))
+		assert.Less(s.T(), s.ctx.TotalIterations(), int64(9999))
 		assert.Equal(s.T(), s.ctx.TotalIterations(), s.ctx.SuccessfulIterations())
 	}
 }
@@ -154,7 +154,7 @@ teardown {
 	decodedPipeline.Wait()
 
 	if assert.Equal(s.T(), pipeline.Stopped, s.ctx.Status()) {
-		assert.Less(s.T(), s.ctx.TotalIterations(), int64(400))
+		assert.Less(s.T(), s.ctx.TotalIterations(), int64(9999))
 		assert.Equal(s.T(), s.ctx.TotalIterations(), s.ctx.SuccessfulIterations())
 	}
 }
@@ -191,7 +191,7 @@ teardown {
 	decodedPipeline.Wait()
 
 	if assert.Equal(s.T(), pipeline.ForcefullyStopped, s.ctx.Status()) {
-		assert.Less(s.T(), s.ctx.TotalIterations(), int64(400))
+		assert.Less(s.T(), s.ctx.TotalIterations(), int64(9999))
 		assert.Equal(s.T(), s.ctx.TotalIterations(), s.ctx.SuccessfulIterations())
 	}
 }
@@ -228,7 +228,7 @@ teardown {
 	decodedPipeline.Wait()
 
 	if assert.Equal(s.T(), pipeline.ForcefullyStopped, s.ctx.Status()) {
-		assert.Less(s.T(), s.ctx.TotalIterations(), int64(400))
+		assert.Less(s.T(), s.ctx.TotalIterations(), int64(9999))
 		assert.Equal(s.T(), s.ctx.TotalIterations(), s.ctx.SuccessfulIterations())
 	}
 }
