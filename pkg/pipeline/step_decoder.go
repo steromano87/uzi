@@ -7,7 +7,6 @@ func DecodeStepBlocks(ctx *hcl.EvalContext, blocks []*hcl.Block) ([]Step, error)
 
 	for _, block := range blocks {
 		switch block.Type {
-
 		case transactionType:
 			transaction := Transaction{}
 			err := transaction.DecodeFromHCLBlock(ctx, block)
@@ -23,6 +22,14 @@ func DecodeStepBlocks(ctx *hcl.EvalContext, blocks []*hcl.Block) ([]Step, error)
 				return nil, err
 			}
 			steps = append(steps, &log)
+
+		case fixedWaitType:
+			fixedWait := FixedWait{}
+			err := fixedWait.DecodeFromHCLBlock(ctx, block)
+			if err != nil {
+				return nil, err
+			}
+			steps = append(steps, &fixedWait)
 		}
 	}
 

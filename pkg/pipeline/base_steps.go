@@ -15,4 +15,8 @@ var baseSteps = []hcl.BlockHeaderSchema{
 		Type:       logType,
 		LabelNames: logLabels,
 	},
+	{
+		Type:       fixedWaitType,
+		LabelNames: fixedWaitLabels,
+	},
 }
