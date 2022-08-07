@@ -56,7 +56,7 @@ func (m *Main) Run(ctx *Context) error {
 		m.contextLogger(ctx).Info().Msg("Shutdown requested, exiting main loop")
 	}
 
-	if ctx.TotalIterations() >= m.maxIterations {
+	if m.maxIterations > 0 && ctx.TotalIterations() >= m.maxIterations {
 		m.contextLogger(ctx).Info().Msg(
 			fmt.Sprintf("Maximum iterations reached (%d), exiting main loop", ctx.TotalIterations()))
 	}
@@ -81,6 +81,6 @@ func (m *Main) DecodeFromHCLBlock(ctx *hcl.EvalContext, block *hcl.Block) error 
 }
 
 func (m *Main) contextLogger(ctx *Context) *zerolog.Logger {
-	logger := ctx.Logger.With().Str("component", "Main step").Logger()
+	logger := ctx.Logger.With().Str("component", "Main step").Str("pipelineID", ctx.id).Logger()
 	return &logger
 }

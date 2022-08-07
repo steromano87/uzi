@@ -2,12 +2,14 @@ package pipeline
 
 import (
 	"context"
+	"github.com/google/uuid"
 	"github.com/steromano87/harkonnen/v1/pkg/loading"
 	"sync"
 )
 
 type Context struct {
 	loading.L
+	id string
 
 	status      string
 	statusMutex sync.RWMutex
@@ -28,6 +30,7 @@ func NewContextFromParent(ctx loading.L) (*Context, context.CancelFunc) {
 	ctx.Context = newContext
 	pipelineContext := &Context{
 		L:                    ctx,
+		id:                   uuid.NewString(),
 		PlannedShutdownChan:  make(chan struct{}),
 		GracefulShutdownChan: make(chan struct{}),
 		TerminationChan:      make(chan struct{}),

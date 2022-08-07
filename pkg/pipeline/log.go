@@ -35,7 +35,7 @@ func (log *Log) Run(ctx *Context) error {
 		return errors.New(fmt.Sprintf("%s is not a valid log level", log.level))
 	}
 
-	partialLogger.Msg(log.message)
+	partialLogger.Str("pipelineID", ctx.id).Msg(log.message)
 
 	return nil
 }

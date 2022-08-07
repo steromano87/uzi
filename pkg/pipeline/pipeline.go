@@ -1,7 +1,6 @@
 package pipeline
 
 import (
-	"fmt"
 	"github.com/rs/zerolog"
 	"sync"
 )
@@ -23,7 +22,7 @@ type Pipeline struct {
 	ctx           *Context
 	MaxIterations int64
 
-	waitGroup sync.WaitGroup
+	waitGroup *sync.WaitGroup
 
 	setup    Setup
 	main     Main
@@ -32,39 +31,20 @@ type Pipeline struct {
 	scheduledForGracefulShutdown bool
 }
 
-func (p *Pipeline) Start(ctx *Context) {
+func (p *Pipeline) Start(ctx *Context, wg *sync.WaitGroup) {
 	p.ctx = ctx
-	p.waitGroup.Add(1)
+	p.waitGroup = wg
 
 	p.main.maxIterations = p.MaxIterations
 
 	go p.run()
-	p.ctx.UpdateStatus(Running)
-}
-
-func (p *Pipeline) Wait() {
-	p.waitGroup.Wait()
 }
 
 func (p *Pipeline) run() {
 	p.contextLogger().Info().Msg("Pipeline execution started")
+	p.ctx.UpdateStatus(Running)
 
-	defer func() {
-		switch p.ctx.Status() {
-		case GracefullyShuttingDown:
-			p.ctx.UpdateStatus(Stopped)
-
-		case ForcefullyStopping:
-			p.ctx.UpdateStatus(ForcefullyStopped)
-
-		default:
-			p.ctx.UpdateStatus(Completed)
-		}
-
-		p.contextLogger().Info().Msg(fmt.Sprintf("Pipeline execution terminated with %s status", p.ctx.Status()))
-
-		p.waitGroup.Done()
-	}()
+	defer p.finalizeRun()
 
 	var err error
 
@@ -85,6 +65,25 @@ func (p *Pipeline) run() {
 }
 
 func (p *Pipeline) contextLogger() *zerolog.Logger {
-	logger := p.ctx.Logger.With().Str("component", "Pipeline").Logger()
+	logger := p.ctx.Logger.With().Str("component", "Pipeline").Str("id", p.ctx.id).Logger()
 	return &logger
+}
+
+func (p *Pipeline) finalizeRun() {
+	switch p.ctx.Status() {
+	case GracefullyShuttingDown:
+		p.ctx.UpdateStatus(Stopped)
+
+	case ForcefullyStopping:
+		p.ctx.UpdateStatus(ForcefullyStopped)
+
+	default:
+		p.ctx.UpdateStatus(Completed)
+	}
+
+	p.contextLogger().Info().Str(
+		"status", p.ctx.Status()).Int64(
+		"totalIterations", p.ctx.TotalIterations()).Msg("Pipeline execution terminated")
+
+	p.waitGroup.Done()
 }

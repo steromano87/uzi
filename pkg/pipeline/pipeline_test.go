@@ -10,6 +10,7 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/project"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"sync"
 	"testing"
 	"time"
 )
@@ -74,10 +75,13 @@ teardown {
 	tempScript := filet.TmpFile(s.T(), "", tempScriptContent)
 	defer filet.CleanUp(s.T())
 
+	waitGroup := sync.WaitGroup{}
+
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
 	decodedPipeline.MaxIterations = 3
-	decodedPipeline.Start(s.ctx)
-	decodedPipeline.Wait()
+	waitGroup.Add(1)
+	decodedPipeline.Start(s.ctx, &waitGroup)
+	waitGroup.Wait()
 
 	if assert.Equal(s.T(), pipeline.Completed, s.ctx.Status()) {
 		assert.Equal(s.T(), int64(3), s.ctx.TotalIterations())
@@ -108,13 +112,16 @@ teardown {
 	tempScript := filet.TmpFile(s.T(), "", tempScriptContent)
 	defer filet.CleanUp(s.T())
 
+	waitGroup := sync.WaitGroup{}
+
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	decodedPipeline.MaxIterations = 400
-	decodedPipeline.Start(s.ctx)
+	decodedPipeline.MaxIterations = 9999
+	waitGroup.Add(1)
+	decodedPipeline.Start(s.ctx, &waitGroup)
 	time.Sleep(2 * time.Millisecond)
 	s.T().Log("Asked for planned shutdown")
 	s.ctx.PlannedShutdown()
-	decodedPipeline.Wait()
+	waitGroup.Wait()
 
 	if assert.Equal(s.T(), pipeline.Completed, s.ctx.Status()) {
 		assert.Less(s.T(), s.ctx.TotalIterations(), int64(9999))
@@ -145,13 +152,16 @@ teardown {
 	tempScript := filet.TmpFile(s.T(), "", tempScriptContent)
 	defer filet.CleanUp(s.T())
 
+	waitGroup := sync.WaitGroup{}
+
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	decodedPipeline.MaxIterations = 400
-	decodedPipeline.Start(s.ctx)
+	decodedPipeline.MaxIterations = 9999
+	waitGroup.Add(1)
+	decodedPipeline.Start(s.ctx, &waitGroup)
 	time.Sleep(2 * time.Millisecond)
 	s.T().Log("Asked for graceful shutdown")
 	s.ctx.GracefulShutdown()
-	decodedPipeline.Wait()
+	waitGroup.Wait()
 
 	if assert.Equal(s.T(), pipeline.Stopped, s.ctx.Status()) {
 		assert.Less(s.T(), s.ctx.TotalIterations(), int64(9999))
@@ -182,13 +192,16 @@ teardown {
 	tempScript := filet.TmpFile(s.T(), "", tempScriptContent)
 	defer filet.CleanUp(s.T())
 
+	waitGroup := sync.WaitGroup{}
+
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	decodedPipeline.MaxIterations = 400
-	decodedPipeline.Start(s.ctx)
+	decodedPipeline.MaxIterations = 9999
+	waitGroup.Add(1)
+	decodedPipeline.Start(s.ctx, &waitGroup)
 	time.Sleep(2 * time.Millisecond)
 	s.T().Log("Asked for forced shutdown")
 	s.ctx.Terminate()
-	decodedPipeline.Wait()
+	waitGroup.Wait()
 
 	if assert.Equal(s.T(), pipeline.ForcefullyStopped, s.ctx.Status()) {
 		assert.Less(s.T(), s.ctx.TotalIterations(), int64(9999))
@@ -219,13 +232,16 @@ teardown {
 	tempScript := filet.TmpFile(s.T(), "", tempScriptContent)
 	defer filet.CleanUp(s.T())
 
+	waitGroup := sync.WaitGroup{}
+
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	decodedPipeline.MaxIterations = 400
-	decodedPipeline.Start(s.ctx)
+	decodedPipeline.MaxIterations = 9999
+	waitGroup.Add(1)
+	decodedPipeline.Start(s.ctx, &waitGroup)
 	time.Sleep(2 * time.Millisecond)
 	s.T().Log("Asked for context cancellation")
 	s.ctxCancelFunc()
-	decodedPipeline.Wait()
+	waitGroup.Wait()
 
 	if assert.Equal(s.T(), pipeline.ForcefullyStopped, s.ctx.Status()) {
 		assert.Less(s.T(), s.ctx.TotalIterations(), int64(9999))

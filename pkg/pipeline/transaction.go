@@ -33,13 +33,7 @@ func (t *Transaction) DecodeFromHCLBlock(ctx *hcl.EvalContext, block *hcl.Block)
 		return diagnostics.Errs()[0]
 	}
 
-	if attr, ok := body.Attributes["name"]; ok {
-		transactionName, diagnostics := attr.Expr.Value(ctx)
-		if diagnostics != nil && diagnostics.HasErrors() {
-			return diagnostics.Errs()[0]
-		}
-		t.name = transactionName.AsString()
-	}
+	t.name = block.Labels[0]
 
 	decodedSteps, err := DecodeStepBlocks(ctx, body.Blocks)
 	if err != nil {

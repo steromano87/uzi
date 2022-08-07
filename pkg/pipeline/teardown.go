@@ -56,6 +56,6 @@ func (t *Teardown) DecodeFromHCLBlock(ctx *hcl.EvalContext, block *hcl.Block) er
 }
 
 func (t *Teardown) contextLogger(ctx *Context) *zerolog.Logger {
-	logger := ctx.Logger.With().Str("component", "Teardown step").Logger()
+	logger := ctx.Logger.With().Str("component", "Teardown step").Str("pipelineID", ctx.id).Logger()
 	return &logger
 }

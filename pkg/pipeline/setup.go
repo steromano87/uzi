@@ -56,6 +56,6 @@ func (s *Setup) DecodeFromHCLBlock(ctx *hcl.EvalContext, block *hcl.Block) error
 }
 
 func (s *Setup) contextLogger(ctx *Context) *zerolog.Logger {
-	logger := ctx.Logger.With().Str("component", "Setup step").Logger()
+	logger := ctx.Logger.With().Str("component", "Setup step").Str("pipelineID", ctx.id).Logger()
 	return &logger
 }
