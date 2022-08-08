@@ -32,8 +32,9 @@ type PipelineTestSuite struct {
 }
 
 func (s *PipelineTestSuite) SetupTest() {
+	zerolog.TimeFieldFormat = time.RFC3339Nano
 	consoleWriter := zerolog.NewConsoleWriter()
-	consoleWriter.TimeFormat = time.RFC3339Nano
+	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
 	sampleWriter := &MockedSampleWriter{
 		Samples: []model.Sample{},
