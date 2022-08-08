@@ -5,7 +5,7 @@ import "github.com/hashicorp/hcl/v2"
 var (
 	fixedWaitType = "fixed_wait"
 
-	fixedWaitLabels = []string{"description"}
+	fixedWaitLabels []string
 
 	fixedWaitSchema = &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{

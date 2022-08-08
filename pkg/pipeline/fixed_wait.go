@@ -22,8 +22,6 @@ func (w *FixedWait) DecodeFromHCLBlock(ctx *hcl.EvalContext, block *hcl.Block) e
 		return diagnostics.Errs()[0]
 	}
 
-	w.description = block.Labels[0]
-
 	for name, attr := range body.Attributes {
 		switch name {
 		case "amount":
