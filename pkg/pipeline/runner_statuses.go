@@ -1,6 +1,7 @@
 package pipeline
 
 const (
+	Ready     = "READY"
 	Running   = "RUNNING"
 	Completed = "COMPLETED"
 

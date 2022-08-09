@@ -29,6 +29,7 @@ func NewContextFromParent(ctx loading.L) (*Context, context.CancelFunc) {
 	ctx.Context = newContext
 	pipelineContext := &Context{
 		L:                    ctx,
+		status:               Ready,
 		id:                   uuid.NewString(),
 		PlannedShutdownChan:  make(chan struct{}),
 		GracefulShutdownChan: make(chan struct{}),
