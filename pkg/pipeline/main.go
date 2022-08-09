@@ -28,19 +28,15 @@ func (m *Main) Run(ctx *Context) error {
 				ctx.UpdateStatus(GracefullyShuttingDown)
 				m.scheduledForGracefulShutdown = true
 
-			case <-ctx.TerminationChan:
-				m.contextLogger(ctx).Warn().Msg("Forced termination requested, exiting immediately...")
-				ctx.UpdateStatus(ForcefullyStopping)
-				runtime.Goexit()
-
 			case <-ctx.Done():
-				m.contextLogger(ctx).Warn().Msg("Context canceled, exiting immediately...")
+				m.contextLogger(ctx).Warn().Msg("Forced termination requested, exiting immediately...")
 				ctx.UpdateStatus(ForcefullyStopping)
 				runtime.Goexit()
 
 			default:
 				err = step.Run(ctx)
 				if err != nil {
+					m.contextLogger(ctx).Error().Err(err).Msg("Error during main loop execution, ending current loop")
 					break
 				}
 			}

@@ -18,13 +18,8 @@ func (s *Setup) Run(ctx *Context) error {
 			s.contextLogger(ctx).Info().Msg("Graceful shutdown requested")
 			ctx.UpdateStatus(GracefullyShuttingDown)
 
-		case <-ctx.TerminationChan:
-			s.contextLogger(ctx).Warn().Msg("Forced termination requested, exiting immediately...")
-			ctx.UpdateStatus(ForcefullyStopping)
-			return nil
-
 		case <-ctx.Done():
-			s.contextLogger(ctx).Warn().Msg("Context canceled, exiting immediately...")
+			s.contextLogger(ctx).Warn().Msg("Forced termination requested, exiting immediately...")
 			ctx.UpdateStatus(ForcefullyStopping)
 			return nil
 
@@ -32,6 +27,7 @@ func (s *Setup) Run(ctx *Context) error {
 			err = step.Run(ctx)
 			if err != nil {
 				s.contextLogger(ctx).Error().Err(err).Msg("Error encountered")
+				return err
 			}
 		}
 	}

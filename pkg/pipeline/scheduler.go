@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"errors"
+	"fmt"
 	"github.com/emirpasic/gods/lists/arraylist"
 	"github.com/jinzhu/copier"
 	"github.com/steromano87/harkonnen/v1/pkg/loading"
@@ -45,7 +46,12 @@ func (j *Scheduler) Schedule(desiredInstances int) error {
 	}
 
 	for desiredInstances < j.RunningPipelines() {
-		err := j.stopPipeline()
+		indexToStop, err := j.firstRunningPipelineIndex()
+		if err != nil {
+			return err
+		}
+
+		err = j.stopPipeline(indexToStop)
 		if err != nil {
 			return err
 		}
@@ -64,7 +70,7 @@ func (j *Scheduler) RunningPipelines() int {
 	pipIterator := j.runners.Iterator()
 
 	for pipIterator.Next() {
-		if pipHolder := pipIterator.Value().(runnerHolder); pipHolder.ctx.Status() == Running {
+		if runner := pipIterator.Value().(*Runner); runner.Status() == Running {
 			count++
 		}
 	}
@@ -79,27 +85,23 @@ func (j *Scheduler) startPipeline() error {
 		return err
 	}
 
-	pipelineContext, cancelFunc := NewContextFromParent(j.l)
-	pipelineHolder := runnerHolder{
-		ctx:        pipelineContext,
-		cancelFunc: cancelFunc,
-		runner:     NewRunner(pipelineToStart, j.maxIterations),
-	}
-	j.runners.Add(pipelineHolder)
+	runner := NewRunner(j.l, pipelineToStart, j.maxIterations)
+	j.runners.Add(runner)
 	j.runnersWaitGroup.Add(1)
-	pipelineHolder.runner.Start(pipelineHolder.ctx, &j.runnersWaitGroup)
+	runner.Start(&j.runnersWaitGroup)
+
+	for runner.Status() != Running {
+	}
 
 	return nil
 }
 
-func (j *Scheduler) stopPipeline() error {
-	pipToBeStoppedIndex, err := j.firstRunningPipelineIndex()
-	if err != nil {
-		return err
+func (j *Scheduler) stopPipeline(index int) error {
+	pipToBeStopped, ok := j.runners.Get(index)
+	if !ok {
+		return errors.New(fmt.Sprintf("cannot stop pipeline with index %d because it does not exist", index))
 	}
-
-	pipToBeStopped, _ := j.runners.Get(pipToBeStoppedIndex)
-	pipToBeStopped.(runnerHolder).ctx.PlannedShutdown()
+	pipToBeStopped.(*Runner).PlannedShutdown()
 
 	return nil
 }
@@ -109,8 +111,8 @@ func (j *Scheduler) firstRunningPipelineIndex() (int, error) {
 	pipIterator := j.runners.Iterator()
 
 	for pipIterator.Next() {
-		index, pip := pipIterator.Index(), pipIterator.Value().(runnerHolder)
-		if pip.ctx.Status() == Running {
+		index, runner := pipIterator.Index(), pipIterator.Value().(*Runner)
+		if runner.Status() == Running {
 			output = index
 			break
 		}

@@ -18,13 +18,8 @@ func (t *Teardown) Run(ctx *Context) error {
 			t.contextLogger(ctx).Info().Msg("Graceful shutdown requested")
 			ctx.UpdateStatus(GracefullyShuttingDown)
 
-		case <-ctx.TerminationChan:
-			t.contextLogger(ctx).Warn().Msg("Forced termination requested, exiting immediately...")
-			ctx.UpdateStatus(ForcefullyStopping)
-			return nil
-
 		case <-ctx.Done():
-			t.contextLogger(ctx).Warn().Msg("Context canceled, exiting immediately...")
+			t.contextLogger(ctx).Warn().Msg("Forced termination requested, exiting immediately...")
 			ctx.UpdateStatus(ForcefullyStopping)
 			return nil
 

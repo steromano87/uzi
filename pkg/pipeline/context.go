@@ -22,7 +22,6 @@ type Context struct {
 
 	PlannedShutdownChan  chan struct{}
 	GracefulShutdownChan chan struct{}
-	TerminationChan      chan struct{}
 }
 
 func NewContextFromParent(ctx loading.L) (*Context, context.CancelFunc) {
@@ -33,7 +32,6 @@ func NewContextFromParent(ctx loading.L) (*Context, context.CancelFunc) {
 		id:                   uuid.NewString(),
 		PlannedShutdownChan:  make(chan struct{}),
 		GracefulShutdownChan: make(chan struct{}),
-		TerminationChan:      make(chan struct{}),
 	}
 
 	return pipelineContext, cancelFunc
@@ -45,10 +43,6 @@ func (c *Context) PlannedShutdown() {
 
 func (c *Context) GracefulShutdown() {
 	c.GracefulShutdownChan <- struct{}{}
-}
-
-func (c *Context) Terminate() {
-	c.TerminationChan <- struct{}{}
 }
 
 func (c *Context) UpdateStatus(status string) {

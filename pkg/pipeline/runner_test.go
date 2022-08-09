@@ -27,8 +27,8 @@ func (w *MockedSampleWriter) Write(sample model.Sample) error {
 type RunnerTestSuite struct {
 	suite.Suite
 	l             loading.L
-	ctx           *pipeline.Context
-	ctxCancelFunc context.CancelFunc
+	backgroundCtx context.Context
+	cancelFunc    context.CancelFunc
 }
 
 func (s *RunnerTestSuite) SetupTest() {
@@ -40,17 +40,17 @@ func (s *RunnerTestSuite) SetupTest() {
 		Samples: []model.Sample{},
 	}
 
+	s.backgroundCtx = context.TODO()
+	newCtx, cancelFunc := context.WithCancel(s.backgroundCtx)
+	s.cancelFunc = cancelFunc
+
 	s.l = loading.L{
-		Context:      context.TODO(),
+		Context:      newCtx,
 		Logger:       &logger,
 		Config:       project.NewEmptyConfig(),
 		Variables:    loading.NewVariables(),
 		SampleWriter: sampleWriter,
 	}
-
-	ctx, cancelFunc := pipeline.NewContextFromParent(s.l)
-	s.ctx = ctx
-	s.ctxCancelFunc = cancelFunc
 }
 
 func (s *RunnerTestSuite) TestRunnerWithFixedIterations() {
@@ -79,14 +79,14 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	runner := pipeline.NewRunner(decodedPipeline, 3)
+	runner := pipeline.NewRunner(s.l, decodedPipeline, 3)
 	waitGroup.Add(1)
-	runner.Start(s.ctx, &waitGroup)
+	runner.Start(&waitGroup)
 	waitGroup.Wait()
 
-	if assert.Equal(s.T(), pipeline.Completed, s.ctx.Status()) {
-		assert.Equal(s.T(), int64(3), s.ctx.TotalIterations())
-		assert.Equal(s.T(), int64(3), s.ctx.SuccessfulIterations())
+	if assert.Equal(s.T(), pipeline.Completed, runner.Status()) {
+		assert.Equal(s.T(), int64(3), runner.TotalIterations())
+		assert.Equal(s.T(), int64(3), runner.SuccessfulIterations())
 	}
 }
 
@@ -116,17 +116,17 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	runner := pipeline.NewRunner(decodedPipeline, 9999)
+	runner := pipeline.NewRunner(s.l, decodedPipeline, 9999)
 	waitGroup.Add(1)
-	runner.Start(s.ctx, &waitGroup)
+	runner.Start(&waitGroup)
 	time.Sleep(2 * time.Millisecond)
 	s.T().Log("Asked for planned shutdown")
-	s.ctx.PlannedShutdown()
+	runner.PlannedShutdown()
 	waitGroup.Wait()
 
-	if assert.Equal(s.T(), pipeline.Completed, s.ctx.Status()) {
-		assert.Less(s.T(), s.ctx.TotalIterations(), int64(9999))
-		assert.Equal(s.T(), s.ctx.TotalIterations(), s.ctx.SuccessfulIterations())
+	if assert.Equal(s.T(), pipeline.Completed, runner.Status()) {
+		assert.Less(s.T(), runner.TotalIterations(), int64(9999))
+		assert.Equal(s.T(), runner.TotalIterations(), runner.SuccessfulIterations())
 	}
 }
 
@@ -156,17 +156,17 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	runner := pipeline.NewRunner(decodedPipeline, 9999)
+	runner := pipeline.NewRunner(s.l, decodedPipeline, 9999)
 	waitGroup.Add(1)
-	runner.Start(s.ctx, &waitGroup)
+	runner.Start(&waitGroup)
 	time.Sleep(2 * time.Millisecond)
 	s.T().Log("Asked for graceful shutdown")
-	s.ctx.GracefulShutdown()
+	runner.GracefulShutdown()
 	waitGroup.Wait()
 
-	if assert.Equal(s.T(), pipeline.Stopped, s.ctx.Status()) {
-		assert.Less(s.T(), s.ctx.TotalIterations(), int64(9999))
-		assert.Equal(s.T(), s.ctx.TotalIterations(), s.ctx.SuccessfulIterations())
+	if assert.Equal(s.T(), pipeline.Stopped, runner.Status()) {
+		assert.Less(s.T(), runner.TotalIterations(), int64(9999))
+		assert.Equal(s.T(), runner.TotalIterations(), runner.SuccessfulIterations())
 	}
 }
 
@@ -196,21 +196,21 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	runner := pipeline.NewRunner(decodedPipeline, 9999)
+	runner := pipeline.NewRunner(s.l, decodedPipeline, 9999)
 	waitGroup.Add(1)
-	runner.Start(s.ctx, &waitGroup)
+	runner.Start(&waitGroup)
 	time.Sleep(2 * time.Millisecond)
 	s.T().Log("Asked for forced shutdown")
-	s.ctx.Terminate()
+	runner.Terminate()
 	waitGroup.Wait()
 
-	if assert.Equal(s.T(), pipeline.ForcefullyStopped, s.ctx.Status()) {
-		assert.Less(s.T(), s.ctx.TotalIterations(), int64(9999))
-		assert.Equal(s.T(), s.ctx.TotalIterations(), s.ctx.SuccessfulIterations())
+	if assert.Equal(s.T(), pipeline.ForcefullyStopped, runner.Status()) {
+		assert.Less(s.T(), runner.TotalIterations(), int64(9999))
+		assert.Equal(s.T(), runner.TotalIterations(), runner.SuccessfulIterations())
 	}
 }
 
-func (s *RunnerTestSuite) TestRunnerWithContextCancellation() {
+func (s *RunnerTestSuite) TestRunnerWithParentContextCancellation() {
 	tempScriptContent := `
 setup {
 	log {
@@ -236,17 +236,17 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	runner := pipeline.NewRunner(decodedPipeline, 9999)
+	runner := pipeline.NewRunner(s.l, decodedPipeline, 9999)
 	waitGroup.Add(1)
-	runner.Start(s.ctx, &waitGroup)
+	runner.Start(&waitGroup)
 	time.Sleep(2 * time.Millisecond)
 	s.T().Log("Asked for context cancellation")
-	s.ctxCancelFunc()
+	s.cancelFunc()
 	waitGroup.Wait()
 
-	if assert.Equal(s.T(), pipeline.ForcefullyStopped, s.ctx.Status()) {
-		assert.Less(s.T(), s.ctx.TotalIterations(), int64(9999))
-		assert.Equal(s.T(), s.ctx.TotalIterations(), s.ctx.SuccessfulIterations())
+	if assert.Equal(s.T(), pipeline.ForcefullyStopped, runner.Status()) {
+		assert.Less(s.T(), runner.TotalIterations(), int64(9999))
+		assert.Equal(s.T(), runner.TotalIterations(), runner.SuccessfulIterations())
 	}
 }
 
