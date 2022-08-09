@@ -2,8 +2,6 @@ package pipeline
 
 import (
 	"errors"
-	"fmt"
-	"github.com/emirpasic/gods/lists/arraylist"
 	"github.com/jinzhu/copier"
 	"github.com/steromano87/harkonnen/v1/pkg/loading"
 	"sync"
@@ -14,115 +12,147 @@ type Scheduler struct {
 	l                loading.L
 	templatePipeline *Pipeline
 	maxIterations    int64
-	runners          *arraylist.List
+	runners          []*Runner
 
+	startedRunners   int
 	runnersWaitGroup sync.WaitGroup
 }
 
 func NewScheduler(l loading.L) *Scheduler {
 	scheduler := new(Scheduler)
 	scheduler.l = l
-	scheduler.runners = arraylist.New()
+	scheduler.Reset()
 	return scheduler
 }
 
-func (j *Scheduler) Prepare(referencePipeline *Pipeline, instances int, maxIterations int64) error {
-	j.templatePipeline = referencePipeline
-	j.maxIterations = maxIterations
+func (s *Scheduler) Prepare(referencePipeline *Pipeline, instances int, maxIterations int64) error {
+	s.templatePipeline = referencePipeline
+	s.maxIterations = maxIterations
+
+	for i := 0; i < instances; i++ {
+		pipelineToStart := &Pipeline{}
+		err := copier.Copy(pipelineToStart, s.templatePipeline)
+		if err != nil {
+			return err
+		}
+
+		runner := NewRunner(s.l, pipelineToStart, s.maxIterations)
+		s.runners = append(s.runners, runner)
+	}
+	return nil
+}
+
+func (s *Scheduler) Schedule(desiredInstances int) error {
+	for desiredInstances > s.Stats().Started {
+		indexToStart, err := s.firstReadyRunnerIndex()
+		if err != nil {
+			return err
+		}
+		err = s.startPipeline(indexToStart)
+		if err != nil {
+			return err
+		}
+	}
+
+	for desiredInstances < s.Stats().Running {
+		indexToStop, err := s.firstRunningRunnerIndex()
+		if err != nil {
+			return err
+		}
+
+		err = s.stopPipeline(indexToStop)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
 
-func (j *Scheduler) Schedule(desiredInstances int) error {
-	// Setting wait time between two consecutive schedules, because the loop is too fast and the context would not update in time
-	waitTime, _ := time.ParseDuration("10ms")
-
-	for desiredInstances > j.RunningPipelines() {
-		err := j.startPipeline()
-		if err != nil {
-			return err
-		}
-		time.Sleep(waitTime)
-	}
-
-	for desiredInstances < j.RunningPipelines() {
-		indexToStop, err := j.firstRunningPipelineIndex()
-		if err != nil {
-			return err
-		}
-
-		err = j.stopPipeline(indexToStop)
-		if err != nil {
-			return err
-		}
-		time.Sleep(waitTime)
-	}
-
-	return nil
+func (s *Scheduler) WaitForCompletion() {
+	s.runnersWaitGroup.Wait()
 }
 
-func (j *Scheduler) WaitForCompletion() {
-	j.runnersWaitGroup.Wait()
-}
+func (s *Scheduler) Stats() RunnerStats {
+	stats := RunnerStats{
+		Started: s.startedRunners,
+	}
 
-func (j *Scheduler) RunningPipelines() int {
-	count := 0
-	pipIterator := j.runners.Iterator()
+	for _, runner := range s.runners {
+		switch runner.Status() {
+		case Ready:
+			stats.Ready++
 
-	for pipIterator.Next() {
-		if runner := pipIterator.Value().(*Runner); runner.Status() == Running {
-			count++
+		case Running:
+			stats.Running++
+
+		case Completed:
+			stats.Completed++
+
+		case GracefullyShuttingDown:
+			stats.GracefullyShuttingDown++
+
+		case Stopped:
+			stats.Stopped++
+
+		case ForcefullyShuttingDown:
+			stats.ForcefullyShuttingDown++
+
+		case ForcefullyStopped:
+			stats.ForcefullyStopped++
+
+		case Error:
+			stats.Error++
 		}
 	}
 
-	return count
+	return stats
 }
 
-func (j *Scheduler) startPipeline() error {
-	pipelineToStart := &Pipeline{}
-	err := copier.Copy(pipelineToStart, j.templatePipeline)
-	if err != nil {
-		return err
-	}
+func (s *Scheduler) Reset() {
+	s.runners = make([]*Runner, 0)
+}
 
-	runner := NewRunner(j.l, pipelineToStart, j.maxIterations)
-	j.runners.Add(runner)
-	j.runnersWaitGroup.Add(1)
-	runner.Start(&j.runnersWaitGroup)
+func (s *Scheduler) startPipeline(index int) error {
+	s.runnersWaitGroup.Add(1)
+	s.startedRunners++
+	s.runners[index].Start(&s.runnersWaitGroup)
 
-	// Wait for the runner to be started before exiting
-	for runner.Status() != Running {
+	// Wait for the runner to be started before returning
+	for s.runners[index].Status() == Ready {
 		time.Sleep(time.Microsecond)
 	}
 
 	return nil
 }
 
-func (j *Scheduler) stopPipeline(index int) error {
-	pipToBeStopped, ok := j.runners.Get(index)
-	if !ok {
-		return errors.New(fmt.Sprintf("cannot stop pipeline with index %d because it does not exist", index))
+func (s *Scheduler) stopPipeline(index int) error {
+	runner := s.runners[index]
+	runner.PlannedShutdown()
+
+	for runner.Status() == Running {
+		time.Sleep(time.Microsecond)
 	}
-	pipToBeStopped.(*Runner).PlannedShutdown()
 
 	return nil
 }
 
-func (j *Scheduler) firstRunningPipelineIndex() (int, error) {
-	output := -1
-	pipIterator := j.runners.Iterator()
-
-	for pipIterator.Next() {
-		index, runner := pipIterator.Index(), pipIterator.Value().(*Runner)
-		if runner.Status() == Running {
-			output = index
-			break
+func (s *Scheduler) firstReadyRunnerIndex() (int, error) {
+	for index, runner := range s.runners {
+		if runner.Status() == Ready {
+			return index, nil
 		}
 	}
 
-	if output < 0 {
-		return -1, errors.New("no active runners available for stopping")
+	return -1, errors.New("no ready runners available for starting")
+}
+
+func (s *Scheduler) firstRunningRunnerIndex() (int, error) {
+	for index, runner := range s.runners {
+		if runner.Status() == Running {
+			return index, nil
+		}
 	}
 
-	return output, nil
+	return -1, errors.New("no active runners available for stopping")
 }

@@ -14,12 +14,12 @@ import (
 	"time"
 )
 
-type JITSchedulerTestSuite struct {
+type SchedulerTestSuite struct {
 	suite.Suite
 	l loading.L
 }
 
-func (s *JITSchedulerTestSuite) SetupTest() {
+func (s *SchedulerTestSuite) SetupTest() {
 	zerolog.TimeFieldFormat = time.RFC3339Nano
 	consoleWriter := zerolog.NewConsoleWriter()
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
@@ -37,7 +37,7 @@ func (s *JITSchedulerTestSuite) SetupTest() {
 	}
 }
 
-func (s *JITSchedulerTestSuite) TestSchedulePreparation() {
+func (s *SchedulerTestSuite) TestSchedulePreparation() {
 	tempScriptContent := `
 setup {
 	log {
@@ -65,11 +65,12 @@ teardown {
 	err := scheduler.Prepare(decodedPipeline, 10, int64(999))
 
 	if assert.NoError(s.T(), err) {
-		assert.Equal(s.T(), 0, scheduler.RunningPipelines())
+		assert.Equal(s.T(), 10, scheduler.Stats().Ready)
+		assert.Equal(s.T(), 0, scheduler.Stats().Running)
 	}
 }
 
-func (s *JITSchedulerTestSuite) TestPipelineStartAndPlannedShutdown() {
+func (s *SchedulerTestSuite) TestPipelineStartAndPlannedShutdown() {
 	tempScriptContent := `
 setup {
 	log {
@@ -102,7 +103,7 @@ teardown {
 	err := scheduler.Schedule(1)
 
 	if assert.NoError(s.T(), err) {
-		assert.Equal(s.T(), 1, scheduler.RunningPipelines())
+		assert.Equal(s.T(), 1, scheduler.Stats().Running)
 	}
 
 	time.Sleep(2 * time.Millisecond)
@@ -110,11 +111,12 @@ teardown {
 
 	if assert.NoError(s.T(), err) {
 		scheduler.WaitForCompletion()
-		assert.Equal(s.T(), 0, scheduler.RunningPipelines())
+		assert.Equal(s.T(), 0, scheduler.Stats().Running)
+		assert.Equal(s.T(), 1, scheduler.Stats().Completed)
 	}
 }
 
-func (s *JITSchedulerTestSuite) TestPipelineStartWithFixedIterations() {
+func (s *SchedulerTestSuite) TestPipelineStartWithFixedIterations() {
 	tempScriptContent := `
 setup {
 	log {
@@ -143,17 +145,19 @@ teardown {
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
 
 	scheduler := pipeline.NewScheduler(s.l)
-	_ = scheduler.Prepare(decodedPipeline, 3, int64(25))
+	_ = scheduler.Prepare(decodedPipeline, 3, int64(5))
 	err := scheduler.Schedule(3)
 
 	if assert.NoError(s.T(), err) {
-		assert.Equal(s.T(), 3, scheduler.RunningPipelines())
+		assert.Equal(s.T(), 3, scheduler.Stats().Running)
 	}
 
 	scheduler.WaitForCompletion()
-	assert.Equal(s.T(), 0, scheduler.RunningPipelines())
+	if assert.Equal(s.T(), 0, scheduler.Stats().Running) {
+		assert.Equal(s.T(), 3, scheduler.Stats().Completed)
+	}
 }
 
-func TestJITSchedulerTestSuite(t *testing.T) {
-	suite.Run(t, new(JITSchedulerTestSuite))
+func TestSchedulerTestSuite(t *testing.T) {
+	suite.Run(t, new(SchedulerTestSuite))
 }
