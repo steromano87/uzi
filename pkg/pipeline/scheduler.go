@@ -90,7 +90,9 @@ func (j *Scheduler) startPipeline() error {
 	j.runnersWaitGroup.Add(1)
 	runner.Start(&j.runnersWaitGroup)
 
+	// Wait for the runner to be started before exiting
 	for runner.Status() != Running {
+		time.Sleep(time.Microsecond)
 	}
 
 	return nil
