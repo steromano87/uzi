@@ -14,12 +14,12 @@ import (
 	"time"
 )
 
-type StaticSchedulerTestSuite struct {
+type JITSchedulerTestSuite struct {
 	suite.Suite
 	l loading.L
 }
 
-func (s *StaticSchedulerTestSuite) SetupTest() {
+func (s *JITSchedulerTestSuite) SetupTest() {
 	zerolog.TimeFieldFormat = time.RFC3339Nano
 	consoleWriter := zerolog.NewConsoleWriter()
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
@@ -37,7 +37,7 @@ func (s *StaticSchedulerTestSuite) SetupTest() {
 	}
 }
 
-func (s *StaticSchedulerTestSuite) TestSchedulePreparation() {
+func (s *JITSchedulerTestSuite) TestSchedulePreparation() {
 	tempScriptContent := `
 setup {
 	log {
@@ -61,15 +61,15 @@ teardown {
 	defer filet.CleanUp(s.T())
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
 
-	scheduler := pipeline.NewStaticScheduler(s.l)
-	err := scheduler.Prepare(decodedPipeline, 10, int64(0))
+	scheduler := pipeline.NewScheduler(s.l)
+	err := scheduler.Prepare(decodedPipeline, 10, int64(999))
 
 	if assert.NoError(s.T(), err) {
-		assert.Equal(s.T(), 10, scheduler.MaxSchedulablePipelines())
+		assert.Equal(s.T(), 0, scheduler.RunningPipelines())
 	}
 }
 
-func (s *StaticSchedulerTestSuite) TestPipelineStartAndPlannedShutdown() {
+func (s *JITSchedulerTestSuite) TestPipelineStartAndPlannedShutdown() {
 	tempScriptContent := `
 setup {
 	log {
@@ -97,12 +97,12 @@ teardown {
 	defer filet.CleanUp(s.T())
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
 
-	scheduler := pipeline.NewStaticScheduler(s.l)
-	_ = scheduler.Prepare(decodedPipeline, 3, int64(0))
+	scheduler := pipeline.NewScheduler(s.l)
+	_ = scheduler.Prepare(decodedPipeline, 3, int64(999))
 	err := scheduler.Schedule(1)
 
 	if assert.NoError(s.T(), err) {
-		assert.Equal(s.T(), 1, scheduler.ActivePipelines())
+		assert.Equal(s.T(), 1, scheduler.RunningPipelines())
 	}
 
 	time.Sleep(2 * time.Millisecond)
@@ -110,11 +110,11 @@ teardown {
 
 	if assert.NoError(s.T(), err) {
 		scheduler.WaitForCompletion()
-		assert.Equal(s.T(), 0, scheduler.ActivePipelines())
+		assert.Equal(s.T(), 0, scheduler.RunningPipelines())
 	}
 }
 
-func (s *StaticSchedulerTestSuite) TestPipelineStartWithFixedIterations() {
+func (s *JITSchedulerTestSuite) TestPipelineStartWithFixedIterations() {
 	tempScriptContent := `
 setup {
 	log {
@@ -142,18 +142,18 @@ teardown {
 	defer filet.CleanUp(s.T())
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
 
-	scheduler := pipeline.NewStaticScheduler(s.l)
+	scheduler := pipeline.NewScheduler(s.l)
 	_ = scheduler.Prepare(decodedPipeline, 3, int64(25))
 	err := scheduler.Schedule(3)
 
 	if assert.NoError(s.T(), err) {
-		assert.Equal(s.T(), 3, scheduler.ActivePipelines())
+		assert.Equal(s.T(), 3, scheduler.RunningPipelines())
 	}
 
 	scheduler.WaitForCompletion()
-	assert.Equal(s.T(), 0, scheduler.ActivePipelines())
+	assert.Equal(s.T(), 0, scheduler.RunningPipelines())
 }
 
-func TestStaticSchedulerTestSuite(t *testing.T) {
-	suite.Run(t, new(StaticSchedulerTestSuite))
+func TestJITSchedulerTestSuite(t *testing.T) {
+	suite.Run(t, new(JITSchedulerTestSuite))
 }

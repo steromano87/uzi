@@ -24,14 +24,14 @@ func (w *MockedSampleWriter) Write(sample model.Sample) error {
 	return nil
 }
 
-type PipelineTestSuite struct {
+type RunnerTestSuite struct {
 	suite.Suite
 	l             loading.L
 	ctx           *pipeline.Context
 	ctxCancelFunc context.CancelFunc
 }
 
-func (s *PipelineTestSuite) SetupTest() {
+func (s *RunnerTestSuite) SetupTest() {
 	zerolog.TimeFieldFormat = time.RFC3339Nano
 	consoleWriter := zerolog.NewConsoleWriter()
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
@@ -53,7 +53,7 @@ func (s *PipelineTestSuite) SetupTest() {
 	s.ctxCancelFunc = cancelFunc
 }
 
-func (s *PipelineTestSuite) TestRunnerWithFixedIterations() {
+func (s *RunnerTestSuite) TestRunnerWithFixedIterations() {
 	tempScriptContent := `
 setup {
 	log {
@@ -79,9 +79,9 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	decodedPipeline.MaxIterations = 3
+	runner := pipeline.NewRunner(decodedPipeline, 3)
 	waitGroup.Add(1)
-	decodedPipeline.Start(s.ctx, &waitGroup)
+	runner.Start(s.ctx, &waitGroup)
 	waitGroup.Wait()
 
 	if assert.Equal(s.T(), pipeline.Completed, s.ctx.Status()) {
@@ -90,7 +90,7 @@ teardown {
 	}
 }
 
-func (s *PipelineTestSuite) TestRunnerWithPlannedShutdown() {
+func (s *RunnerTestSuite) TestRunnerWithPlannedShutdown() {
 	tempScriptContent := `
 setup {
 	log {
@@ -116,9 +116,9 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	decodedPipeline.MaxIterations = 9999
+	runner := pipeline.NewRunner(decodedPipeline, 9999)
 	waitGroup.Add(1)
-	decodedPipeline.Start(s.ctx, &waitGroup)
+	runner.Start(s.ctx, &waitGroup)
 	time.Sleep(2 * time.Millisecond)
 	s.T().Log("Asked for planned shutdown")
 	s.ctx.PlannedShutdown()
@@ -130,7 +130,7 @@ teardown {
 	}
 }
 
-func (s *PipelineTestSuite) TestRunnerWithGracefulShutdown() {
+func (s *RunnerTestSuite) TestRunnerWithGracefulShutdown() {
 	tempScriptContent := `
 setup {
 	log {
@@ -156,9 +156,9 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	decodedPipeline.MaxIterations = 9999
+	runner := pipeline.NewRunner(decodedPipeline, 9999)
 	waitGroup.Add(1)
-	decodedPipeline.Start(s.ctx, &waitGroup)
+	runner.Start(s.ctx, &waitGroup)
 	time.Sleep(2 * time.Millisecond)
 	s.T().Log("Asked for graceful shutdown")
 	s.ctx.GracefulShutdown()
@@ -170,7 +170,7 @@ teardown {
 	}
 }
 
-func (s *PipelineTestSuite) TestRunnerWithForcedShutdown() {
+func (s *RunnerTestSuite) TestRunnerWithForcedShutdown() {
 	tempScriptContent := `
 setup {
 	log {
@@ -196,9 +196,9 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	decodedPipeline.MaxIterations = 9999
+	runner := pipeline.NewRunner(decodedPipeline, 9999)
 	waitGroup.Add(1)
-	decodedPipeline.Start(s.ctx, &waitGroup)
+	runner.Start(s.ctx, &waitGroup)
 	time.Sleep(2 * time.Millisecond)
 	s.T().Log("Asked for forced shutdown")
 	s.ctx.Terminate()
@@ -210,7 +210,7 @@ teardown {
 	}
 }
 
-func (s *PipelineTestSuite) TestRunnerWithContextCancellation() {
+func (s *RunnerTestSuite) TestRunnerWithContextCancellation() {
 	tempScriptContent := `
 setup {
 	log {
@@ -236,9 +236,9 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	decodedPipeline.MaxIterations = 9999
+	runner := pipeline.NewRunner(decodedPipeline, 9999)
 	waitGroup.Add(1)
-	decodedPipeline.Start(s.ctx, &waitGroup)
+	runner.Start(s.ctx, &waitGroup)
 	time.Sleep(2 * time.Millisecond)
 	s.T().Log("Asked for context cancellation")
 	s.ctxCancelFunc()
@@ -251,5 +251,5 @@ teardown {
 }
 
 func TestPipelineTestSuite(t *testing.T) {
-	suite.Run(t, new(PipelineTestSuite))
+	suite.Run(t, new(RunnerTestSuite))
 }
