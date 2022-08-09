@@ -94,7 +94,7 @@ func (r *Runner) finalizeRun() {
 	case GracefullyShuttingDown:
 		r.ctx.UpdateStatus(Stopped)
 
-	case ForcefullyStopping:
+	case ForcefullyShuttingDown:
 		r.ctx.UpdateStatus(ForcefullyStopped)
 
 	default:

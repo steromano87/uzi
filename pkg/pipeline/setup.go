@@ -20,7 +20,7 @@ func (s *Setup) Run(ctx *Context) error {
 
 		case <-ctx.Done():
 			s.contextLogger(ctx).Warn().Msg("Forced termination requested, exiting immediately...")
-			ctx.UpdateStatus(ForcefullyStopping)
+			ctx.UpdateStatus(ForcefullyShuttingDown)
 			return nil
 
 		default:

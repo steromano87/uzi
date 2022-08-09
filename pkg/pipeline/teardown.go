@@ -20,7 +20,7 @@ func (t *Teardown) Run(ctx *Context) error {
 
 		case <-ctx.Done():
 			t.contextLogger(ctx).Warn().Msg("Forced termination requested, exiting immediately...")
-			ctx.UpdateStatus(ForcefullyStopping)
+			ctx.UpdateStatus(ForcefullyShuttingDown)
 			return nil
 
 		default:
