@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"github.com/hashicorp/hcl/v2"
+	"github.com/rs/zerolog"
 	"time"
 )
 
@@ -13,9 +14,11 @@ type Transaction struct {
 }
 
 func (t *Transaction) Run(ctx *Context) error {
+	t.contextLogger(ctx).Info().Msg("Transaction started")
 	t.start = time.Now()
 	defer func() {
 		t.end = time.Now()
+		t.contextLogger(ctx).Info().Dur("duration", t.Duration()).Msg("Transaction ended")
 	}()
 	for _, step := range t.steps {
 		err := step.Run(ctx)
@@ -46,4 +49,9 @@ func (t *Transaction) DecodeFromHCLBlock(ctx *hcl.EvalContext, block *hcl.Block)
 
 func (t *Transaction) Duration() time.Duration {
 	return t.end.Sub(t.start)
+}
+
+func (t *Transaction) contextLogger(ctx *Context) *zerolog.Logger {
+	logger := ctx.Logger.With().Str("component", "transaction").Str("name", t.name).Logger()
+	return &logger
 }
