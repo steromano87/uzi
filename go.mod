@@ -5,7 +5,6 @@ go 1.18
 require (
 	github.com/Flaque/filet v0.0.0-20201012163910-45f684403088
 	github.com/Masterminds/sprig/v3 v3.2.2
-	github.com/emirpasic/gods v1.18.1
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/hcl/v2 v2.13.0

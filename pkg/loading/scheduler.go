@@ -1,7 +1,7 @@
 package loading
 
 import (
-	"github.com/steromano87/harkonnen/v1/pkg/network"
+	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"math"
 	"time"
 )
@@ -33,16 +33,12 @@ func (s Scheduler) assignShootersQuota(totalShooters int) []int {
 
 func (s Scheduler) sendShooterQuotasUpdate(shooterQuotas []int) error {
 	for injectorID, quota := range shooterQuotas {
-		message := network.NewMessage(network.ShooterQuotaUpdate, map[string]any{
+		message := messaging.NewMessage(messaging.ShooterQuotaUpdate, map[string]any{
 			"injectorID": s.Injectors[injectorID].Name,
 			"newQuota":   quota,
 		})
-		messageType, packedMessage, err := network.PackMessage(message)
-		if err != nil {
-			return err
-		}
 
-		err = s.Injectors[injectorID].Messenger.Write(messageType, packedMessage)
+		err := s.Injectors[injectorID].Messenger.Send(message)
 		if err != nil {
 			return err
 		}

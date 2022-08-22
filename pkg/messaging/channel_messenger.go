@@ -1,0 +1,34 @@
+package messaging
+
+import (
+	"sync"
+)
+
+type ChannelMessenger struct {
+	sendMu   sync.Mutex
+	recvMu   sync.Mutex
+	sendChan chan<- Message
+	recvChan <-chan Message
+}
+
+func NewChannelMessenger(sendChan chan Message, recvChan chan Message) *ChannelMessenger {
+	messenger := new(ChannelMessenger)
+	messenger.sendChan = sendChan
+	messenger.recvChan = recvChan
+
+	return messenger
+}
+
+func (m *ChannelMessenger) Send(message Message) error {
+	m.sendMu.Lock()
+	defer m.sendMu.Unlock()
+	m.sendChan <- message
+	return nil
+}
+
+func (m *ChannelMessenger) Receive() (Message, error) {
+	m.recvMu.Lock()
+	defer m.recvMu.Unlock()
+
+	return <-m.recvChan, nil
+}
