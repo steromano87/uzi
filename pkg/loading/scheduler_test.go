@@ -9,6 +9,8 @@ import (
 	"testing"
 )
 
+///////////////////////////////////////////////////
+
 type MockedMessenger struct {
 	MessageForRead    messaging.Message
 	MessagesFromWrite []messaging.Message
@@ -22,6 +24,20 @@ func (m *MockedMessenger) Send(message messaging.Message) error {
 	m.MessagesFromWrite = append(m.MessagesFromWrite, message)
 	return nil
 }
+
+func (m *MockedMessenger) SendPing() error {
+	panic("not required")
+}
+
+func (m *MockedMessenger) SendPong(_ string) error {
+	panic("not required")
+}
+
+func (m *MockedMessenger) Close() {
+	panic("not required")
+}
+
+///////////////////////////////////////////////////
 
 type SchedulerTestSuite struct {
 	suite.Suite

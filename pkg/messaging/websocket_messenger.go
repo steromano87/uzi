@@ -50,5 +50,18 @@ func (w *WebsocketMessenger) Receive() (Message, error) {
 	}
 
 	return message, nil
+}
 
+func (w *WebsocketMessenger) SendPing() error {
+	// TODO: verify how to set ping message deadline to use the more appropriate `WriteControl` function
+	return w.Send(NewPingMessage())
+}
+
+func (w *WebsocketMessenger) SendPong(pingMsgID string) error {
+	return w.Send(NewPongMessage(pingMsgID))
+}
+
+func (w *WebsocketMessenger) Close() {
+	//TODO implement me
+	panic("implement me")
 }

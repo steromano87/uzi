@@ -39,3 +39,16 @@ func (m *ChannelMessenger) Receive() (Message, error) {
 
 	return <-m.recvChan, nil
 }
+
+func (m *ChannelMessenger) SendPing() error {
+	return m.Send(NewPingMessage())
+}
+
+func (m *ChannelMessenger) SendPong(pingMsgID string) error {
+	return m.Send(NewPongMessage(pingMsgID))
+}
+
+func (m *ChannelMessenger) Close() {
+	//TODO implement me
+	panic("implement me")
+}
