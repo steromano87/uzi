@@ -1,6 +1,7 @@
 package messaging
 
 import (
+	"encoding/json"
 	"errors"
 	"github.com/gorilla/websocket"
 	"sync"
@@ -22,12 +23,12 @@ func NewWebsocketMessenger(conn *websocket.Conn) *WebsocketMessenger {
 func (w *WebsocketMessenger) Send(message Message) error {
 	w.sendMu.Lock()
 	defer w.sendMu.Unlock()
-	msgType, rawBytes, err := Pack(message)
+	rawBytes, err := json.Marshal(message)
 	if err != nil {
 		return err
 	}
 
-	return w.connection.WriteMessage(msgType, rawBytes)
+	return w.connection.WriteMessage(websocket.TextMessage, rawBytes)
 }
 
 func (w *WebsocketMessenger) Receive() (Message, error) {
@@ -42,7 +43,8 @@ func (w *WebsocketMessenger) Receive() (Message, error) {
 		return Message{}, errors.New("only text messages are supported")
 	}
 
-	message, err := Unpack(rawBytes)
+	var message Message
+	err = json.Unmarshal(rawBytes, &message)
 	if err != nil {
 		return Message{}, err
 	}

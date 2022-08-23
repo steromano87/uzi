@@ -1,6 +1,7 @@
 package loading
 
 import (
+	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"math"
 	"time"
@@ -8,37 +9,33 @@ import (
 
 type Scheduler struct {
 	Profile   Profiler
-	Injectors []InjectorRemoteReference
+	Injectors []injector.RemoteReference
 }
 
 func (s Scheduler) Schedule(elapsed time.Duration) error {
-	totalShooters := s.Profile.ShootersAt(elapsed)
-	shooterQuotas := s.assignShootersQuota(totalShooters)
-	return s.sendShooterQuotasUpdate(shooterQuotas)
+	totalRunners := s.Profile.ShootersAt(elapsed)
+	runnersQuota := s.assignRunnersQuota(totalRunners)
+	return s.sendRunnersQuotasUpdate(runnersQuota)
 }
 
-func (s Scheduler) assignShootersQuota(totalShooters int) []int {
+func (s Scheduler) assignRunnersQuota(totalRunners int) []int {
 	quotas := make([]int, len(s.Injectors))
-	remainingShooters := totalShooters
+	remainingRunners := totalRunners
 
-	for injectorID, remoteReference := range s.Injectors {
-		remainingInjectorsWeight := totalInjectorsWeight(s.Injectors[injectorID:])
-		currentQuota := int(math.Floor(float64(remainingShooters) * float64(remoteReference.Weight) / float64(remainingInjectorsWeight)))
-		quotas[injectorID] = currentQuota
-		remainingShooters -= currentQuota
+	for injectorIndex, remoteReference := range s.Injectors {
+		remainingInjectorsWeight := totalInjectorsWeight(s.Injectors[injectorIndex:])
+		currentQuota := int(math.Floor(float64(remainingRunners) * float64(remoteReference.Weight) / float64(remainingInjectorsWeight)))
+		quotas[injectorIndex] = currentQuota
+		remainingRunners -= currentQuota
 	}
 
 	return quotas
 }
 
-func (s Scheduler) sendShooterQuotasUpdate(shooterQuotas []int) error {
-	for injectorID, quota := range shooterQuotas {
-		message := messaging.NewMessage(messaging.ShooterQuotaUpdate, map[string]any{
-			"injectorID": s.Injectors[injectorID].Name,
-			"newQuota":   quota,
-		})
-
-		err := s.Injectors[injectorID].Messenger.Send(message)
+func (s Scheduler) sendRunnersQuotasUpdate(shooterQuotas []int) error {
+	for injectorIndex, quota := range shooterQuotas {
+		message := messaging.NewRunnerQuotaUpdateMessage(quota)
+		err := s.Injectors[injectorIndex].Messenger.Send(message)
 		if err != nil {
 			return err
 		}
@@ -47,9 +44,9 @@ func (s Scheduler) sendShooterQuotasUpdate(shooterQuotas []int) error {
 	return nil
 }
 
-func totalInjectorsWeight(shooters []InjectorRemoteReference) int {
+func totalInjectorsWeight(injectors []injector.RemoteReference) int {
 	weight := 0
-	for _, reference := range shooters {
+	for _, reference := range injectors {
 		weight += reference.Weight
 	}
 
