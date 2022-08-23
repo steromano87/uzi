@@ -19,6 +19,13 @@ func NewChannelMessenger(sendChan chan Message, recvChan chan Message) *ChannelM
 	return messenger
 }
 
+func NewChannelMessengerPair() (bossMessenger *ChannelMessenger, minionMessenger *ChannelMessenger) {
+	bossToMinionChan := make(chan Message)
+	minionToBossChan := make(chan Message)
+
+	return NewChannelMessenger(bossToMinionChan, minionToBossChan), NewChannelMessenger(minionToBossChan, bossToMinionChan)
+}
+
 func (m *ChannelMessenger) Send(message Message) error {
 	m.sendMu.Lock()
 	defer m.sendMu.Unlock()
