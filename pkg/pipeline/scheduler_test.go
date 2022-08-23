@@ -4,10 +4,8 @@ import (
 	"context"
 	"github.com/Flaque/filet"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/loading"
-	"github.com/steromano87/harkonnen/v1/pkg/model"
+	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/steromano87/harkonnen/v1/pkg/pipeline"
-	"github.com/steromano87/harkonnen/v1/pkg/project"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"testing"
@@ -16,7 +14,9 @@ import (
 
 type SchedulerTestSuite struct {
 	suite.Suite
-	l loading.L
+	messenger  messaging.Messenger
+	ctx        messaging.Context
+	cancelFunc context.CancelFunc
 }
 
 func (s *SchedulerTestSuite) SetupTest() {
@@ -24,17 +24,9 @@ func (s *SchedulerTestSuite) SetupTest() {
 	consoleWriter := zerolog.NewConsoleWriter()
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
-	sampleWriter := &MockedSampleWriter{
-		Samples: []model.Sample{},
-	}
 
-	s.l = loading.L{
-		Context:      context.TODO(),
-		Logger:       &logger,
-		Config:       project.NewEmptyConfig(),
-		Variables:    loading.NewVariables(),
-		SampleWriter: sampleWriter,
-	}
+	s.messenger = messaging.NewChannelMessenger(make(chan messaging.Message), make(chan messaging.Message))
+	s.ctx, s.cancelFunc = messaging.NewContext(context.TODO(), &logger, s.messenger)
 }
 
 func (s *SchedulerTestSuite) TestSchedulePreparation() {
@@ -61,7 +53,7 @@ teardown {
 	defer filet.CleanUp(s.T())
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
 
-	scheduler := pipeline.NewScheduler(s.l)
+	scheduler := pipeline.NewScheduler(s.ctx)
 	err := scheduler.Prepare(decodedPipeline, 10, int64(999))
 
 	if assert.NoError(s.T(), err) {
@@ -98,7 +90,7 @@ teardown {
 	defer filet.CleanUp(s.T())
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
 
-	scheduler := pipeline.NewScheduler(s.l)
+	scheduler := pipeline.NewScheduler(s.ctx)
 	_ = scheduler.Prepare(decodedPipeline, 3, int64(999))
 	err := scheduler.Schedule(1)
 
@@ -144,7 +136,7 @@ teardown {
 	defer filet.CleanUp(s.T())
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
 
-	scheduler := pipeline.NewScheduler(s.l)
+	scheduler := pipeline.NewScheduler(s.ctx)
 	_ = scheduler.Prepare(decodedPipeline, 3, int64(5))
 	err := scheduler.Schedule(3)
 

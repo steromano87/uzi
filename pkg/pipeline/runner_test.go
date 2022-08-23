@@ -4,10 +4,9 @@ import (
 	"context"
 	"github.com/Flaque/filet"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/loading"
+	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/steromano87/harkonnen/v1/pkg/model"
 	"github.com/steromano87/harkonnen/v1/pkg/pipeline"
-	"github.com/steromano87/harkonnen/v1/pkg/project"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"sync"
@@ -26,9 +25,11 @@ func (w *MockedSampleWriter) Write(sample model.Sample) error {
 
 type RunnerTestSuite struct {
 	suite.Suite
-	l             loading.L
-	backgroundCtx context.Context
-	cancelFunc    context.CancelFunc
+	backgroundCtx        context.Context
+	backGroundCancelFunc context.CancelFunc
+	ctx                  messaging.Context
+	cancelFunc           context.CancelFunc
+	messenger            messaging.Messenger
 }
 
 func (s *RunnerTestSuite) SetupTest() {
@@ -36,21 +37,13 @@ func (s *RunnerTestSuite) SetupTest() {
 	consoleWriter := zerolog.NewConsoleWriter()
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
-	sampleWriter := &MockedSampleWriter{
-		Samples: []model.Sample{},
-	}
+
+	s.messenger = messaging.NewChannelMessenger(make(chan messaging.Message), make(chan messaging.Message))
 
 	s.backgroundCtx = context.TODO()
 	newCtx, cancelFunc := context.WithCancel(s.backgroundCtx)
-	s.cancelFunc = cancelFunc
-
-	s.l = loading.L{
-		Context:      newCtx,
-		Logger:       &logger,
-		Config:       project.NewEmptyConfig(),
-		Variables:    loading.NewVariables(),
-		SampleWriter: sampleWriter,
-	}
+	s.backGroundCancelFunc = cancelFunc
+	s.ctx, s.cancelFunc = messaging.NewContext(newCtx, &logger, s.messenger)
 }
 
 func (s *RunnerTestSuite) TestRunnerWithFixedIterations() {
@@ -79,7 +72,7 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	runner := pipeline.NewRunner(s.l, decodedPipeline, 3)
+	runner := pipeline.NewRunner(s.ctx, decodedPipeline, 3)
 	waitGroup.Add(1)
 	runner.Start(&waitGroup)
 	waitGroup.Wait()
@@ -116,7 +109,7 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	runner := pipeline.NewRunner(s.l, decodedPipeline, 9999)
+	runner := pipeline.NewRunner(s.ctx, decodedPipeline, 9999)
 	waitGroup.Add(1)
 	runner.Start(&waitGroup)
 	time.Sleep(2 * time.Millisecond)
@@ -156,7 +149,7 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	runner := pipeline.NewRunner(s.l, decodedPipeline, 9999)
+	runner := pipeline.NewRunner(s.ctx, decodedPipeline, 9999)
 	waitGroup.Add(1)
 	runner.Start(&waitGroup)
 	time.Sleep(2 * time.Millisecond)
@@ -196,7 +189,7 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	runner := pipeline.NewRunner(s.l, decodedPipeline, 9999)
+	runner := pipeline.NewRunner(s.ctx, decodedPipeline, 9999)
 	waitGroup.Add(1)
 	runner.Start(&waitGroup)
 	time.Sleep(2 * time.Millisecond)
@@ -236,7 +229,7 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	runner := pipeline.NewRunner(s.l, decodedPipeline, 9999)
+	runner := pipeline.NewRunner(s.ctx, decodedPipeline, 9999)
 	waitGroup.Add(1)
 	runner.Start(&waitGroup)
 	time.Sleep(2 * time.Millisecond)

@@ -3,13 +3,13 @@ package pipeline
 import (
 	"errors"
 	"github.com/jinzhu/copier"
-	"github.com/steromano87/harkonnen/v1/pkg/loading"
+	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"sync"
 	"time"
 )
 
 type Scheduler struct {
-	l                loading.L
+	ctx              messaging.Context
 	templatePipeline *Pipeline
 	maxIterations    int64
 	runners          []*Runner
@@ -18,9 +18,9 @@ type Scheduler struct {
 	runnersWaitGroup sync.WaitGroup
 }
 
-func NewScheduler(l loading.L) *Scheduler {
+func NewScheduler(ctx messaging.Context) *Scheduler {
 	scheduler := new(Scheduler)
-	scheduler.l = l
+	scheduler.ctx = ctx
 	scheduler.Reset()
 	return scheduler
 }
@@ -36,7 +36,7 @@ func (s *Scheduler) Prepare(referencePipeline *Pipeline, instances int, maxItera
 			return err
 		}
 
-		runner := NewRunner(s.l, pipelineToStart, s.maxIterations)
+		runner := NewRunner(s.ctx, pipelineToStart, s.maxIterations)
 		s.runners = append(s.runners, runner)
 	}
 	return nil
