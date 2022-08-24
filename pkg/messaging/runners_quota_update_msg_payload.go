@@ -16,10 +16,6 @@ func NewRunnerQuotaUpdateMessage(runnerQuota int) Message {
 	return NewRawMessage(RunnersQuotaUpdateMsgId, &RunnersQuotaUpdatePayload{Quota: runnerQuota})
 }
 
-func (r *RunnersQuotaUpdatePayload) Type() string {
-	return RunnersQuotaUpdateMsgId
-}
-
 func (r *RunnersQuotaUpdatePayload) UnmarshalJSON(bytes []byte) error {
 	var intermediate map[string]any
 
