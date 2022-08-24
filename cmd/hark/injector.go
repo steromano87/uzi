@@ -28,8 +28,8 @@ var injectorCmd = &cobra.Command{
 		_, messenger := messaging.NewChannelMessengerPair()
 
 		messagingCtx, cancelFunc := messaging.NewContext(context.Background(), &logger, messenger)
-		inj := injector.New(messagingCtx)
-		inj.Run()
+		inj, _ := injector.New(messagingCtx)
+		inj.Start()
 		logger.Info().Msg("Remote injector started, press Ctrl+C to stop it")
 
 		<-c
