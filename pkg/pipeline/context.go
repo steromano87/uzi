@@ -3,12 +3,12 @@ package pipeline
 import (
 	"context"
 	"github.com/google/uuid"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	"github.com/steromano87/harkonnen/v1/pkg/base"
 	"sync"
 )
 
 type Context struct {
-	messaging.Context
+	base.Context
 	id string
 
 	status      string
@@ -24,9 +24,9 @@ type Context struct {
 	GracefulShutdownChan chan struct{}
 }
 
-func NewContextFromParent(ctx messaging.Context) (*Context, context.CancelFunc) {
+func NewContextFromParent(ctx base.Context) (*Context, context.CancelFunc) {
 	newContext, cancelFunc := context.WithCancel(ctx)
-	ctx.Context.Context = newContext
+	ctx.Context = newContext
 	pipelineContext := &Context{
 		Context:              ctx,
 		status:               Ready,

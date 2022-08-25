@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
+	"github.com/steromano87/harkonnen/v1/pkg/base"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/steromano87/harkonnen/v1/pkg/pipeline"
 	"io"
@@ -13,7 +14,7 @@ import (
 )
 
 type Injector struct {
-	ctx    messaging.Context
+	ctx    base.Context
 	runner *pipeline.Runner
 
 	status string
@@ -21,7 +22,7 @@ type Injector struct {
 	workingFolder string
 }
 
-func New(ctx messaging.Context) (*Injector, error) {
+func New(ctx base.Context) (*Injector, error) {
 	inj := new(Injector)
 	inj.ctx = ctx
 	inj.status = Stopped
@@ -40,7 +41,7 @@ func (i *Injector) Start() {
 }
 
 func (i *Injector) Stop() {
-	defer i.cleanWorkingFolder()
+	i.cleanWorkingFolder()
 
 	i.status = Stopped
 }
@@ -55,7 +56,7 @@ func (i *Injector) WorkingFolder() string {
 
 func (i *Injector) handleIncomingMessages() {
 	select {
-	case <-i.ctx.Done():
+	case <-i.ctx.Context.Done():
 		i.ctx.Logger.Info().Msg("Context canceled, exiting incoming message handling loop")
 		i.Stop()
 	default:
@@ -131,6 +132,7 @@ func (i *Injector) initWorkingFolder() error {
 }
 
 func (i *Injector) cleanWorkingFolder() {
+	i.ctx.Logger.Info().Str("workingFolder", i.workingFolder).Msg("Cleaning temporary working folder")
 	err := os.RemoveAll(i.workingFolder)
 	if err != nil {
 		i.ctx.Logger.Error().Err(err).Str("workingFolder", i.workingFolder).Msg("Error cleaning temporary working folder")

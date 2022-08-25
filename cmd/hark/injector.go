@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
+	"github.com/steromano87/harkonnen/v1/pkg/base"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"os"
@@ -27,7 +28,7 @@ var injectorCmd = &cobra.Command{
 		// FIXME: correctly implement the websocket messenger
 		_, messenger := messaging.NewChannelMessengerPair()
 
-		messagingCtx, cancelFunc := messaging.NewContext(context.Background(), &logger, messenger)
+		messagingCtx, cancelFunc := base.NewContext(context.Background(), &logger, messenger)
 		inj, _ := injector.New(messagingCtx)
 		inj.Start()
 		logger.Info().Msg("Remote injector started, press Ctrl+C to stop it")

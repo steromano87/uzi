@@ -41,7 +41,7 @@ func (s *ClientTestSuite) SetupTest() {
 
 	s.l = loading.L{
 		Logger:       &logger,
-		Config:       project.NewEmptyConfig(),
+		Config:       project.NewConfig(),
 		Variables:    loading.NewVariables(),
 		SampleWriter: s.sampleWriter,
 	}

@@ -3,13 +3,13 @@ package pipeline
 import (
 	"errors"
 	"github.com/jinzhu/copier"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	"github.com/steromano87/harkonnen/v1/pkg/base"
 	"sync"
 	"time"
 )
 
 type Scheduler struct {
-	ctx              messaging.Context
+	ctx              base.Context
 	templatePipeline *Pipeline
 	maxIterations    int64
 	runners          []*Runner
@@ -18,7 +18,7 @@ type Scheduler struct {
 	runnersWaitGroup sync.WaitGroup
 }
 
-func NewScheduler(ctx messaging.Context) *Scheduler {
+func NewScheduler(ctx base.Context) *Scheduler {
 	scheduler := new(Scheduler)
 	scheduler.ctx = ctx
 	scheduler.Reset()

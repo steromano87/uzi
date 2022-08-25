@@ -3,7 +3,7 @@ package pipeline
 import (
 	"context"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	"github.com/steromano87/harkonnen/v1/pkg/base"
 	"sync"
 )
 
@@ -17,7 +17,7 @@ type Runner struct {
 	scheduledForGracefulShutdown bool
 }
 
-func NewRunner(parentCtx messaging.Context, pip *Pipeline, maxIterations int64) *Runner {
+func NewRunner(parentCtx base.Context, pip *Pipeline, maxIterations int64) *Runner {
 	runner := new(Runner)
 	runner.pip = pip
 	runner.pip.main.maxIterations = maxIterations

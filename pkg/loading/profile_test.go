@@ -33,7 +33,7 @@ func (s *ProfileTestSuite) SetupTest() {
 	s.sampleWriter = &MockedSampleWriter{
 		Samples: []model.Sample{},
 	}
-	s.configuration = project.NewEmptyConfig()
+	s.configuration = project.NewConfig()
 	s.l = loading.L{
 		Logger:       &s.logger,
 		Config:       s.configuration,

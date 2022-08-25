@@ -10,33 +10,29 @@ import (
 
 type Config struct {
 	*viper.Viper
-	ProjectDir string
+	workingDir string
 }
 
-func NewConfig(projectDir string) (*Config, error) {
-	config := NewEmptyConfig()
-
-	absoluteProjectDir, err := filepath.Abs(projectDir)
-	if err != nil {
-		return nil, err
-	}
-
-	config.ProjectDir = absoluteProjectDir
-	config.AddConfigPath(config.ProjectDir)
-
-	err = config.ReadInConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	return config, nil
-}
-
-func NewEmptyConfig() *Config {
+func NewConfig() *Config {
 	config := new(Config)
 	config.viperSetup()
 
 	return config
+}
+
+func (c *Config) ReadConfigFromWorkingDir(workingDir string) error {
+	absWorkingDir, err := filepath.Abs(workingDir)
+	if err != nil {
+		return err
+	}
+
+	c.workingDir = absWorkingDir
+	c.AddConfigPath(absWorkingDir)
+	return c.ReadInConfig()
+}
+
+func (c *Config) IsVolatile() bool {
+	return c.workingDir == ""
 }
 
 func (c *Config) GetOrDefault(key string, defaultValue interface{}) interface{} {
@@ -147,7 +143,7 @@ func (c *Config) SubConfig(key string) (*Config, error) {
 		viperConfig := c.Sub(key)
 		return &Config{
 			viperConfig,
-			c.ProjectDir,
+			c.workingDir,
 		}, nil
 	}
 

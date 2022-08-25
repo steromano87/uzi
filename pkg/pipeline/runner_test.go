@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/Flaque/filet"
 	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/base"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/steromano87/harkonnen/v1/pkg/model"
 	"github.com/steromano87/harkonnen/v1/pkg/pipeline"
@@ -27,7 +28,7 @@ type RunnerTestSuite struct {
 	suite.Suite
 	backgroundCtx        context.Context
 	backGroundCancelFunc context.CancelFunc
-	ctx                  messaging.Context
+	ctx                  base.Context
 	cancelFunc           context.CancelFunc
 	messenger            messaging.Messenger
 }
@@ -43,7 +44,7 @@ func (s *RunnerTestSuite) SetupTest() {
 	s.backgroundCtx = context.TODO()
 	newCtx, cancelFunc := context.WithCancel(s.backgroundCtx)
 	s.backGroundCancelFunc = cancelFunc
-	s.ctx, s.cancelFunc = messaging.NewContext(newCtx, &logger, s.messenger)
+	s.ctx, s.cancelFunc = base.NewContext(newCtx, &logger, s.messenger)
 }
 
 func (s *RunnerTestSuite) TestRunnerWithFixedIterations() {

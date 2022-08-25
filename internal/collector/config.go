@@ -2,7 +2,7 @@ package collector
 
 import (
 	"github.com/mcuadros/go-defaults"
-	"github.com/steromano87/harkonnen/v1/pkg/project"
+	"github.com/steromano87/harkonnen/v1/pkg/base"
 )
 
 const (
@@ -17,17 +17,17 @@ type Config struct {
 	DSN  string `yaml:"dsn" default:"results/results.db"`
 }
 
-func NewConfig(ctx project.Context) Config {
+func NewConfig(ctx base.Context) Config {
 	config := Config{}
 	defaults.SetDefaults(&config)
 
 	// Manually replace default values with the ones from the Viper config
-	if ctx.Config().IsSet(ConfigKey + ".type") {
-		config.Type = ctx.Config().GetString(ConfigKey + ".type")
+	if ctx.Config.IsSet(ConfigKey + ".type") {
+		config.Type = ctx.Config.GetString(ConfigKey + ".type")
 	}
 
-	if ctx.Config().IsSet(ConfigKey + ".dsn") {
-		config.DSN = ctx.Config().GetString(ConfigKey + ".dsn")
+	if ctx.Config.IsSet(ConfigKey + ".dsn") {
+		config.DSN = ctx.Config.GetString(ConfigKey + ".dsn")
 	}
 
 	return config

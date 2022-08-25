@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/Flaque/filet"
 	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/base"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/steromano87/harkonnen/v1/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
@@ -15,7 +16,7 @@ import (
 type SchedulerTestSuite struct {
 	suite.Suite
 	messenger  messaging.Messenger
-	ctx        messaging.Context
+	ctx        base.Context
 	cancelFunc context.CancelFunc
 }
 
@@ -26,7 +27,7 @@ func (s *SchedulerTestSuite) SetupTest() {
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
 
 	s.messenger = messaging.NewChannelMessenger(make(chan messaging.Message), make(chan messaging.Message))
-	s.ctx, s.cancelFunc = messaging.NewContext(context.TODO(), &logger, s.messenger)
+	s.ctx, s.cancelFunc = base.NewContext(context.TODO(), &logger, s.messenger)
 }
 
 func (s *SchedulerTestSuite) TestSchedulePreparation() {
