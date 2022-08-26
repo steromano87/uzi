@@ -26,16 +26,16 @@ var injectorCmd = &cobra.Command{
 		logger.Info().Msg("Starting remote injector")
 
 		// FIXME: correctly implement the websocket messenger
-		_, messenger := messaging.NewChannelMessengerPair()
+		_, messenger := messaging.NewChannelMessengerPair(100)
 
-		messagingCtx, cancelFunc := base.NewContext(context.Background(), &logger, messenger)
+		messagingCtx, _ := base.NewContext(context.Background(), &logger, messenger)
 		inj, _ := injector.New(messagingCtx)
 		inj.Start()
 		logger.Info().Msg("Remote injector started, press Ctrl+C to stop it")
 
 		<-c
 		logger.Info().Msg("Starting graceful shutdown")
-		cancelFunc()
+		inj.Stop()
 		logger.Info().Msg("Gracefully shutdown completed")
 	},
 }

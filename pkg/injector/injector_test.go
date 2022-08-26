@@ -33,7 +33,7 @@ func (s *InjectorTestSuite) SetupTest() {
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
 
-	s.bossMessenger, s.minionMessenger = messaging.NewChannelMessengerPair()
+	s.bossMessenger, s.minionMessenger = messaging.NewChannelMessengerPair(100)
 	s.ctx, s.cancelFunc = base.NewContext(context.TODO(), &logger, s.minionMessenger)
 }
 
@@ -63,14 +63,12 @@ func (s *InjectorTestSuite) TestStartNewInjector() {
 func (s *InjectorTestSuite) TestPingMessageHandling() {
 	inj, _ := injector.New(s.ctx)
 	inj.Start()
-	err := s.bossMessenger.SendPing()
+	s.bossMessenger.SendPing()
 
-	if assert.NoError(s.T(), err) {
-		responseMessage, err := s.bossMessenger.Receive()
-		if assert.NoError(s.T(), err) {
-			assert.Equal(s.T(), messaging.PongMsgId, responseMessage.Type)
-			assert.NotEmpty(s.T(), responseMessage.AnswersTo)
-		}
+	responseMessage, ok := <-s.bossMessenger.Receive()
+	if assert.True(s.T(), ok) {
+		assert.Equal(s.T(), messaging.PongMsgId, responseMessage.Type)
+		assert.NotEmpty(s.T(), responseMessage.AnswersTo)
 	}
 }
 
@@ -123,17 +121,15 @@ func (s *InjectorTestSuite) TestWorkingFolderInitMessageHandling() {
 	require.NoError(s.T(), err)
 
 	workDirMessage := messaging.NewWorkingFolderInitMsgID(compressedBytes.Bytes())
-	err = s.bossMessenger.Send(workDirMessage)
+	s.bossMessenger.Send(workDirMessage)
 
-	if assert.NoError(s.T(), err) {
-		responseMessage, err := s.bossMessenger.Receive()
-		if assert.NoError(s.T(), err) {
-			assert.Equal(s.T(), messaging.AcknowledgeMsgID, responseMessage.Type)
-			assert.Equal(s.T(), workDirMessage.ID, responseMessage.AnswersTo)
+	responseMessage, ok := <-s.bossMessenger.Receive()
+	if assert.True(s.T(), ok) {
+		assert.Equal(s.T(), messaging.AcknowledgeMsgID, responseMessage.Type)
+		assert.Equal(s.T(), workDirMessage.ID, responseMessage.AnswersTo)
 
-			if assert.DirExists(s.T(), inj.WorkingFolder()) {
-				assert.FileExists(s.T(), filepath.Join(inj.WorkingFolder(), tempFile.Name()))
-			}
+		if assert.DirExists(s.T(), inj.WorkingFolder()) {
+			assert.FileExists(s.T(), filepath.Join(inj.WorkingFolder(), tempFile.Name()))
 		}
 	}
 }

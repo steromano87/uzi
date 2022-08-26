@@ -59,13 +59,8 @@ func (i *Injector) handleIncomingMessages() {
 	case <-i.ctx.Context.Done():
 		i.ctx.Logger.Info().Msg("Context canceled, exiting incoming message handling loop")
 		i.Stop()
-	default:
-		incomingMessage, err := i.ctx.Messenger.Receive()
-		if err != nil {
-			i.ctx.Logger.Error().Err(err).Msg("Encountered error when reading message")
-			return
-		}
 
+	case incomingMessage := <-i.ctx.Messenger.Receive():
 		payload := incomingMessage.Payload
 		messageLogger := i.ctx.Logger.With().Str("msgType", incomingMessage.Type).Str("ID", incomingMessage.ID).Logger()
 
@@ -84,13 +79,8 @@ func (i *Injector) handleIncomingMessages() {
 
 func (i *Injector) handlePingMessage(message messaging.Message) {
 	i.ctx.Logger.Debug().Str("pingMsgID", message.ID).Msg("Received ping message")
-	err := i.ctx.SendPong(message.ID)
-	if err != nil {
-		i.ctx.Logger.Error().Err(err).Str("pingMsgID", message.ID).Msg("Encountered error when replying to a ping message")
-		_ = i.ctx.Send(messaging.NewErrorResponseMessage(message.ID, err))
-	} else {
-		i.ctx.Logger.Debug().Str("pingMsgID", message.ID).Msg("Answered with pong message")
-	}
+	i.ctx.SendPong(message.ID)
+	i.ctx.Logger.Debug().Str("pingMsgID", message.ID).Msg("Answered with pong message")
 }
 
 func (i *Injector) handleWorkingFolderInitMessage(message messaging.Message) {
@@ -101,7 +91,7 @@ func (i *Injector) handleWorkingFolderInitMessage(message messaging.Message) {
 	zipReader, err := zip.NewReader(bytes.NewReader(compressedWorkingFolder), int64(len(compressedWorkingFolder)))
 	if err != nil {
 		i.ctx.Logger.Error().Err(err).Str("ID", message.ID).Msg("Encountered error when reading compressed folder byte stream")
-		_ = i.ctx.Messenger.Send(messaging.NewErrorResponseMessage(message.ID, err))
+		i.ctx.Messenger.Send(messaging.NewErrorResponseMessage(message.ID, err))
 	}
 
 	// Iterate over zipped files and extract them to working folder
@@ -109,16 +99,16 @@ func (i *Injector) handleWorkingFolderInitMessage(message messaging.Message) {
 		err = i.unzipFile(file)
 		if err != nil {
 			i.ctx.Logger.Error().Err(err).Str("ID", message.ID).Msg("Encountered error when unzipping working folder")
-			_ = i.ctx.Messenger.Send(messaging.NewErrorResponseMessage(message.ID, err))
+			i.ctx.Messenger.Send(messaging.NewErrorResponseMessage(message.ID, err))
 		}
 	}
 
-	_ = i.ctx.Messenger.Send(messaging.NewAcknowledgeMessage(message.ID))
+	i.ctx.Messenger.Send(messaging.NewAcknowledgeMessage(message.ID))
 }
 
 func (i *Injector) handleRunnerQuotaUpdate(message messaging.Message) {
 	i.ctx.Logger.Info().Str("ID", message.ID).Int("newQuota", message.Payload.(*messaging.RunnersQuotaUpdatePayload).Quota).Msg("Received runners quota update message")
-	_ = i.ctx.Messenger.Send(messaging.NewAcknowledgeMessage(message.ID))
+	i.ctx.Messenger.Send(messaging.NewAcknowledgeMessage(message.ID))
 }
 
 func (i *Injector) initWorkingFolder() error {

@@ -1,9 +1,12 @@
 package messaging
 
+import "context"
+
 type Messenger interface {
-	Receive() (Message, error)
-	Send(Message) error
-	SendPing() error
-	SendPong(pingMsgID string) error
+	Start(ctx context.Context)
+	Receive() <-chan Message
+	Send(message Message)
+	SendPing()
+	SendPong(pingMsgID string)
 	Close()
 }

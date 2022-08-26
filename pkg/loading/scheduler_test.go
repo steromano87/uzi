@@ -41,8 +41,10 @@ func (m *MockedMessenger) Close() {
 
 type SchedulerTestSuite struct {
 	suite.Suite
-	profile   loading.Profiler
-	scheduler loading.Scheduler
+	profile         loading.Profiler
+	scheduler       loading.Scheduler
+	bossMessenger   messaging.Messenger
+	minionMessenger messaging.Messenger
 }
 
 func (s *SchedulerTestSuite) SetupTest() {
@@ -57,6 +59,8 @@ func (s *SchedulerTestSuite) SetupTest() {
 		Profile:   s.profile,
 		Injectors: nil,
 	}
+
+	s.bossMessenger, s.minionMessenger = messaging.NewChannelMessengerPair(100)
 }
 
 func (s *SchedulerTestSuite) TestSingleInjectorQuota() {
@@ -64,17 +68,14 @@ func (s *SchedulerTestSuite) TestSingleInjectorQuota() {
 		{
 			ID:        "first",
 			Weight:    1,
-			Messenger: &MockedMessenger{},
+			Messenger: s.bossMessenger,
 		},
 	}
 	s.scheduler.Injectors = injectorReferences
-	err := s.scheduler.Schedule(1)
+	s.scheduler.Schedule(1)
+	message, ok := <-s.minionMessenger.Receive()
 
-	if assert.NoError(s.T(), err) {
-		messenger := injectorReferences[0].Messenger.(*MockedMessenger)
-		assert.Len(s.T(), messenger.MessagesFromWrite, 1)
-
-		message := messenger.MessagesFromWrite[0]
+	if assert.True(s.T(), ok) {
 		assert.Equal(s.T(), &messaging.RunnersQuotaUpdatePayload{Quota: 10}, message.Payload)
 	}
 }
@@ -84,28 +85,21 @@ func (s *SchedulerTestSuite) TestTwoInjectorsWithSameWeight() {
 		{
 			ID:        "first",
 			Weight:    1,
-			Messenger: &MockedMessenger{},
+			Messenger: s.bossMessenger,
 		},
 		{
 			ID:        "second",
 			Weight:    1,
-			Messenger: &MockedMessenger{},
+			Messenger: s.bossMessenger,
 		},
 	}
 	s.scheduler.Injectors = injectorReferences
-	err := s.scheduler.Schedule(1)
+	s.scheduler.Schedule(1)
+	firstMessage := <-s.minionMessenger.Receive()
+	secondMessage, ok := <-s.minionMessenger.Receive()
 
-	if assert.NoError(s.T(), err) {
-		firstMessenger := injectorReferences[0].Messenger.(*MockedMessenger)
-		assert.Len(s.T(), firstMessenger.MessagesFromWrite, 1)
-
-		firstMessage := firstMessenger.MessagesFromWrite[0]
+	if assert.True(s.T(), ok) {
 		assert.Equal(s.T(), &messaging.RunnersQuotaUpdatePayload{Quota: 5}, firstMessage.Payload)
-
-		secondMessenger := injectorReferences[1].Messenger.(*MockedMessenger)
-		assert.Len(s.T(), secondMessenger.MessagesFromWrite, 1)
-
-		secondMessage := secondMessenger.MessagesFromWrite[0]
 		assert.Equal(s.T(), &messaging.RunnersQuotaUpdatePayload{Quota: 5}, secondMessage.Payload)
 	}
 }
@@ -115,28 +109,21 @@ func (s *SchedulerTestSuite) TestTwoInjectorsWithDifferentWeight() {
 		{
 			ID:        "first",
 			Weight:    8,
-			Messenger: &MockedMessenger{},
+			Messenger: s.bossMessenger,
 		},
 		{
 			ID:        "second",
 			Weight:    2,
-			Messenger: &MockedMessenger{},
+			Messenger: s.bossMessenger,
 		},
 	}
 	s.scheduler.Injectors = injectorReferences
-	err := s.scheduler.Schedule(1)
+	s.scheduler.Schedule(1)
+	firstMessage := <-s.minionMessenger.Receive()
+	secondMessage, ok := <-s.minionMessenger.Receive()
 
-	if assert.NoError(s.T(), err) {
-		firstMessenger := injectorReferences[0].Messenger.(*MockedMessenger)
-		assert.Len(s.T(), firstMessenger.MessagesFromWrite, 1)
-
-		firstMessage := firstMessenger.MessagesFromWrite[0]
+	if assert.True(s.T(), ok) {
 		assert.Equal(s.T(), &messaging.RunnersQuotaUpdatePayload{Quota: 8}, firstMessage.Payload)
-
-		secondMessenger := injectorReferences[1].Messenger.(*MockedMessenger)
-		assert.Len(s.T(), secondMessenger.MessagesFromWrite, 1)
-
-		secondMessage := secondMessenger.MessagesFromWrite[0]
 		assert.Equal(s.T(), &messaging.RunnersQuotaUpdatePayload{Quota: 2}, secondMessage.Payload)
 	}
 }
@@ -146,39 +133,28 @@ func (s *SchedulerTestSuite) TestThreeInjectorsWithDifferentWeight() {
 		{
 			ID:        "first",
 			Weight:    8,
-			Messenger: &MockedMessenger{},
+			Messenger: s.bossMessenger,
 		},
 		{
 			ID:        "second",
 			Weight:    2,
-			Messenger: &MockedMessenger{},
+			Messenger: s.bossMessenger,
 		},
 		{
 			ID:        "third",
 			Weight:    2,
-			Messenger: &MockedMessenger{},
+			Messenger: s.bossMessenger,
 		},
 	}
 	s.scheduler.Injectors = injectorReferences
-	err := s.scheduler.Schedule(1)
+	s.scheduler.Schedule(1)
+	firstMessage := <-s.minionMessenger.Receive()
+	secondMessage := <-s.minionMessenger.Receive()
+	thirdMessage, ok := <-s.minionMessenger.Receive()
 
-	if assert.NoError(s.T(), err) {
-		firstMessenger := injectorReferences[0].Messenger.(*MockedMessenger)
-		assert.Len(s.T(), firstMessenger.MessagesFromWrite, 1)
-
-		firstMessage := firstMessenger.MessagesFromWrite[0]
+	if assert.True(s.T(), ok) {
 		assert.Equal(s.T(), &messaging.RunnersQuotaUpdatePayload{Quota: 6}, firstMessage.Payload)
-
-		secondMessenger := injectorReferences[1].Messenger.(*MockedMessenger)
-		assert.Len(s.T(), secondMessenger.MessagesFromWrite, 1)
-
-		secondMessage := secondMessenger.MessagesFromWrite[0]
 		assert.Equal(s.T(), &messaging.RunnersQuotaUpdatePayload{Quota: 2}, secondMessage.Payload)
-
-		thirdMessenger := injectorReferences[2].Messenger.(*MockedMessenger)
-		assert.Len(s.T(), thirdMessenger.MessagesFromWrite, 1)
-
-		thirdMessage := thirdMessenger.MessagesFromWrite[0]
 		assert.Equal(s.T(), &messaging.RunnersQuotaUpdatePayload{Quota: 2}, thirdMessage.Payload)
 	}
 }

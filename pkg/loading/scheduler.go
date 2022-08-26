@@ -12,10 +12,10 @@ type Scheduler struct {
 	Injectors []injector.RemoteReference
 }
 
-func (s Scheduler) Schedule(elapsed time.Duration) error {
+func (s Scheduler) Schedule(elapsed time.Duration) {
 	totalRunners := s.Profile.ShootersAt(elapsed)
 	runnersQuota := s.assignRunnersQuota(totalRunners)
-	return s.sendRunnersQuotasUpdate(runnersQuota)
+	s.sendRunnersQuotasUpdate(runnersQuota)
 }
 
 func (s Scheduler) assignRunnersQuota(totalRunners int) []int {
@@ -32,16 +32,11 @@ func (s Scheduler) assignRunnersQuota(totalRunners int) []int {
 	return quotas
 }
 
-func (s Scheduler) sendRunnersQuotasUpdate(shooterQuotas []int) error {
+func (s Scheduler) sendRunnersQuotasUpdate(shooterQuotas []int) {
 	for injectorIndex, quota := range shooterQuotas {
 		message := messaging.NewRunnerQuotaUpdateMessage(quota)
-		err := s.Injectors[injectorIndex].Messenger.Send(message)
-		if err != nil {
-			return err
-		}
+		s.Injectors[injectorIndex].Messenger.Send(message)
 	}
-
-	return nil
 }
 
 func totalInjectorsWeight(injectors []injector.RemoteReference) int {
