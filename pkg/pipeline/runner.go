@@ -65,7 +65,7 @@ func (r *Runner) run() {
 
 	if r.ctx.IterationsCounter().MaxIterationsReached() {
 		r.contextLogger().Info().Msg(
-			fmt.Sprintf("Maximum iterations reached (%d), exiting Main loop", r.ctx.IterationsCounter().CompletedIterations()))
+			fmt.Sprintf("Maximum iterations reached (%d), exiting Main loop", r.ctx.IterationsCounter().maxIterations))
 	}
 
 	err = r.pip.Teardown.Run(r.ctx)
