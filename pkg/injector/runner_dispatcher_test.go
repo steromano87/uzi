@@ -193,6 +193,8 @@ teardown {
 	dispatcher.WaitForCompletion()
 	if assert.Equal(s.T(), 0, dispatcher.Stats().Running) {
 		assert.Equal(s.T(), 3, dispatcher.Stats().Completed)
+		assert.EqualValues(s.T(), 5, dispatcher.IterationsCounter().CompletedIterations())
+		assert.EqualValues(s.T(), 5, dispatcher.IterationsCounter().PassedIterations())
 	}
 }
 
