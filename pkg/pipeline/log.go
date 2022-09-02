@@ -17,25 +17,25 @@ func (log *Log) Run(ctx *Context) error {
 
 	switch log.level {
 	case "error":
-		partialLogger = ctx.Logger.Error()
+		partialLogger = ctx.Logger().Error()
 
 	case "warning":
-		partialLogger = ctx.Logger.Warn()
+		partialLogger = ctx.Logger().Warn()
 
 	case "info":
-		partialLogger = ctx.Logger.Info()
+		partialLogger = ctx.Logger().Info()
 
 	case "debug":
-		partialLogger = ctx.Logger.Debug()
+		partialLogger = ctx.Logger().Debug()
 
 	case "trace":
-		partialLogger = ctx.Logger.Trace()
+		partialLogger = ctx.Logger().Trace()
 
 	default:
 		return errors.New(fmt.Sprintf("%s is not a valid log level", log.level))
 	}
 
-	partialLogger.Str("pipelineID", ctx.id).Msg(log.message)
+	partialLogger.Msg(log.message)
 
 	return nil
 }

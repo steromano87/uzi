@@ -1,8 +1,10 @@
 package pipeline
 
 const (
-	Ready     = "READY"
-	Running   = "RUNNING"
+	Ready   = "READY"
+	Running = "RUNNING"
+
+	Exiting   = "EXITING"
 	Completed = "COMPLETED"
 
 	GracefullyShuttingDown = "GRACEFULLY_SHUTTING_DOWN"

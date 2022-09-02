@@ -24,15 +24,15 @@ func (l *LogDispatcherTestSuite) SetupTest() {
 }
 
 func (l *LogDispatcherTestSuite) TestNewLogDispatcher() {
-	dispatcher := injector.NewLogDispatcher(l.minionMessenger, 10)
+	dispatcher := injector.NewLogSender(l.minionMessenger, 10)
 
-	if assert.IsType(l.T(), &injector.LogDispatcher{}, dispatcher) {
+	if assert.IsType(l.T(), &injector.LogSender{}, dispatcher) {
 		assert.Implements(l.T(), (*io.Writer)(nil), dispatcher)
 	}
 }
 
 func (l *LogDispatcherTestSuite) TestWriteLogBelowBufferLimit() {
-	dispatcher := injector.NewLogDispatcher(l.minionMessenger, 10)
+	dispatcher := injector.NewLogSender(l.minionMessenger, 10)
 	logger := zerolog.New(dispatcher)
 	logger.Info().Msg("my first log")
 	logger.Info().Msg("my second log")
@@ -52,7 +52,7 @@ func (l *LogDispatcherTestSuite) TestWriteLogBelowBufferLimit() {
 }
 
 func (l *LogDispatcherTestSuite) TestWriteLogWithManualFlush() {
-	dispatcher := injector.NewLogDispatcher(l.minionMessenger, 10)
+	dispatcher := injector.NewLogSender(l.minionMessenger, 10)
 	logger := zerolog.New(dispatcher)
 	logger.Info().Msg("my first log")
 	logger.Info().Msg("my second log")

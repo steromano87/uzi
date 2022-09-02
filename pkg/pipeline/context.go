@@ -2,82 +2,82 @@ package pipeline
 
 import (
 	"context"
-	"github.com/google/uuid"
-	"github.com/steromano87/harkonnen/v1/pkg/base"
-	"sync"
+	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/project"
+	"github.com/steromano87/harkonnen/v1/pkg/variables"
 )
 
 type Context struct {
-	base.Context
-	id string
+	context.Context
 
-	status      string
-	statusMutex sync.RWMutex
+	logger *zerolog.Logger
+	config *project.Config
 
-	totalIterations      int64
-	totalIterationsMutex sync.RWMutex
+	vars              *variables.Holder
+	iterationsCounter *IterationsCounter
 
-	successfulIterations      int64
-	successfulIterationsMutex sync.RWMutex
+	status string
 
-	PlannedShutdownChan  chan struct{}
-	GracefulShutdownChan chan struct{}
+	gracefulShutdownChan chan struct{}
+	plannedShutdownChan  chan struct{}
 }
 
-func NewContextFromParent(ctx base.Context) (*Context, context.CancelFunc) {
-	newContext, cancelFunc := context.WithCancel(ctx)
-	ctx.Context = newContext
-	pipelineContext := &Context{
-		Context:              ctx,
+func NewContext(ctx context.Context, logger *zerolog.Logger, iterCounter *IterationsCounter) (*Context, context.CancelFunc) {
+	cancelCtx, cancelFunc := context.WithCancel(ctx)
+
+	return &Context{
+		Context:              cancelCtx,
+		logger:               logger,
+		config:               project.NewConfig(),
+		vars:                 variables.NewHolder(),
+		iterationsCounter:    iterCounter,
 		status:               Ready,
-		id:                   uuid.NewString(),
-		PlannedShutdownChan:  make(chan struct{}),
-		GracefulShutdownChan: make(chan struct{}),
-	}
-
-	return pipelineContext, cancelFunc
+		gracefulShutdownChan: make(chan struct{}),
+		plannedShutdownChan:  make(chan struct{}),
+	}, cancelFunc
 }
 
-func (c *Context) PlannedShutdown() {
-	c.PlannedShutdownChan <- struct{}{}
+func (c *Context) UpdateConfig(config *project.Config) {
+	c.config = config
 }
 
-func (c *Context) GracefulShutdown() {
-	c.GracefulShutdownChan <- struct{}{}
-}
-
-func (c *Context) UpdateStatus(status string) {
-	c.statusMutex.Lock()
-	defer c.statusMutex.Unlock()
-	c.status = status
+func (c *Context) UpdateVariables(newVars variables.Holder) {
+	c.vars.SetGlobals(newVars.Globals())
+	c.vars.UpdateIterVars(newVars.IterVars())
 }
 
 func (c *Context) Status() string {
-	c.statusMutex.RLock()
-	defer c.statusMutex.RUnlock()
 	return c.status
 }
 
-func (c *Context) AddSuccessfulIteration() {
-	c.successfulIterationsMutex.Lock()
-	defer c.successfulIterationsMutex.Unlock()
-	c.successfulIterations++
+func (c *Context) PlannedShutdown() <-chan struct{} {
+	return c.plannedShutdownChan
 }
 
-func (c *Context) SuccessfulIterations() int64 {
-	c.successfulIterationsMutex.RLock()
-	defer c.successfulIterationsMutex.RUnlock()
-	return c.successfulIterations
+func (c *Context) SchedulePlannedShutdown() {
+	c.plannedShutdownChan <- struct{}{}
 }
 
-func (c *Context) AddIteration() {
-	c.totalIterationsMutex.Lock()
-	defer c.totalIterationsMutex.Unlock()
-	c.totalIterations++
+func (c *Context) GracefulShutdown() <-chan struct{} {
+	return c.gracefulShutdownChan
 }
 
-func (c *Context) TotalIterations() int64 {
-	c.totalIterationsMutex.RLock()
-	defer c.totalIterationsMutex.RUnlock()
-	return c.totalIterations
+func (c *Context) ScheduleGracefulShutdown() {
+	c.gracefulShutdownChan <- struct{}{}
+}
+
+func (c *Context) Logger() *zerolog.Logger {
+	return c.logger
+}
+
+func (c *Context) Config() *project.Config {
+	return c.config
+}
+
+func (c *Context) IterationsCounter() *IterationsCounter {
+	return c.iterationsCounter
+}
+
+func (c *Context) Variables() *variables.Holder {
+	return c.vars
 }

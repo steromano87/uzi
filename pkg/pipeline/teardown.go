@@ -14,13 +14,13 @@ func (t *Teardown) Run(ctx *Context) error {
 
 	for _, step := range t.steps {
 		select {
-		case <-ctx.GracefulShutdownChan:
+		case <-ctx.GracefulShutdown():
 			t.contextLogger(ctx).Info().Msg("Graceful shutdown requested")
-			ctx.UpdateStatus(GracefullyShuttingDown)
+			ctx.status = GracefullyShuttingDown
 
 		case <-ctx.Done():
 			t.contextLogger(ctx).Warn().Msg("Forced termination requested, exiting immediately...")
-			ctx.UpdateStatus(ForcefullyShuttingDown)
+			ctx.status = ForcefullyShuttingDown
 			return nil
 
 		default:
@@ -51,6 +51,6 @@ func (t *Teardown) DecodeFromHCLBlock(ctx *hcl.EvalContext, block *hcl.Block) er
 }
 
 func (t *Teardown) contextLogger(ctx *Context) *zerolog.Logger {
-	logger := ctx.Logger.With().Str("component", "Teardown step").Str("pipelineID", ctx.id).Logger()
+	logger := ctx.Logger().With().Str("component", "Teardown step").Logger()
 	return &logger
 }

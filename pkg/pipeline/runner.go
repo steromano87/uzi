@@ -1,109 +1,99 @@
 package pipeline
 
 import (
-	"context"
+	"fmt"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/base"
 	"sync"
 )
 
 type Runner struct {
-	pip           *Pipeline
-	maxIterations int64
+	id  string
+	ctx *Context
 
-	ctx                          *Context
-	cancelFunc                   context.CancelFunc
-	waitGroup                    *sync.WaitGroup
-	scheduledForGracefulShutdown bool
+	pip       Pipeline
+	waitGroup *sync.WaitGroup
 }
 
-func NewRunner(parentCtx base.Context, pip *Pipeline, maxIterations int64) *Runner {
+func NewRunner(ctx *Context) *Runner {
 	runner := new(Runner)
-	runner.pip = pip
-	runner.pip.main.maxIterations = maxIterations
-
-	ctx, cancelFunc := NewContextFromParent(parentCtx)
 	runner.ctx = ctx
-	runner.cancelFunc = cancelFunc
+	runner.id = uuid.NewString()
 
 	return runner
 }
 
-func (r *Runner) Start(wg *sync.WaitGroup) {
+func (r *Runner) Start(wg *sync.WaitGroup, pip Pipeline) {
 	r.waitGroup = wg
+	r.pip = pip
 	go r.run()
-}
-
-func (r *Runner) PlannedShutdown() {
-	r.ctx.PlannedShutdown()
 }
 
 func (r *Runner) GracefulShutdown() {
 	r.ctx.GracefulShutdown()
 }
 
-func (r *Runner) Terminate() {
-	r.cancelFunc()
-}
-
-func (r *Runner) Status() string {
-	return r.ctx.Status()
-}
-
-func (r *Runner) TotalIterations() int64 {
-	return r.ctx.totalIterations
-}
-
-func (r *Runner) SuccessfulIterations() int64 {
-	return r.ctx.successfulIterations
-}
-
 func (r *Runner) run() {
 	r.contextLogger().Info().Msg("Pipeline execution started")
-	r.ctx.UpdateStatus(Running)
+	r.ctx.status = Running
 
 	defer r.finalizeRun()
 
 	var err error
 
-	err = r.pip.setup.Run(r.ctx)
+	err = r.pip.Setup.Run(r.ctx)
 	if err != nil {
 		r.contextLogger().Error().Msg("Pipeline stopped due to an error during setup")
-		r.ctx.UpdateStatus(Error)
+		r.ctx.status = Error
 		return
 	}
 
-	err = r.pip.main.Run(r.ctx)
-	if err != nil {
-		r.contextLogger().Error().Err(err).Msg("Pipeline encountered a error during main loop")
+	for !r.pip.Main.ScheduledForGracefulShutdown() && !r.ctx.IterationsCounter().MaxIterationsReached() {
+		r.ctx.IterationsCounter().AddInProgressIteration()
+		err := r.pip.Main.Run(r.ctx)
+
+		if err == nil {
+			r.ctx.IterationsCounter().AddPassedIteration()
+		} else {
+			r.ctx.IterationsCounter().AddFailedIteration()
+		}
 	}
 
-	err = r.pip.teardown.Run(r.ctx)
+	if r.pip.Main.ScheduledForGracefulShutdown() {
+		r.contextLogger().Info().Msg("Shutdown requested, exiting Main loop")
+	}
+
+	if r.ctx.IterationsCounter().MaxIterationsReached() {
+		r.contextLogger().Info().Msg(
+			fmt.Sprintf("Maximum iterations reached (%d), exiting Main loop", r.ctx.IterationsCounter().CompletedIterations()))
+	}
+
+	err = r.pip.Teardown.Run(r.ctx)
 	if err != nil {
 		r.contextLogger().Error().Err(err).Msg("Pipeline encountered a error during teardown")
 	}
 }
 
 func (r *Runner) contextLogger() *zerolog.Logger {
-	logger := r.ctx.Logger.With().Str("component", "Pipeline").Str("id", r.ctx.id).Logger()
+	logger := r.ctx.Logger().With().Str("component", "Runner").Str("id", r.id).Logger()
 	return &logger
 }
 
 func (r *Runner) finalizeRun() {
 	switch r.ctx.Status() {
 	case GracefullyShuttingDown:
-		r.ctx.UpdateStatus(Stopped)
+		r.ctx.status = Stopped
 
 	case ForcefullyShuttingDown:
-		r.ctx.UpdateStatus(ForcefullyStopped)
+		r.ctx.status = ForcefullyStopped
 
 	default:
-		r.ctx.UpdateStatus(Completed)
+		r.ctx.status = Completed
 	}
 
 	r.contextLogger().Info().Str(
-		"status", r.ctx.Status()).Int64(
-		"totalIterations", r.ctx.TotalIterations()).Msg("Pipeline execution terminated")
+		"status", r.ctx.Status()).Uint64(
+		"totalIterations", r.ctx.IterationsCounter().CompletedIterations()).Msg("Pipeline execution terminated")
 
 	r.waitGroup.Done()
 }

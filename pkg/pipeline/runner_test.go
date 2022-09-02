@@ -4,9 +4,7 @@ import (
 	"context"
 	"github.com/Flaque/filet"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/base"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
-	"github.com/steromano87/harkonnen/v1/pkg/model"
 	"github.com/steromano87/harkonnen/v1/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -15,22 +13,14 @@ import (
 	"time"
 )
 
-type MockedSampleWriter struct {
-	Samples []model.Sample
-}
-
-func (w *MockedSampleWriter) Write(sample model.Sample) error {
-	w.Samples = append(w.Samples, sample)
-	return nil
-}
-
 type RunnerTestSuite struct {
 	suite.Suite
 	backgroundCtx        context.Context
 	backGroundCancelFunc context.CancelFunc
-	ctx                  base.Context
+	ctx                  *pipeline.Context
 	cancelFunc           context.CancelFunc
 	messenger            messaging.Messenger
+	iterCounter          *pipeline.IterationsCounter
 }
 
 func (s *RunnerTestSuite) SetupTest() {
@@ -40,11 +30,12 @@ func (s *RunnerTestSuite) SetupTest() {
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
 
 	s.messenger = messaging.NewChannelMessenger(make(chan messaging.Message), make(chan messaging.Message))
+	s.iterCounter = pipeline.NewIterationsCounter()
 
 	s.backgroundCtx = context.TODO()
 	newCtx, cancelFunc := context.WithCancel(s.backgroundCtx)
 	s.backGroundCancelFunc = cancelFunc
-	s.ctx, s.cancelFunc = base.NewContext(newCtx, &logger, s.messenger)
+	s.ctx, s.cancelFunc = pipeline.NewContext(newCtx, &logger, s.iterCounter)
 }
 
 func (s *RunnerTestSuite) TestRunnerWithFixedIterations() {
@@ -56,6 +47,10 @@ setup {
 }
 
 main {
+	fixed_wait {
+		amount = "1ms"
+	}
+
 	log {
 		message = "Main loop executed"
 	}
@@ -73,14 +68,15 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	runner := pipeline.NewRunner(s.ctx, decodedPipeline, 3)
+	s.ctx.IterationsCounter().SetMaxIterations(3)
+	runner := pipeline.NewRunner(s.ctx)
 	waitGroup.Add(1)
-	runner.Start(&waitGroup)
+	runner.Start(&waitGroup, decodedPipeline)
 	waitGroup.Wait()
 
-	if assert.Equal(s.T(), pipeline.Completed, runner.Status()) {
-		assert.Equal(s.T(), int64(3), runner.TotalIterations())
-		assert.Equal(s.T(), int64(3), runner.SuccessfulIterations())
+	if assert.Equal(s.T(), pipeline.Completed, s.ctx.Status()) {
+		assert.EqualValues(s.T(), 3, s.ctx.IterationsCounter().CompletedIterations())
+		assert.EqualValues(s.T(), 3, s.ctx.IterationsCounter().PassedIterations())
 	}
 }
 
@@ -93,6 +89,10 @@ setup {
 }
 
 main {
+	fixed_wait {
+		amount = "1ms"
+	}
+
 	log {
 		message = "Main loop executed"
 	}
@@ -110,17 +110,18 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	runner := pipeline.NewRunner(s.ctx, decodedPipeline, 9999)
+	runner := pipeline.NewRunner(s.ctx)
+	s.ctx.IterationsCounter().SetMaxIterations(9999)
 	waitGroup.Add(1)
-	runner.Start(&waitGroup)
+	runner.Start(&waitGroup, decodedPipeline)
 	time.Sleep(2 * time.Millisecond)
 	s.T().Log("Asked for planned shutdown")
-	runner.PlannedShutdown()
+	s.ctx.SchedulePlannedShutdown()
 	waitGroup.Wait()
 
-	if assert.Equal(s.T(), pipeline.Completed, runner.Status()) {
-		assert.Less(s.T(), runner.TotalIterations(), int64(9999))
-		assert.Equal(s.T(), runner.TotalIterations(), runner.SuccessfulIterations())
+	if assert.Equal(s.T(), pipeline.Completed, s.ctx.Status()) {
+		assert.Less(s.T(), s.ctx.IterationsCounter().CompletedIterations(), uint64(9999))
+		assert.Equal(s.T(), s.ctx.IterationsCounter().CompletedIterations(), s.ctx.IterationsCounter().PassedIterations())
 	}
 }
 
@@ -133,6 +134,10 @@ setup {
 }
 
 main {
+	fixed_wait {
+		amount = "1ms"
+	}
+
 	log {
 		message = "Main loop executed"
 	}
@@ -150,17 +155,18 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	runner := pipeline.NewRunner(s.ctx, decodedPipeline, 9999)
+	runner := pipeline.NewRunner(s.ctx)
+	s.ctx.IterationsCounter().SetMaxIterations(9999)
 	waitGroup.Add(1)
-	runner.Start(&waitGroup)
+	runner.Start(&waitGroup, decodedPipeline)
 	time.Sleep(2 * time.Millisecond)
-	s.T().Log("Asked for graceful shutdown")
-	runner.GracefulShutdown()
+	s.T().Log("Asked for planned shutdown")
+	s.ctx.ScheduleGracefulShutdown()
 	waitGroup.Wait()
 
-	if assert.Equal(s.T(), pipeline.Stopped, runner.Status()) {
-		assert.Less(s.T(), runner.TotalIterations(), int64(9999))
-		assert.Equal(s.T(), runner.TotalIterations(), runner.SuccessfulIterations())
+	if assert.Equal(s.T(), pipeline.Stopped, s.ctx.Status()) {
+		assert.Less(s.T(), s.ctx.IterationsCounter().CompletedIterations(), uint64(9999))
+		assert.Equal(s.T(), s.ctx.IterationsCounter().CompletedIterations(), s.ctx.IterationsCounter().PassedIterations())
 	}
 }
 
@@ -173,6 +179,10 @@ setup {
 }
 
 main {
+	fixed_wait {
+		amount = "1ms"
+	}
+
 	log {
 		message = "Main loop executed"
 	}
@@ -190,17 +200,18 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	runner := pipeline.NewRunner(s.ctx, decodedPipeline, 9999)
+	runner := pipeline.NewRunner(s.ctx)
+	s.ctx.IterationsCounter().SetMaxIterations(9999)
 	waitGroup.Add(1)
-	runner.Start(&waitGroup)
+	runner.Start(&waitGroup, decodedPipeline)
 	time.Sleep(2 * time.Millisecond)
 	s.T().Log("Asked for forced shutdown")
-	runner.Terminate()
+	s.cancelFunc()
 	waitGroup.Wait()
 
-	if assert.Equal(s.T(), pipeline.ForcefullyStopped, runner.Status()) {
-		assert.Less(s.T(), runner.TotalIterations(), int64(9999))
-		assert.Equal(s.T(), runner.TotalIterations(), runner.SuccessfulIterations())
+	if assert.Equal(s.T(), pipeline.ForcefullyStopped, s.ctx.Status()) {
+		assert.Less(s.T(), s.ctx.IterationsCounter().CompletedIterations(), uint64(9999))
+		assert.Equal(s.T(), s.ctx.IterationsCounter().CompletedIterations(), s.ctx.IterationsCounter().PassedIterations())
 	}
 }
 
@@ -213,6 +224,10 @@ setup {
 }
 
 main {
+	fixed_wait {
+		amount = "1ms"
+	}
+
 	log {
 		message = "Main loop executed"
 	}
@@ -230,17 +245,18 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	runner := pipeline.NewRunner(s.ctx, decodedPipeline, 9999)
+	runner := pipeline.NewRunner(s.ctx)
+	s.ctx.IterationsCounter().SetMaxIterations(9999)
 	waitGroup.Add(1)
-	runner.Start(&waitGroup)
+	runner.Start(&waitGroup, decodedPipeline)
 	time.Sleep(2 * time.Millisecond)
 	s.T().Log("Asked for context cancellation")
-	s.cancelFunc()
+	s.backGroundCancelFunc()
 	waitGroup.Wait()
 
-	if assert.Equal(s.T(), pipeline.ForcefullyStopped, runner.Status()) {
-		assert.Less(s.T(), runner.TotalIterations(), int64(9999))
-		assert.Equal(s.T(), runner.TotalIterations(), runner.SuccessfulIterations())
+	if assert.Equal(s.T(), pipeline.ForcefullyStopped, s.ctx.Status()) {
+		assert.Less(s.T(), s.ctx.IterationsCounter().CompletedIterations(), uint64(9999))
+		assert.Equal(s.T(), s.ctx.IterationsCounter().CompletedIterations(), s.ctx.IterationsCounter().PassedIterations())
 	}
 }
 

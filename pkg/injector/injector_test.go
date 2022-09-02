@@ -6,7 +6,6 @@ import (
 	"context"
 	"github.com/Flaque/filet"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/base"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +22,7 @@ type InjectorTestSuite struct {
 	suite.Suite
 	bossMessenger   messaging.Messenger
 	minionMessenger messaging.Messenger
-	ctx             base.Context
+	ctx             injector.Context
 	cancelFunc      context.CancelFunc
 }
 
@@ -34,7 +33,7 @@ func (s *InjectorTestSuite) SetupTest() {
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
 
 	s.bossMessenger, s.minionMessenger = messaging.NewChannelMessengerPair(100)
-	s.ctx, s.cancelFunc = base.NewContext(context.TODO(), &logger, s.minionMessenger)
+	s.ctx, s.cancelFunc = injector.NewContext(context.TODO(), &logger, s.minionMessenger)
 }
 
 func (s *InjectorTestSuite) TearDownTest() {

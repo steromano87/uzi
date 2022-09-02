@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-type LogDispatcher struct {
+type LogSender struct {
 	messenger  messaging.Messenger
 	bufferSize int
 
@@ -14,8 +14,8 @@ type LogDispatcher struct {
 	mu         sync.Mutex
 }
 
-func NewLogDispatcher(messenger messaging.Messenger, bufferSize int) *LogDispatcher {
-	dispatcher := new(LogDispatcher)
+func NewLogSender(messenger messaging.Messenger, bufferSize int) *LogSender {
+	dispatcher := new(LogSender)
 	dispatcher.messenger = messenger
 	dispatcher.bufferSize = bufferSize
 	dispatcher.queuedLogs = make([]json.RawMessage, 0)
@@ -23,7 +23,7 @@ func NewLogDispatcher(messenger messaging.Messenger, bufferSize int) *LogDispatc
 	return dispatcher
 }
 
-func (l *LogDispatcher) Write(p []byte) (n int, err error) {
+func (l *LogSender) Write(p []byte) (n int, err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.queuedLogs = append(l.queuedLogs, p)
@@ -35,7 +35,7 @@ func (l *LogDispatcher) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func (l *LogDispatcher) Flush() {
+func (l *LogSender) Flush() {
 	logMessage := messaging.NewRemoteLogMessage(l.queuedLogs)
 	l.messenger.Send(logMessage)
 	l.queuedLogs = make([]json.RawMessage, 0)

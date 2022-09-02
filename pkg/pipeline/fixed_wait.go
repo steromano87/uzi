@@ -11,7 +11,7 @@ type FixedWait struct {
 }
 
 func (w *FixedWait) Run(ctx *Context) error {
-	ctx.Logger.Info().Str("pipelineID", ctx.id).Dur("amount", w.amount).Msg("Waiting")
+	ctx.Logger().Info().Dur("amount", w.amount).Msg("Waiting")
 	time.Sleep(w.amount)
 	return nil
 }

@@ -4,9 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
-	"github.com/steromano87/harkonnen/v1/pkg/base"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
-	"github.com/steromano87/harkonnen/v1/pkg/pipeline"
 	"io"
 	"os"
 	"path/filepath"
@@ -14,15 +12,15 @@ import (
 )
 
 type Injector struct {
-	ctx    base.Context
-	runner *pipeline.Runner
+	ctx        Context
+	dispatcher RunnerDispatcher
 
 	status string
 
 	workingFolder string
 }
 
-func New(ctx base.Context) (*Injector, error) {
+func New(ctx Context) (*Injector, error) {
 	inj := new(Injector)
 	inj.ctx = ctx
 	inj.status = Stopped
@@ -57,12 +55,12 @@ func (i *Injector) WorkingFolder() string {
 func (i *Injector) handleIncomingMessages() {
 	select {
 	case <-i.ctx.Context.Done():
-		i.ctx.Logger.Info().Msg("Context canceled, exiting incoming message handling loop")
+		i.ctx.Logger().Info().Msg("Context canceled, exiting incoming message handling loop")
 		i.Stop()
 
 	case incomingMessage := <-i.ctx.Messenger.Receive():
 		payload := incomingMessage.Payload
-		messageLogger := i.ctx.Logger.With().Str("msgType", incomingMessage.Type).Str("ID", incomingMessage.ID).Logger()
+		messageLogger := i.ctx.Logger().With().Str("msgType", incomingMessage.Type).Str("ID", incomingMessage.ID).Logger()
 
 		switch incomingMessage.Type {
 		case messaging.PingMsgId:
@@ -72,25 +70,25 @@ func (i *Injector) handleIncomingMessages() {
 		case messaging.RunnersQuotaUpdateMsgId:
 			messageLogger.Info().Int("newQuota", payload.(*messaging.RunnersQuotaUpdatePayload).Quota).Msg("Received runners quota update message")
 		default:
-			i.ctx.Logger.Warn().Msg("Received unknown message type")
+			i.ctx.Logger().Warn().Msg("Received unknown message type")
 		}
 	}
 }
 
 func (i *Injector) handlePingMessage(message messaging.Message) {
-	i.ctx.Logger.Debug().Str("pingMsgID", message.ID).Msg("Received ping message")
+	i.ctx.Logger().Debug().Str("pingMsgID", message.ID).Msg("Received ping message")
 	i.ctx.SendPong(message.ID)
-	i.ctx.Logger.Debug().Str("pingMsgID", message.ID).Msg("Answered with pong message")
+	i.ctx.Logger().Debug().Str("pingMsgID", message.ID).Msg("Answered with pong message")
 }
 
 func (i *Injector) handleWorkingFolderInitMessage(message messaging.Message) {
-	i.ctx.Logger.Info().Str("ID", message.ID).Msg("Received compressed working folder, unzipping...")
+	i.ctx.Logger().Info().Str("ID", message.ID).Msg("Received compressed working folder, unzipping...")
 	compressedWorkingFolder := message.Payload.(*messaging.WorkingFolderInitPayload).CompressedWorkingFolder
 
 	// Read byte content into zip reader
 	zipReader, err := zip.NewReader(bytes.NewReader(compressedWorkingFolder), int64(len(compressedWorkingFolder)))
 	if err != nil {
-		i.ctx.Logger.Error().Err(err).Str("ID", message.ID).Msg("Encountered error when reading compressed folder byte stream")
+		i.ctx.Logger().Error().Err(err).Str("ID", message.ID).Msg("Encountered error when reading compressed folder byte stream")
 		i.ctx.Messenger.Send(messaging.NewErrorResponseMessage(message.ID, err))
 	}
 
@@ -98,7 +96,7 @@ func (i *Injector) handleWorkingFolderInitMessage(message messaging.Message) {
 	for _, file := range zipReader.File {
 		err = i.unzipFile(file)
 		if err != nil {
-			i.ctx.Logger.Error().Err(err).Str("ID", message.ID).Msg("Encountered error when unzipping working folder")
+			i.ctx.Logger().Error().Err(err).Str("ID", message.ID).Msg("Encountered error when unzipping working folder")
 			i.ctx.Messenger.Send(messaging.NewErrorResponseMessage(message.ID, err))
 		}
 	}
@@ -107,7 +105,7 @@ func (i *Injector) handleWorkingFolderInitMessage(message messaging.Message) {
 }
 
 func (i *Injector) handleRunnerQuotaUpdate(message messaging.Message) {
-	i.ctx.Logger.Info().Str("ID", message.ID).Int("newQuota", message.Payload.(*messaging.RunnersQuotaUpdatePayload).Quota).Msg("Received runners quota update message")
+	i.ctx.Logger().Info().Str("ID", message.ID).Int("newQuota", message.Payload.(*messaging.RunnersQuotaUpdatePayload).Quota).Msg("Received runners quota update message")
 	i.ctx.Messenger.Send(messaging.NewAcknowledgeMessage(message.ID))
 }
 
@@ -117,15 +115,15 @@ func (i *Injector) initWorkingFolder() error {
 		return err
 	}
 	i.workingFolder = dir
-	i.ctx.Logger.Info().Str("workingFolder", i.workingFolder).Msg("Created temporary working folder")
+	i.ctx.Logger().Info().Str("workingFolder", i.workingFolder).Msg("Created temporary working folder")
 	return err
 }
 
 func (i *Injector) cleanWorkingFolder() {
-	i.ctx.Logger.Info().Str("workingFolder", i.workingFolder).Msg("Cleaning temporary working folder")
+	i.ctx.Logger().Info().Str("workingFolder", i.workingFolder).Msg("Cleaning temporary working folder")
 	err := os.RemoveAll(i.workingFolder)
 	if err != nil {
-		i.ctx.Logger.Error().Err(err).Str("workingFolder", i.workingFolder).Msg("Error cleaning temporary working folder")
+		i.ctx.Logger().Error().Err(err).Str("workingFolder", i.workingFolder).Msg("Error cleaning temporary working folder")
 	}
 }
 

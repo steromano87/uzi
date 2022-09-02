@@ -1,4 +1,4 @@
-package pipeline
+package injector
 
 type RunnerStats struct {
 	Ready                  int

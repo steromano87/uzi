@@ -1,7 +1,6 @@
 package pipeline
 
 import (
-	"fmt"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/rs/zerolog"
 	"runtime"
@@ -9,55 +8,39 @@ import (
 
 type Main struct {
 	steps                        []Step
-	maxIterations                int64
 	scheduledForGracefulShutdown bool
 }
 
 func (m *Main) Run(ctx *Context) error {
-	for !m.scheduledForGracefulShutdown && (ctx.TotalIterations() < m.maxIterations || m.maxIterations == 0) {
-		var err error
+	var err error
 
-		for _, step := range m.steps {
-			select {
-			case <-ctx.PlannedShutdownChan:
-				m.contextLogger(ctx).Info().Msg("Planned shutdown requested")
-				m.scheduledForGracefulShutdown = true
+	for _, step := range m.steps {
+		select {
+		case <-ctx.GracefulShutdown():
+			m.contextLogger(ctx).Info().Msg("Graceful shutdown requested")
+			m.scheduledForGracefulShutdown = true
+			ctx.status = GracefullyShuttingDown
 
-			case <-ctx.GracefulShutdownChan:
-				m.contextLogger(ctx).Info().Msg("Graceful shutdown requested")
-				ctx.UpdateStatus(GracefullyShuttingDown)
-				m.scheduledForGracefulShutdown = true
+		case <-ctx.PlannedShutdown():
+			m.contextLogger(ctx).Info().Msg("Planned shutdown requested")
+			m.scheduledForGracefulShutdown = true
+			ctx.status = Exiting
 
-			case <-ctx.Done():
-				m.contextLogger(ctx).Warn().Msg("Forced termination requested, exiting immediately...")
-				ctx.UpdateStatus(ForcefullyShuttingDown)
-				runtime.Goexit()
+		case <-ctx.Done():
+			m.contextLogger(ctx).Warn().Msg("Forced termination requested, exiting immediately...")
+			ctx.status = ForcefullyShuttingDown
+			runtime.Goexit()
 
-			default:
-				err = step.Run(ctx)
-				if err != nil {
-					m.contextLogger(ctx).Error().Err(err).Msg("Error during main loop execution, ending current loop")
-					break
-				}
+		default:
+			err = step.Run(ctx)
+			if err != nil {
+				m.contextLogger(ctx).Error().Err(err).Msg("Error during Main loop execution, ending current loop")
+				break
 			}
 		}
-
-		ctx.AddIteration()
-		if err == nil {
-			ctx.AddSuccessfulIteration()
-		}
 	}
 
-	if m.scheduledForGracefulShutdown {
-		m.contextLogger(ctx).Info().Msg("Shutdown requested, exiting main loop")
-	}
-
-	if m.maxIterations > 0 && ctx.TotalIterations() >= m.maxIterations {
-		m.contextLogger(ctx).Info().Msg(
-			fmt.Sprintf("Maximum iterations reached (%d), exiting main loop", ctx.TotalIterations()))
-	}
-
-	return nil
+	return err
 }
 
 func (m *Main) DecodeFromHCLBlock(ctx *hcl.EvalContext, block *hcl.Block) error {
@@ -76,7 +59,11 @@ func (m *Main) DecodeFromHCLBlock(ctx *hcl.EvalContext, block *hcl.Block) error 
 	return nil
 }
 
+func (m *Main) ScheduledForGracefulShutdown() bool {
+	return m.scheduledForGracefulShutdown
+}
+
 func (m *Main) contextLogger(ctx *Context) *zerolog.Logger {
-	logger := ctx.Logger.With().Str("component", "Main step").Str("pipelineID", ctx.id).Logger()
+	logger := ctx.Logger().With().Str("component", "Main step").Logger()
 	return &logger
 }

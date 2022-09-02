@@ -12,8 +12,8 @@ type Holder struct {
 	iterVars LinearKeysMap
 }
 
-func NewHolder() Holder {
-	return Holder{
+func NewHolder() *Holder {
+	return &Holder{
 		locals:   NewLinearKeysMap(),
 		globals:  NewLinearKeysMap(),
 		iterVars: NewLinearKeysMap(),
@@ -34,6 +34,14 @@ func (h *Holder) UpdateIterVars(input map[string]any) {
 
 func (h *Holder) SetLocal(key string, value any) {
 	h.locals.Set(key, value)
+}
+
+func (h *Holder) Globals() map[string]any {
+	return h.globals.AsMap()
+}
+
+func (h *Holder) IterVars() map[string]any {
+	return h.iterVars.AsMap()
 }
 
 func (h *Holder) Render(t string) (string, error) {
