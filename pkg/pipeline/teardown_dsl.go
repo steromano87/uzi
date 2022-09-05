@@ -1,6 +1,9 @@
 package pipeline
 
-import "github.com/hashicorp/hcl/v2"
+import (
+	"github.com/hashicorp/hcl/v2"
+	"github.com/steromano87/harkonnen/v1/pkg/dsl"
+)
 
 var (
 	teardownType = "teardown"
@@ -9,6 +12,6 @@ var (
 
 	teardownSchema = &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{},
-		Blocks:     baseSteps,
+		Blocks:     dsl.RegisteredSteps(),
 	}
 )

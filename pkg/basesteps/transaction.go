@@ -1,19 +1,19 @@
-package pipeline
+package basesteps
 
 import (
-	"github.com/hashicorp/hcl/v2"
 	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/dsl"
 	"time"
 )
 
 type Transaction struct {
 	name  string
-	steps []Step
+	steps []dsl.Step
 	start time.Time
 	end   time.Time
 }
 
-func (t *Transaction) Run(ctx *Context) error {
+func (t *Transaction) Run(ctx dsl.StepContext) error {
 	t.contextLogger(ctx).Info().Msg("Transaction started")
 	t.start = time.Now()
 	defer func() {
@@ -30,28 +30,11 @@ func (t *Transaction) Run(ctx *Context) error {
 	return nil
 }
 
-func (t *Transaction) DecodeFromHCLBlock(ctx *hcl.EvalContext, block *hcl.Block) error {
-	body, diagnostics := block.Body.Content(transactionSchema)
-	if diagnostics != nil && diagnostics.HasErrors() {
-		return diagnostics.Errs()[0]
-	}
-
-	t.name = block.Labels[0]
-
-	decodedSteps, err := DecodeStepBlocks(ctx, body.Blocks)
-	if err != nil {
-		return err
-	}
-	t.steps = decodedSteps
-
-	return nil
-}
-
 func (t *Transaction) Duration() time.Duration {
 	return t.end.Sub(t.start)
 }
 
-func (t *Transaction) contextLogger(ctx *Context) *zerolog.Logger {
+func (t *Transaction) contextLogger(ctx dsl.StepContext) *zerolog.Logger {
 	logger := ctx.Logger().With().Str("component", "transaction").Str("name", t.name).Logger()
 	return &logger
 }

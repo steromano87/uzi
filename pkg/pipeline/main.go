@@ -3,11 +3,12 @@ package pipeline
 import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/dsl"
 	"runtime"
 )
 
 type Main struct {
-	steps                        []Step
+	steps                        []dsl.Step
 	scheduledForGracefulShutdown bool
 }
 
@@ -49,7 +50,7 @@ func (m *Main) DecodeFromHCLBlock(ctx *hcl.EvalContext, block *hcl.Block) error 
 		return diagnostics.Errs()[0]
 	}
 
-	decodedSteps, err := DecodeStepBlocks(ctx, body.Blocks)
+	decodedSteps, err := dsl.DecodeStepBlocks(ctx, body.Blocks)
 	if err != nil {
 		return err
 	}

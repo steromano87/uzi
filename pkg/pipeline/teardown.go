@@ -3,10 +3,11 @@ package pipeline
 import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/dsl"
 )
 
 type Teardown struct {
-	steps []Step
+	steps []dsl.Step
 }
 
 func (t *Teardown) Run(ctx *Context) error {
@@ -40,7 +41,7 @@ func (t *Teardown) DecodeFromHCLBlock(ctx *hcl.EvalContext, block *hcl.Block) er
 		return diagnostics.Errs()[0]
 	}
 
-	decodedSteps, err := DecodeStepBlocks(ctx, body.Blocks)
+	decodedSteps, err := dsl.DecodeStepBlocks(ctx, body.Blocks)
 	if err != nil {
 		return err
 	}
