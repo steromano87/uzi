@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/steromano87/harkonnen/v1/pkg/project"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 )
@@ -10,8 +11,9 @@ import (
 type Context struct {
 	context.Context
 
-	logger *zerolog.Logger
-	config *project.Config
+	logger    *zerolog.Logger
+	config    *project.Config
+	messenger messaging.Messenger
 
 	vars              *variables.Holder
 	iterationsCounter *IterationsCounter
@@ -22,13 +24,14 @@ type Context struct {
 	plannedShutdownChan  chan struct{}
 }
 
-func NewContext(ctx context.Context, logger *zerolog.Logger, iterCounter *IterationsCounter) (*Context, context.CancelFunc) {
+func NewContext(ctx context.Context, logger *zerolog.Logger, messenger messaging.Messenger, iterCounter *IterationsCounter) (*Context, context.CancelFunc) {
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
 
 	return &Context{
 		Context:              cancelCtx,
 		logger:               logger,
 		config:               project.NewConfig(),
+		messenger:            messenger,
 		vars:                 variables.NewHolder(),
 		iterationsCounter:    iterCounter,
 		status:               Ready,
@@ -80,4 +83,8 @@ func (c *Context) IterationsCounter() *IterationsCounter {
 
 func (c *Context) Variables() *variables.Holder {
 	return c.vars
+}
+
+func (c *Context) Messenger() messaging.Messenger {
+	return c.messenger
 }

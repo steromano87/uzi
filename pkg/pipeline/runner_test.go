@@ -35,7 +35,7 @@ func (s *RunnerTestSuite) SetupTest() {
 	s.backgroundCtx = context.TODO()
 	newCtx, cancelFunc := context.WithCancel(s.backgroundCtx)
 	s.backGroundCancelFunc = cancelFunc
-	s.ctx, s.cancelFunc = pipeline.NewContext(newCtx, &logger, s.iterCounter)
+	s.ctx, s.cancelFunc = pipeline.NewContext(newCtx, &logger, s.messenger, s.iterCounter)
 }
 
 func (s *RunnerTestSuite) TestRunnerWithFixedIterations() {
