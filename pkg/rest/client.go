@@ -16,10 +16,9 @@ import (
 const restClientVariablesKey = "restClient"
 
 type Client struct {
-	ctx          dsl.StepContext
-	config       Config
-	innerClient  http.Client
-	lastResponse *http.Response
+	ctx         dsl.StepContext
+	config      Config
+	innerClient http.Client
 }
 
 func NewClient(ctx dsl.StepContext) *Client {
@@ -29,10 +28,6 @@ func NewClient(ctx dsl.StepContext) *Client {
 	client.buildInnerClient()
 
 	return client
-}
-
-func (c *Client) LastResponse() *http.Response {
-	return c.lastResponse
 }
 
 func (c *Client) Execute(request Request) error {
@@ -114,9 +109,8 @@ func (c *Client) Execute(request Request) error {
 
 	// TODO: add sample caching instead of sending them one by one
 	c.ctx.Messenger().Send(messaging.NewSampleMessage([]model.Sample{sample}))
-	c.lastResponse = response
 
-	return nil
+	return c.saveLastResponse(response)
 }
 
 func (c *Client) calculateSentReceivedBytes(response *http.Response) (sent uint64, received uint64, err error) {
@@ -220,4 +214,27 @@ func (c *Client) setRedirectsFromConfig() {
 	} else {
 		c.disableRedirects()
 	}
+}
+
+func (c *Client) saveLastResponse(response *http.Response) error {
+	bodyBuffer, err := io.ReadAll(response.Body)
+	if err != nil {
+		return err
+	}
+
+	purifiedAnswer := struct {
+		Status     string
+		StatusCode int
+		Proto      string
+		Header     http.Header
+		Body       []byte
+	}{
+		Status:     response.Status,
+		StatusCode: response.StatusCode,
+		Proto:      response.Proto,
+		Header:     response.Header,
+		Body:       bodyBuffer,
+	}
+
+	return c.ctx.Variables().SetLastResponse(purifiedAnswer)
 }
