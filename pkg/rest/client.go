@@ -2,7 +2,8 @@ package rest
 
 import (
 	"bytes"
-	"github.com/steromano87/harkonnen/v1/pkg/loading"
+	"github.com/steromano87/harkonnen/v1/pkg/dsl"
+	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/steromano87/harkonnen/v1/pkg/model"
 	"io"
 	"net/http"
@@ -12,17 +13,19 @@ import (
 	"time"
 )
 
+const restClientVariablesKey = "restClient"
+
 type Client struct {
-	l            loading.L
+	ctx          dsl.StepContext
 	config       Config
 	innerClient  http.Client
 	lastResponse *http.Response
 }
 
-func NewClient(l loading.L) *Client {
+func NewClient(ctx dsl.StepContext) *Client {
 	client := new(Client)
-	client.l = l
-	client.config = NewConfig(l)
+	client.ctx = ctx
+	client.config = NewConfig(ctx)
 	client.buildInnerClient()
 
 	return client
@@ -32,7 +35,7 @@ func (c *Client) LastResponse() *http.Response {
 	return c.lastResponse
 }
 
-func (c *Client) Execute(request Request, options ...Option) {
+func (c *Client) Execute(request Request) error {
 	c.setRedirectsFromConfig()
 
 	// Generate the raw request
@@ -42,7 +45,7 @@ func (c *Client) Execute(request Request, options ...Option) {
 	if c.config.BaseUrl() != "" {
 		baseUrl, err = url.Parse(c.config.BaseUrl())
 		if err != nil {
-			c.l.OnUnrecoverableError(err)
+			return err
 		}
 	} else {
 		baseUrl = nil
@@ -51,14 +54,13 @@ func (c *Client) Execute(request Request, options ...Option) {
 	rawRequest, err := request.Build(baseUrl)
 
 	if err != nil {
-		c.l.OnUnrecoverableError(err)
-		return
+		return err
 	}
 
 	// If option is present, allow redirects
-	if HasOption(options, FollowRedirects) {
+	if HasOption(request.Options, FollowRedirects) {
 		c.enableRedirects()
-	} else if HasOption(options, NoFollowRedirects) {
+	} else if HasOption(request.Options, NoFollowRedirects) {
 		c.disableRedirects()
 	}
 
@@ -68,17 +70,18 @@ func (c *Client) Execute(request Request, options ...Option) {
 	endTime := time.Now()
 
 	if err != nil {
-		c.l.OnUnrecoverableError(err)
-		return
+		return err
 	}
 
-	if response.StatusCode >= 400 && !HasOption(options, AllowUnsuccessfulStatuses) {
-		c.l.OnUnrecoverableError(ErrBadHTTPStatus{Status: response.Status})
-		return
+	if response.StatusCode >= 400 && !HasOption(request.Options, AllowUnsuccessfulStatuses) {
+		return err
 	}
 
 	// Calculate request and response size
-	sentBytes, receivedBytes := c.calculateSentReceivedBytes(response)
+	sentBytes, receivedBytes, err := c.calculateSentReceivedBytes(response)
+	if err != nil {
+		return err
+	}
 
 	// Save query string and strip it from the URL
 	pureUrl := rawRequest.URL
@@ -109,18 +112,21 @@ func (c *Client) Execute(request Request, options ...Option) {
 	}
 	sample.Timestamp = startTime
 
-	c.l.OnNewSample(sample)
+	// TODO: add sample caching instead of sending them one by one
+	c.ctx.Messenger().Send(messaging.NewSampleMessage([]model.Sample{sample}))
 	c.lastResponse = response
+
+	return nil
 }
 
-func (c *Client) calculateSentReceivedBytes(response *http.Response) (uint64, uint64) {
+func (c *Client) calculateSentReceivedBytes(response *http.Response) (sent uint64, received uint64, err error) {
 	// Get original request from response
 	request := response.Request
 
 	// Calculate request header size in bytes
 	requestHeader, err := httputil.DumpRequestOut(request, false)
 	if err != nil {
-		c.l.OnUnrecoverableError(err)
+		return 0, 0, err
 	}
 
 	requestHeaderSize := uint64(len(requestHeader))
@@ -137,7 +143,7 @@ func (c *Client) calculateSentReceivedBytes(response *http.Response) (uint64, ui
 		temp, err := io.Copy(io.Discard, countWriter)
 
 		if err != nil {
-			c.l.OnUnrecoverableError(err)
+			return 0, 0, err
 		}
 
 		request.Body = backupWriter
@@ -147,7 +153,7 @@ func (c *Client) calculateSentReceivedBytes(response *http.Response) (uint64, ui
 	// Calculate response header size in bytes
 	responseHeader, err := httputil.DumpResponse(response, false)
 	if err != nil {
-		c.l.OnUnrecoverableError(err)
+		return 0, 0, err
 	}
 
 	responseHeaderSize := uint64(len(responseHeader))
@@ -163,14 +169,14 @@ func (c *Client) calculateSentReceivedBytes(response *http.Response) (uint64, ui
 		temp, err := io.Copy(io.Discard, countWriter)
 
 		if err != nil {
-			c.l.OnUnrecoverableError(err)
+			return 0, 0, err
 		}
 
 		response.Body = backupWriter
 		responseBodySize = uint64(temp)
 	}
 
-	return requestHeaderSize + requestBodySize, responseHeaderSize + responseBodySize
+	return requestHeaderSize + requestBodySize, responseHeaderSize + responseBodySize, nil
 }
 
 func (c *Client) buildInnerClient() {

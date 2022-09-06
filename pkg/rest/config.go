@@ -1,7 +1,7 @@
 package rest
 
 import (
-	"github.com/steromano87/harkonnen/v1/pkg/loading"
+	"github.com/steromano87/harkonnen/v1/pkg/dsl"
 	"github.com/steromano87/harkonnen/v1/pkg/project"
 	"time"
 )
@@ -12,9 +12,9 @@ type Config struct {
 	*project.Config
 }
 
-func NewConfig(l loading.L) Config {
+func NewConfig(ctx dsl.StepContext) Config {
 	restConfig := Config{}
-	restConfig.Config = l.Config
+	restConfig.Config = ctx.Config()
 
 	return restConfig
 }

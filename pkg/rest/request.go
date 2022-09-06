@@ -2,6 +2,7 @@ package rest
 
 import (
 	"bytes"
+	"github.com/steromano87/harkonnen/v1/pkg/dsl"
 	"io"
 	"net/http"
 	"net/url"
@@ -23,90 +24,21 @@ const (
 type Request struct {
 	Method
 	Url         string
+	Name        string
 	Parameters  *url.Values
 	ContentType string
 	Body        string
 	RawBody     []byte
+	Options     []Option
 }
 
-func Get(url string, parameters *url.Values) Request {
-	return Request{
-		Method:      "GET",
-		Url:         url,
-		Parameters:  parameters,
-		ContentType: "",
-		Body:        "",
+func (r *Request) Run(ctx dsl.StepContext) error {
+	restClient, ok := ctx.Variables().Locals()[restClientVariablesKey].(*Client)
+	if !ok {
+		restClient = NewClient(ctx)
 	}
-}
 
-func Post(url string, contentType string, body []byte) Request {
-	return Request{
-		Method:      "POST",
-		Url:         url,
-		Parameters:  nil,
-		ContentType: contentType,
-		RawBody:     body,
-	}
-}
-
-func PostForm(url string, formValues url.Values) Request {
-	return Request{
-		Method:      "POST",
-		Url:         url,
-		Parameters:  nil,
-		ContentType: "application/x-www-form-urlencoded",
-		Body:        formValues.Encode(),
-	}
-}
-
-func Put(url string, contentType string, body []byte) Request {
-	return Request{
-		Method:      "PUT",
-		Url:         url,
-		Parameters:  nil,
-		ContentType: contentType,
-		RawBody:     body,
-	}
-}
-
-func Patch(url string, contentType string, body []byte) Request {
-	return Request{
-		Method:      "PATCH",
-		Url:         url,
-		Parameters:  nil,
-		ContentType: contentType,
-		RawBody:     body,
-	}
-}
-
-func Delete(url string, contentType string, body []byte) Request {
-	return Request{
-		Method:      "DELETE",
-		Url:         url,
-		Parameters:  nil,
-		ContentType: contentType,
-		RawBody:     body,
-	}
-}
-
-func Head(url string, contentType string, body []byte) Request {
-	return Request{
-		Method:      "HEAD",
-		Url:         url,
-		Parameters:  nil,
-		ContentType: contentType,
-		RawBody:     body,
-	}
-}
-
-func Options(url string, contentType string, body []byte) Request {
-	return Request{
-		Method:      "OPTIONS",
-		Url:         url,
-		Parameters:  nil,
-		ContentType: contentType,
-		RawBody:     body,
-	}
+	return restClient.Execute(*r)
 }
 
 func (r *Request) Build(baseUrl *url.URL) (*http.Request, error) {
