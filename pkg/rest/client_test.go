@@ -107,6 +107,13 @@ func (s *ClientTestSuite) TestGetRequest() {
 				assert.Equal(s.T(), url.Values{}, sampleData.Parameters)
 				assert.Equal(s.T(), rest.GET, sampleData.Method)
 			}
+
+			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+
+			assert.Contains(s.T(), responseBody, "Request method: 'GET'")
+			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
+			assert.Contains(s.T(), responseBody, "Request partial URL: '/'")
+			assert.Contains(s.T(), responseBody, "Request body: ''")
 		}
 	}
 }
@@ -144,6 +151,14 @@ func (s *ClientTestSuite) TestGetRequestWithQueryString() {
 				assert.Equal(s.T(), parameters, sampleData.Parameters)
 				assert.Equal(s.T(), rest.GET, sampleData.Method)
 			}
+
+			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+
+			assert.Contains(s.T(), responseBody, "Request method: 'GET'")
+			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
+			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request partial URL: '/?%s'", parameters.Encode()))
+			assert.Contains(s.T(), responseBody, "Request body: ''")
+
 		}
 	}
 }
@@ -176,6 +191,14 @@ func (s *ClientTestSuite) TestPostNoBody() {
 				assert.Equal(s.T(), url.Values{}, sampleData.Parameters)
 				assert.Equal(s.T(), rest.POST, sampleData.Method)
 			}
+
+			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+
+			assert.Contains(s.T(), responseBody, "Request method: 'POST'")
+			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
+			assert.Contains(s.T(), responseBody, "Request partial URL: '/'")
+			assert.Contains(s.T(), responseBody, "Request body: ''")
+
 		}
 	}
 }
@@ -208,6 +231,14 @@ func (s *ClientTestSuite) TestPutNoBody() {
 				assert.Equal(s.T(), url.Values{}, sampleData.Parameters)
 				assert.Equal(s.T(), rest.PUT, sampleData.Method)
 			}
+
+			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+
+			assert.Contains(s.T(), responseBody, "Request method: 'PUT'")
+			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
+			assert.Contains(s.T(), responseBody, "Request partial URL: '/'")
+			assert.Contains(s.T(), responseBody, "Request body: ''")
+
 		}
 	}
 }
@@ -240,6 +271,14 @@ func (s *ClientTestSuite) TestPatchNoBody() {
 				assert.Equal(s.T(), url.Values{}, sampleData.Parameters)
 				assert.Equal(s.T(), rest.PATCH, sampleData.Method)
 			}
+
+			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+
+			assert.Contains(s.T(), responseBody, "Request method: 'PATCH'")
+			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
+			assert.Contains(s.T(), responseBody, "Request partial URL: '/'")
+			assert.Contains(s.T(), responseBody, "Request body: ''")
+
 		}
 	}
 }
@@ -272,6 +311,14 @@ func (s *ClientTestSuite) TestDeleteNoBody() {
 				assert.Equal(s.T(), url.Values{}, sampleData.Parameters)
 				assert.Equal(s.T(), rest.DELETE, sampleData.Method)
 			}
+
+			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+
+			assert.Contains(s.T(), responseBody, "Request method: 'DELETE'")
+			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
+			assert.Contains(s.T(), responseBody, "Request partial URL: '/'")
+			assert.Contains(s.T(), responseBody, "Request body: ''")
+
 		}
 	}
 }
@@ -304,6 +351,10 @@ func (s *ClientTestSuite) TestHeadNoBody() {
 				assert.Equal(s.T(), url.Values{}, sampleData.Parameters)
 				assert.Equal(s.T(), rest.HEAD, sampleData.Method)
 			}
+
+			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+
+			assert.Empty(s.T(), responseBody, "HEAD body must be empty")
 		}
 	}
 }
@@ -336,6 +387,14 @@ func (s *ClientTestSuite) TestOptionsNoBody() {
 				assert.Equal(s.T(), url.Values{}, sampleData.Parameters)
 				assert.Equal(s.T(), rest.OPTIONS, sampleData.Method)
 			}
+
+			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+
+			assert.Contains(s.T(), responseBody, "Request method: 'OPTIONS'")
+			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
+			assert.Contains(s.T(), responseBody, "Request partial URL: '/'")
+			assert.Contains(s.T(), responseBody, "Request body: ''")
+
 		}
 	}
 }
@@ -372,6 +431,14 @@ func (s *ClientTestSuite) TestPostFormRequest() {
 				assert.Equal(s.T(), url.Values{}, sampleData.Parameters)
 				assert.Equal(s.T(), rest.POST, sampleData.Method)
 			}
+
+			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+
+			assert.Contains(s.T(), responseBody, "Request method: 'POST'")
+			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
+			assert.Contains(s.T(), responseBody, "Request partial URL: '/'")
+			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request body: '%s'", values.Encode()))
+
 		}
 	}
 }
@@ -444,6 +511,10 @@ func (s *ClientTestSuite) TestRequestWithRedirect_WithoutRedirectSetting() {
 				assert.Equal(s.T(), url.Values{}, sampleData.Parameters)
 				assert.Equal(s.T(), rest.GET, sampleData.Method)
 			}
+
+			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+
+			assert.Empty(s.T(), responseBody)
 		}
 	}
 }
@@ -484,6 +555,14 @@ func (s *ClientTestSuite) TestRequestWithRedirect_WithRedirectSetting() {
 				assert.Equal(s.T(), url.Values{}, sampleData.Parameters)
 				assert.Equal(s.T(), rest.GET, sampleData.Method)
 			}
+
+			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+
+			assert.Contains(s.T(), responseBody, "Request method: 'GET'")
+			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
+			assert.Contains(s.T(), responseBody, "Request partial URL: '/redirected'")
+			assert.Contains(s.T(), responseBody, "Request body: ''")
+
 		}
 	}
 }

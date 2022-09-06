@@ -227,13 +227,13 @@ func (c *Client) saveLastResponse(response *http.Response) error {
 		StatusCode int
 		Proto      string
 		Header     http.Header
-		Body       []byte
+		Body       string
 	}{
 		Status:     response.Status,
 		StatusCode: response.StatusCode,
 		Proto:      response.Proto,
 		Header:     response.Header,
-		Body:       bodyBuffer,
+		Body:       string(bodyBuffer),
 	}
 
 	return c.ctx.Variables().SetLastResponse(purifiedAnswer)
