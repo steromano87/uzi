@@ -40,6 +40,10 @@ func (h *Holder) Globals() map[string]any {
 	return h.globals.AsMap()
 }
 
+func (h *Holder) Locals() map[string]any {
+	return h.locals.AsMap()
+}
+
 func (h *Holder) IterVars() map[string]any {
 	return h.iterVars.AsMap()
 }
