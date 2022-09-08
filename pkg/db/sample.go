@@ -1,4 +1,4 @@
-package model
+package db
 
 import (
 	"github.com/mitchellh/hashstructure/v2"
@@ -6,7 +6,7 @@ import (
 )
 
 type Sample struct {
-	Base
+	baseRecord
 	Kind          string
 	Name          string
 	Duration      time.Duration

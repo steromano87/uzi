@@ -2,8 +2,8 @@ package rest
 
 import (
 	"bytes"
+	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
-	"github.com/steromano87/harkonnen/v1/pkg/model"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -90,7 +90,7 @@ func (c *Client) Execute(request Request) error {
 	finalURL := response.Request.URL
 
 	// Create request sample
-	sample := model.Sample{
+	sample := db.Sample{
 		Kind:          SampleType,
 		Name:          rawRequest.URL.String(),
 		Duration:      endTime.Sub(startTime),

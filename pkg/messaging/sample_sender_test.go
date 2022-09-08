@@ -1,8 +1,8 @@
 package messaging_test
 
 import (
+	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
-	"github.com/steromano87/harkonnen/v1/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"testing"
@@ -25,7 +25,7 @@ func (s *SampleSenderTestSuite) TestNewSampleSender() {
 }
 
 func (s *SampleSenderTestSuite) TestCollectBelowBufferLimit() {
-	sample := model.Sample{}
+	sample := db.Sample{}
 
 	sender := messaging.NewSampleSender(s.minionMessenger, 10)
 	sender.Collect(sample)
@@ -46,7 +46,7 @@ func (s *SampleSenderTestSuite) TestCollectBelowBufferLimit() {
 }
 
 func (s *SampleSenderTestSuite) TestSampleSendingWithManualFlush() {
-	sample := model.Sample{}
+	sample := db.Sample{}
 
 	sender := messaging.NewSampleSender(s.minionMessenger, 10)
 	sender.Collect(sample)
@@ -72,7 +72,7 @@ func (s *SampleSenderTestSuite) TestSampleSendingWithManualFlush() {
 }
 
 func (s *SampleSenderTestSuite) TestSampleSendingWithAutomaticFlush() {
-	sample := model.Sample{}
+	sample := db.Sample{}
 
 	sender := messaging.NewSampleSender(s.minionMessenger, 2)
 	sender.Collect(sample)

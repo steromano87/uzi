@@ -1,10 +1,10 @@
-package model
+package db
 
 import (
 	"time"
 )
 
-type Base struct {
+type baseRecord struct {
 	ID        uint      `gorm:"primaryKey;autoincrement"`
 	Timestamp time.Time `gorm:"index;type:uint"`
 }

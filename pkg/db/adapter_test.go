@@ -1,10 +1,10 @@
-package collector_test
+package db_test
 
 import (
 	"context"
 	"fmt"
 	"github.com/Flaque/filet"
-	"github.com/steromano87/harkonnen/v1/internal/collector"
+	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
@@ -21,43 +21,37 @@ type MockedDBEntry struct {
 	Data string
 }
 
-type ManagerTestSuite struct {
+type AdapterTestSuite struct {
 	suite.Suite
 	tempWorkingDir string
 }
 
-func (s *ManagerTestSuite) SetupTest() {
+func (s *AdapterTestSuite) SetupTest() {
 	s.tempWorkingDir = filet.TmpDir(s.T(), "")
 }
 
-func (s *ManagerTestSuite) TearDownTest() {
+func (s *AdapterTestSuite) TearDownTest() {
 	filet.CleanUp(s.T())
 }
 
-func (s *ManagerTestSuite) TestCreateNewSQLiteDBOnFile() {
-	writer := collector.DbWriter{
-		Type: collector.SQLite,
-		DSN:  path.Join(s.tempWorkingDir, "results.db"),
-	}
+func (s *AdapterTestSuite) TestCreateNewSQLiteDBOnFile() {
+	adapter := db.NewAdapter(db.SQLite, path.Join(s.tempWorkingDir, "results.db"))
 
-	err := writer.Connect(context.TODO())
+	err := adapter.Connect(context.TODO())
 
 	if assert.NoError(s.T(), err) {
 		assert.FileExists(s.T(), path.Join(s.tempWorkingDir, "results.db"))
 	}
 }
 
-func (s *ManagerTestSuite) TestCreateNewSQLiteDBOnMemory() {
-	writer := collector.DbWriter{
-		Type: collector.SQLite,
-		DSN:  "file::memory:?cache=shared",
-	}
+func (s *AdapterTestSuite) TestCreateNewSQLiteDBOnMemory() {
+	adapter := db.NewAdapter(db.SQLite, "file::memory:?cache=shared")
 
-	err := writer.Connect(context.TODO())
+	err := adapter.Connect(context.TODO())
 	assert.NoError(s.T(), err)
 }
 
-func (s *ManagerTestSuite) TestConnectOnMySQLDatabase() {
+func (s *AdapterTestSuite) TestConnectOnMySQLDatabase() {
 	if testing.Short() {
 		s.T().Skip("Skipped in short mode")
 	}
@@ -96,48 +90,43 @@ func (s *ManagerTestSuite) TestConnectOnMySQLDatabase() {
 		port, _ := container.MappedPort(ctx, "3306")
 		hostIP, _ := container.Host(ctx)
 
-		writer := collector.DbWriter{
-			Type: collector.MySQL,
-			DSN: fmt.Sprintf(
-				"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-				dbUser,
-				dbPassword,
-				hostIP,
-				port.Port(),
-				dbName),
-		}
+		adapter := db.NewAdapter(db.MySQL, fmt.Sprintf(
+			"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+			dbUser,
+			dbPassword,
+			hostIP,
+			port.Port(),
+			dbName))
 
-		err := writer.Connect(ctx)
+		err := adapter.Connect(ctx)
 		if assert.NoError(s.T(), err) {
 			item := MockedDBEntry{
 				Data: "Random data",
 			}
-			err := writer.AutoMigrate(&item)
+			err := adapter.AutoMigrate(&item)
 
 			assert.NoError(s.T(), err)
 		}
 	}
 }
 
-func (s *ManagerTestSuite) TestSaveItemToDB() {
-	writer := collector.DbWriter{
-		Type: collector.SQLite,
-		DSN:  path.Join(s.tempWorkingDir, "results.db"),
-	}
+func (s *AdapterTestSuite) TestSaveItemToDB() {
+	adapter := db.NewAdapter(db.SQLite, path.Join(s.tempWorkingDir, "results.db"))
 
 	ctx := context.TODO()
-	err := writer.Connect(ctx)
+	err := adapter.Connect(ctx)
 
 	if assert.NoError(s.T(), err) {
 		item := MockedDBEntry{
 			Data: "Random data",
 		}
 
-		err := writer.AutoMigrate(&item)
+		err := adapter.AutoMigrate(&item)
 		if assert.NoError(s.T(), err) {
-			result := writer.Save(ctx, &item)
+			result := adapter.WithContext(ctx).Create(&item)
 
-			if assert.NoError(s.T(), result) {
+			if assert.NoError(s.T(), result.Error) {
+				assert.EqualValues(s.T(), 1, result.RowsAffected)
 				fileInfo, _ := os.Stat(path.Join(s.tempWorkingDir, "results.db"))
 				assert.Greater(s.T(), fileInfo.Size(), int64(0))
 			}
@@ -145,6 +134,6 @@ func (s *ManagerTestSuite) TestSaveItemToDB() {
 	}
 }
 
-func TestManagerTestSuite(t *testing.T) {
-	suite.Run(t, new(ManagerTestSuite))
+func TestAdapterTestSuite(t *testing.T) {
+	suite.Run(t, new(AdapterTestSuite))
 }

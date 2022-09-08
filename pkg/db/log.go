@@ -1,7 +1,7 @@
-package model
+package db
 
 type Log struct {
-	Base
+	baseRecord
 	Origin    string `gorm:"index:idx_origin"`
 	Level     string `gorm:"index:idx_level"`
 	Component string
