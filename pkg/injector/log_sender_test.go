@@ -11,19 +11,19 @@ import (
 	"time"
 )
 
-type LogDispatcherTestSuite struct {
+type LogSenderTestSuite struct {
 	suite.Suite
 	bossMessenger   messaging.Messenger
 	minionMessenger messaging.Messenger
 }
 
-func (l *LogDispatcherTestSuite) SetupTest() {
+func (l *LogSenderTestSuite) SetupTest() {
 	zerolog.TimeFieldFormat = time.RFC3339Nano
 
 	l.bossMessenger, l.minionMessenger = messaging.NewChannelMessengerPair(100)
 }
 
-func (l *LogDispatcherTestSuite) TestNewLogDispatcher() {
+func (l *LogSenderTestSuite) TestNewLogSender() {
 	dispatcher := injector.NewLogSender(l.minionMessenger, 10)
 
 	if assert.IsType(l.T(), &injector.LogSender{}, dispatcher) {
@@ -31,7 +31,7 @@ func (l *LogDispatcherTestSuite) TestNewLogDispatcher() {
 	}
 }
 
-func (l *LogDispatcherTestSuite) TestWriteLogBelowBufferLimit() {
+func (l *LogSenderTestSuite) TestWriteLogBelowBufferLimit() {
 	dispatcher := injector.NewLogSender(l.minionMessenger, 10)
 	logger := zerolog.New(dispatcher)
 	logger.Info().Msg("my first log")
@@ -51,7 +51,7 @@ func (l *LogDispatcherTestSuite) TestWriteLogBelowBufferLimit() {
 	assert.True(l.T(), noValue)
 }
 
-func (l *LogDispatcherTestSuite) TestWriteLogWithManualFlush() {
+func (l *LogSenderTestSuite) TestWriteLogWithManualFlush() {
 	dispatcher := injector.NewLogSender(l.minionMessenger, 10)
 	logger := zerolog.New(dispatcher)
 	logger.Info().Msg("my first log")
@@ -76,5 +76,5 @@ func (l *LogDispatcherTestSuite) TestWriteLogWithManualFlush() {
 }
 
 func TestLogDispatcherTestSuite(t *testing.T) {
-	suite.Run(t, new(LogDispatcherTestSuite))
+	suite.Run(t, new(LogSenderTestSuite))
 }
