@@ -1,6 +1,7 @@
 package project
 
 import (
+	"bytes"
 	"errors"
 	"github.com/spf13/viper"
 	"path/filepath"
@@ -147,13 +148,18 @@ func (c *Config) SubConfig(key string) (*Config, error) {
 		}, nil
 	}
 
-	return nil, errors.New(key + " key not found, cannot extract subconfiguration")
+	return nil, errors.New(key + " key not found, cannot extract sub-configuration")
 }
 
 func (c *Config) viperSetup() {
 	c.Viper = viper.New()
-	c.SetConfigName("harkonnen")
+
+	// Read default configuration
 	c.SetConfigType("yaml")
+	_ = c.ReadConfig(bytes.NewBufferString(DefaultProjectManifest))
+
+	// Read configuration from environment
+	c.SetConfigName("harkonnen")
 	c.SetEnvPrefix("HARK")
 	c.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	c.AutomaticEnv()

@@ -1,0 +1,28 @@
+name: My loading project with Harkonnen
+
+minHarkonnenVersion: ""
+
+#################
+# Configuration #
+#################
+
+messaging:
+  logging:
+    bufferSize: 50
+  samples:
+    bufferSize: 10
+
+client:
+  rest:
+    timeout: 30s
+    baseUrl: ""
+    followRedirects: true
+    keepCookies: true
+    idleConnectionTimeout: 10s
+    tlsHandshakeTimeout: 10s
+    responseHeaderTimeout: 10s
+    maxIdleConnections: 100
+    maxConnectionsPerHost: 100
+    maxIdleConnectionsPerHost: 100
+    enableKeepAlive: true
+    enableCompression: true
