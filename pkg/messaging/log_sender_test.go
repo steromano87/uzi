@@ -1,8 +1,7 @@
-package injector_test
+package messaging_test
 
 import (
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -24,15 +23,15 @@ func (l *LogSenderTestSuite) SetupTest() {
 }
 
 func (l *LogSenderTestSuite) TestNewLogSender() {
-	dispatcher := injector.NewLogSender(l.minionMessenger, 10)
+	dispatcher := messaging.NewLogSender(l.minionMessenger, 10)
 
-	if assert.IsType(l.T(), &injector.LogSender{}, dispatcher) {
+	if assert.IsType(l.T(), &messaging.LogSender{}, dispatcher) {
 		assert.Implements(l.T(), (*io.Writer)(nil), dispatcher)
 	}
 }
 
 func (l *LogSenderTestSuite) TestWriteLogBelowBufferLimit() {
-	dispatcher := injector.NewLogSender(l.minionMessenger, 10)
+	dispatcher := messaging.NewLogSender(l.minionMessenger, 10)
 	logger := zerolog.New(dispatcher)
 	logger.Info().Msg("my first log")
 	logger.Info().Msg("my second log")
@@ -52,7 +51,7 @@ func (l *LogSenderTestSuite) TestWriteLogBelowBufferLimit() {
 }
 
 func (l *LogSenderTestSuite) TestWriteLogWithManualFlush() {
-	dispatcher := injector.NewLogSender(l.minionMessenger, 10)
+	dispatcher := messaging.NewLogSender(l.minionMessenger, 10)
 	logger := zerolog.New(dispatcher)
 	logger.Info().Msg("my first log")
 	logger.Info().Msg("my second log")
@@ -76,7 +75,7 @@ func (l *LogSenderTestSuite) TestWriteLogWithManualFlush() {
 }
 
 func (l *LogSenderTestSuite) TestWriteLogWithAutomaticFlush() {
-	dispatcher := injector.NewLogSender(l.minionMessenger, 2)
+	dispatcher := messaging.NewLogSender(l.minionMessenger, 2)
 	logger := zerolog.New(dispatcher)
 	logger.Info().Msg("my first log")
 	logger.Info().Msg("my second log")

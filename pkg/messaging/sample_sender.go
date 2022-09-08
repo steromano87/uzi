@@ -1,20 +1,19 @@
-package injector
+package messaging
 
 import (
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/steromano87/harkonnen/v1/pkg/model"
 	"sync"
 )
 
 type SampleSender struct {
-	messenger  messaging.Messenger
+	messenger  Messenger
 	bufferSize int
 
 	queuedSamples []model.Sample
 	mu            sync.Mutex
 }
 
-func NewSampleSender(messenger messaging.Messenger, bufferSize int) *SampleSender {
+func NewSampleSender(messenger Messenger, bufferSize int) *SampleSender {
 	sender := new(SampleSender)
 	sender.messenger = messenger
 	sender.bufferSize = bufferSize
@@ -34,7 +33,7 @@ func (s *SampleSender) Collect(sample model.Sample) {
 }
 
 func (s *SampleSender) Flush() {
-	sampleMessage := messaging.NewSampleMessage(s.queuedSamples)
+	sampleMessage := NewSampleMessage(s.queuedSamples)
 	s.messenger.Send(sampleMessage)
 	s.queuedSamples = make([]model.Sample, 0)
 }

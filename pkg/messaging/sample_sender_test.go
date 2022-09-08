@@ -1,7 +1,6 @@
-package injector_test
+package messaging_test
 
 import (
-	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/steromano87/harkonnen/v1/pkg/model"
 	"github.com/stretchr/testify/assert"
@@ -20,15 +19,15 @@ func (s *SampleSenderTestSuite) SetupTest() {
 }
 
 func (s *SampleSenderTestSuite) TestNewSampleSender() {
-	sender := injector.NewSampleSender(s.minionMessenger, 10)
+	sender := messaging.NewSampleSender(s.minionMessenger, 10)
 
-	assert.IsType(s.T(), &injector.SampleSender{}, sender)
+	assert.IsType(s.T(), &messaging.SampleSender{}, sender)
 }
 
 func (s *SampleSenderTestSuite) TestCollectBelowBufferLimit() {
 	sample := model.Sample{}
 
-	sender := injector.NewSampleSender(s.minionMessenger, 10)
+	sender := messaging.NewSampleSender(s.minionMessenger, 10)
 	sender.Collect(sample)
 	sender.Collect(sample)
 
@@ -49,7 +48,7 @@ func (s *SampleSenderTestSuite) TestCollectBelowBufferLimit() {
 func (s *SampleSenderTestSuite) TestSampleSendingWithManualFlush() {
 	sample := model.Sample{}
 
-	sender := injector.NewSampleSender(s.minionMessenger, 10)
+	sender := messaging.NewSampleSender(s.minionMessenger, 10)
 	sender.Collect(sample)
 	sender.Collect(sample)
 
@@ -75,7 +74,7 @@ func (s *SampleSenderTestSuite) TestSampleSendingWithManualFlush() {
 func (s *SampleSenderTestSuite) TestSampleSendingWithAutomaticFlush() {
 	sample := model.Sample{}
 
-	sender := injector.NewSampleSender(s.minionMessenger, 2)
+	sender := messaging.NewSampleSender(s.minionMessenger, 2)
 	sender.Collect(sample)
 	sender.Collect(sample)
 

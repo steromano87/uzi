@@ -1,20 +1,19 @@
-package injector
+package messaging
 
 import (
 	"encoding/json"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"sync"
 )
 
 type LogSender struct {
-	messenger  messaging.Messenger
+	messenger  Messenger
 	bufferSize int
 
 	queuedLogs []json.RawMessage
 	mu         sync.Mutex
 }
 
-func NewLogSender(messenger messaging.Messenger, bufferSize int) *LogSender {
+func NewLogSender(messenger Messenger, bufferSize int) *LogSender {
 	dispatcher := new(LogSender)
 	dispatcher.messenger = messenger
 	dispatcher.bufferSize = bufferSize
@@ -36,7 +35,7 @@ func (l *LogSender) Write(p []byte) (n int, err error) {
 }
 
 func (l *LogSender) Flush() {
-	logMessage := messaging.NewRemoteLogMessage(l.queuedLogs)
+	logMessage := NewRemoteLogMessage(l.queuedLogs)
 	l.messenger.Send(logMessage)
 	l.queuedLogs = make([]json.RawMessage, 0)
 }
