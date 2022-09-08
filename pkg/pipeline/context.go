@@ -11,9 +11,10 @@ import (
 type Context struct {
 	context.Context
 
-	logger    *zerolog.Logger
-	config    *project.Config
-	messenger messaging.Messenger
+	logger       *zerolog.Logger
+	config       *project.Config
+	messenger    messaging.Messenger
+	sampleSender *messaging.SampleSender
 
 	vars              *variables.Holder
 	iterationsCounter *IterationsCounter
@@ -24,14 +25,16 @@ type Context struct {
 	plannedShutdownChan  chan struct{}
 }
 
-func NewContext(ctx context.Context, logger *zerolog.Logger, messenger messaging.Messenger, iterCounter *IterationsCounter) (*Context, context.CancelFunc) {
+func NewContext(ctx context.Context, config *project.Config, logger *zerolog.Logger, messenger messaging.Messenger, iterCounter *IterationsCounter) (*Context, context.CancelFunc) {
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
+	sampleSenderBufferSize := config.GetInt("messaging.samples.bufferSize")
 
 	return &Context{
 		Context:              cancelCtx,
 		logger:               logger,
-		config:               project.NewConfig(),
+		config:               config,
 		messenger:            messenger,
+		sampleSender:         messaging.NewSampleSender(messenger, sampleSenderBufferSize),
 		vars:                 variables.NewHolder(),
 		iterationsCounter:    iterCounter,
 		status:               Ready,
@@ -87,4 +90,8 @@ func (c *Context) Variables() *variables.Holder {
 
 func (c *Context) Messenger() messaging.Messenger {
 	return c.messenger
+}
+
+func (c *Context) SampleSender() *messaging.SampleSender {
+	return c.sampleSender
 }

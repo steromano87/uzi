@@ -12,4 +12,5 @@ type StepContext interface {
 	Variables() *variables.Holder
 	Config() *project.Config
 	Messenger() messaging.Messenger
+	SampleSender() *messaging.SampleSender
 }

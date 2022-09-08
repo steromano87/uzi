@@ -3,7 +3,6 @@ package rest
 import (
 	"bytes"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/steromano87/harkonnen/v1/pkg/model"
 	"io"
 	"net/http"
@@ -107,8 +106,7 @@ func (c *Client) Execute(request Request) error {
 	}
 	sample.Timestamp = startTime
 
-	// TODO: add sample caching instead of sending them one by one
-	c.ctx.Messenger().Send(messaging.NewSampleMessage([]model.Sample{sample}))
+	c.ctx.SampleSender().Collect(sample)
 
 	return c.saveLastResponse(response)
 }

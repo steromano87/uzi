@@ -41,7 +41,7 @@ func (d *RunnerDispatcher) Prepare(referencePipeline pipeline.Pipeline, instance
 	d.iterationsCounter.SetMaxIterations(maxIterations)
 
 	for i := 0; i < instances; i++ {
-		pipContext, pipCancelFunc := pipeline.NewContext(d.ctx.Context, d.ctx.Logger(), d.ctx.Messenger, d.iterationsCounter)
+		pipContext, pipCancelFunc := pipeline.NewContext(d.ctx.Context, d.ctx.config, d.ctx.Logger(), d.ctx.Messenger, d.iterationsCounter)
 		currentRunner := pipeline.NewRunner(pipContext)
 
 		d.runners = append(d.runners, runnerHolder{

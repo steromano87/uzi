@@ -7,6 +7,7 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/steromano87/harkonnen/v1/pkg/pipeline"
+	"github.com/steromano87/harkonnen/v1/pkg/project"
 	"github.com/steromano87/harkonnen/v1/pkg/rest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -37,7 +38,9 @@ func (s *ClientTestSuite) SetupTest() {
 
 	s.bossMessenger, s.minionMessenger = messaging.NewChannelMessengerPair(100)
 
-	s.ctx, _ = pipeline.NewContext(context.TODO(), &s.logger, s.minionMessenger, pipeline.NewIterationsCounter())
+	config := project.NewConfig()
+	config.Set("messaging.samples.bufferSize", 1)
+	s.ctx, _ = pipeline.NewContext(context.TODO(), config, &s.logger, s.minionMessenger, pipeline.NewIterationsCounter())
 
 	s.client = rest.NewClient(s.ctx)
 

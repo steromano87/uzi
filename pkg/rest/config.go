@@ -52,7 +52,7 @@ func (c Config) MaxIdleConnections() int {
 }
 
 func (c Config) MaxConnectionsPerHost() int {
-	return c.GetIntOrDefault(ConfigKey+".maxIdleConnectionsPerHost", 100)
+	return c.GetIntOrDefault(ConfigKey+".maxConnectionsPerHost", 100)
 }
 
 func (c Config) MaxIdleConnectionsPerHost() int {
