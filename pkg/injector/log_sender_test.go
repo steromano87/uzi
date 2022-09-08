@@ -75,6 +75,29 @@ func (l *LogSenderTestSuite) TestWriteLogWithManualFlush() {
 	}
 }
 
+func (l *LogSenderTestSuite) TestWriteLogWithAutomaticFlush() {
+	dispatcher := injector.NewLogSender(l.minionMessenger, 2)
+	logger := zerolog.New(dispatcher)
+	logger.Info().Msg("my first log")
+	logger.Info().Msg("my second log")
+
+	var message messaging.Message
+
+	select {
+	case message = <-l.bossMessenger.Receive():
+
+	default:
+		assert.Fail(l.T(), "no message was sent")
+	}
+
+	if assert.IsType(l.T(), messaging.Message{}, message) {
+		payload := message.Payload
+		if assert.IsType(l.T(), &messaging.RemoteLogPayload{}, payload) {
+			assert.Len(l.T(), payload.(*messaging.RemoteLogPayload).Logs, 2)
+		}
+	}
+}
+
 func TestLogDispatcherTestSuite(t *testing.T) {
 	suite.Run(t, new(LogSenderTestSuite))
 }
