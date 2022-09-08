@@ -61,7 +61,7 @@ func (r RequestDecoder) Decode(ctx *hcl.EvalContext, block *hcl.Block) (dsl.Step
 }
 
 func (r RequestDecoder) decodeGet(ctx *hcl.EvalContext, block *hcl.Block) (dsl.Step, error) {
-	getSchema := &hcl.BodySchema{
+	reqSchema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{
 				Name:     "name",
@@ -79,55 +79,47 @@ func (r RequestDecoder) decodeGet(ctx *hcl.EvalContext, block *hcl.Block) (dsl.S
 		Blocks: []hcl.BlockHeaderSchema{},
 	}
 
-	body, diagnostics := block.Body.Content(getSchema)
+	body, diagnostics := block.Body.Content(reqSchema)
 	if diagnostics != nil && diagnostics.HasErrors() {
 		return nil, diagnostics.Errs()[0]
 	}
 
-	get := new(Request)
+	req := new(Request)
 
-	get.Url = block.Labels[0]
-	get.Method = GET
+	req.Url = block.Labels[0]
+	req.Method = GET
 
 	for name, attr := range body.Attributes {
 		switch name {
 		case "name":
-			value, diagnostics := attr.Expr.Value(ctx)
-			if diagnostics.HasErrors() {
-				continue
+			value, err := r.parseNameAttribute(ctx, attr)
+			if err != nil {
+				return nil, err
 			}
-			get.Name = value.AsString()
+			req.Name = value
 
 		case "parameters":
-			value, diagnostics := attr.Expr.Value(ctx)
-			if diagnostics.HasErrors() {
-				continue
+			parameters, err := r.parseParametersAttribute(ctx, attr)
+			if err != nil {
+				return nil, err
 			}
 
-			rawParameters := value.AsValueMap()
-			parameters := url.Values{}
-
-			for key, value := range rawParameters {
-				parsedValues := make([]string, 0)
-				for _, valueItem := range value.AsValueSlice() {
-					parsedValues = append(parsedValues, valueItem.AsString())
-				}
-
-				parameters[key] = parsedValues
-			}
-
-			get.Parameters = &parameters
+			req.Parameters = &parameters
 
 		case "Options":
 			// FIXME: implement a string parsing for Options
 		}
 	}
 
-	return get, nil
+	if req.Name == "" {
+		req.Name = req.Url
+	}
+
+	return req, nil
 }
 
 func (r RequestDecoder) decodePost(ctx *hcl.EvalContext, block *hcl.Block) (dsl.Step, error) {
-	postSchema := &hcl.BodySchema{
+	reqSchema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{
 				Name:     "name",
@@ -149,51 +141,51 @@ func (r RequestDecoder) decodePost(ctx *hcl.EvalContext, block *hcl.Block) (dsl.
 		Blocks: []hcl.BlockHeaderSchema{},
 	}
 
-	body, diagnostics := block.Body.Content(postSchema)
+	body, diagnostics := block.Body.Content(reqSchema)
 	if diagnostics != nil && diagnostics.HasErrors() {
 		return nil, diagnostics.Errs()[0]
 	}
 
-	post := new(Request)
+	req := new(Request)
 
-	post.Url = block.Labels[0]
-	post.Method = POST
+	req.Url = block.Labels[0]
+	req.Method = POST
 
 	for name, attr := range body.Attributes {
 		switch name {
 		case "name":
-			value, diagnostics := attr.Expr.Value(ctx)
-			if diagnostics.HasErrors() {
-				continue
+			value, err := r.parseNameAttribute(ctx, attr)
+			if err != nil {
+				return nil, err
 			}
-			post.Name = value.AsString()
+			req.Name = value
 
 		case "body":
 			value, diagnostics := attr.Expr.Value(ctx)
 			if diagnostics.HasErrors() {
-				continue
+				return nil, diagnostics
 			}
 
-			post.RawBody = []byte(value.AsString())
+			req.RawBody = []byte(value.AsString())
 
 		case "contentType":
 			value, diagnostics := attr.Expr.Value(ctx)
 			if diagnostics.HasErrors() {
-				continue
+				return nil, diagnostics
 			}
 
-			post.ContentType = value.AsString()
+			req.ContentType = value.AsString()
 
 		case "Options":
 			// FIXME: implement a string parsing for Options
 		}
 	}
 
-	return post, nil
+	return req, nil
 }
 
 func (r RequestDecoder) decodePostForm(ctx *hcl.EvalContext, block *hcl.Block) (dsl.Step, error) {
-	postSchema := &hcl.BodySchema{
+	reqSchema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{
 				Name:     "name",
@@ -211,25 +203,25 @@ func (r RequestDecoder) decodePostForm(ctx *hcl.EvalContext, block *hcl.Block) (
 		Blocks: []hcl.BlockHeaderSchema{},
 	}
 
-	body, diagnostics := block.Body.Content(postSchema)
+	body, diagnostics := block.Body.Content(reqSchema)
 	if diagnostics != nil && diagnostics.HasErrors() {
 		return nil, diagnostics.Errs()[0]
 	}
 
-	post := new(Request)
+	req := new(Request)
 
-	post.Url = block.Labels[0]
-	post.Method = POST
-	post.ContentType = "application/x-www-form-urlencoded"
+	req.Url = block.Labels[0]
+	req.Method = POST
+	req.ContentType = "application/x-www-form-urlencoded"
 
 	for name, attr := range body.Attributes {
 		switch name {
 		case "name":
-			value, diagnostics := attr.Expr.Value(ctx)
-			if diagnostics.HasErrors() {
-				continue
+			value, err := r.parseNameAttribute(ctx, attr)
+			if err != nil {
+				return nil, err
 			}
-			post.Name = value.AsString()
+			req.Name = value
 
 		case "form":
 			value, diagnostics := attr.Expr.Value(ctx)
@@ -249,18 +241,18 @@ func (r RequestDecoder) decodePostForm(ctx *hcl.EvalContext, block *hcl.Block) (
 				parameters[key] = parsedValues
 			}
 
-			post.Body = parameters.Encode()
+			req.Body = parameters.Encode()
 
 		case "Options":
 			// FIXME: implement a string parsing for Options
 		}
 	}
 
-	return post, nil
+	return req, nil
 }
 
 func (r RequestDecoder) decodePut(ctx *hcl.EvalContext, block *hcl.Block) (dsl.Step, error) {
-	putSchema := &hcl.BodySchema{
+	reqSchema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{
 				Name:     "name",
@@ -282,32 +274,32 @@ func (r RequestDecoder) decodePut(ctx *hcl.EvalContext, block *hcl.Block) (dsl.S
 		Blocks: []hcl.BlockHeaderSchema{},
 	}
 
-	body, diagnostics := block.Body.Content(putSchema)
+	body, diagnostics := block.Body.Content(reqSchema)
 	if diagnostics != nil && diagnostics.HasErrors() {
 		return nil, diagnostics.Errs()[0]
 	}
 
-	put := new(Request)
+	req := new(Request)
 
-	put.Url = block.Labels[0]
-	put.Method = PUT
+	req.Url = block.Labels[0]
+	req.Method = PUT
 
 	for name, attr := range body.Attributes {
 		switch name {
 		case "name":
-			value, diagnostics := attr.Expr.Value(ctx)
-			if diagnostics.HasErrors() {
-				continue
+			value, err := r.parseNameAttribute(ctx, attr)
+			if err != nil {
+				return nil, err
 			}
-			put.Name = value.AsString()
+			req.Name = value
 
 		case "body":
 			value, diagnostics := attr.Expr.Value(ctx)
 			if diagnostics.HasErrors() {
-				continue
+				return nil, diagnostics
 			}
 
-			put.RawBody = []byte(value.AsString())
+			req.RawBody = []byte(value.AsString())
 
 		case "contentType":
 			value, diagnostics := attr.Expr.Value(ctx)
@@ -315,18 +307,18 @@ func (r RequestDecoder) decodePut(ctx *hcl.EvalContext, block *hcl.Block) (dsl.S
 				continue
 			}
 
-			put.ContentType = value.AsString()
+			req.ContentType = value.AsString()
 
 		case "Options":
 			// FIXME: implement a string parsing for Options
 		}
 	}
 
-	return put, nil
+	return req, nil
 }
 
 func (r RequestDecoder) decodePatch(ctx *hcl.EvalContext, block *hcl.Block) (dsl.Step, error) {
-	patchSchema := &hcl.BodySchema{
+	reqSchema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{
 				Name:     "name",
@@ -348,51 +340,51 @@ func (r RequestDecoder) decodePatch(ctx *hcl.EvalContext, block *hcl.Block) (dsl
 		Blocks: []hcl.BlockHeaderSchema{},
 	}
 
-	body, diagnostics := block.Body.Content(patchSchema)
+	body, diagnostics := block.Body.Content(reqSchema)
 	if diagnostics != nil && diagnostics.HasErrors() {
 		return nil, diagnostics.Errs()[0]
 	}
 
-	patch := new(Request)
+	req := new(Request)
 
-	patch.Url = block.Labels[0]
-	patch.Method = PATCH
+	req.Url = block.Labels[0]
+	req.Method = PATCH
 
 	for name, attr := range body.Attributes {
 		switch name {
 		case "name":
-			value, diagnostics := attr.Expr.Value(ctx)
-			if diagnostics.HasErrors() {
-				continue
+			value, err := r.parseNameAttribute(ctx, attr)
+			if err != nil {
+				return nil, err
 			}
-			patch.Name = value.AsString()
+			req.Name = value
 
 		case "body":
 			value, diagnostics := attr.Expr.Value(ctx)
 			if diagnostics.HasErrors() {
-				continue
+				return nil, diagnostics
 			}
 
-			patch.RawBody = []byte(value.AsString())
+			req.RawBody = []byte(value.AsString())
 
 		case "contentType":
 			value, diagnostics := attr.Expr.Value(ctx)
 			if diagnostics.HasErrors() {
-				continue
+				return nil, diagnostics
 			}
 
-			patch.ContentType = value.AsString()
+			req.ContentType = value.AsString()
 
 		case "Options":
 			// FIXME: implement a string parsing for Options
 		}
 	}
 
-	return patch, nil
+	return req, nil
 }
 
 func (r RequestDecoder) decodeDelete(ctx *hcl.EvalContext, block *hcl.Block) (dsl.Step, error) {
-	deleteSchema := &hcl.BodySchema{
+	reqSchema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{
 				Name:     "name",
@@ -414,51 +406,51 @@ func (r RequestDecoder) decodeDelete(ctx *hcl.EvalContext, block *hcl.Block) (ds
 		Blocks: []hcl.BlockHeaderSchema{},
 	}
 
-	body, diagnostics := block.Body.Content(deleteSchema)
+	body, diagnostics := block.Body.Content(reqSchema)
 	if diagnostics != nil && diagnostics.HasErrors() {
 		return nil, diagnostics.Errs()[0]
 	}
 
-	request := new(Request)
+	req := new(Request)
 
-	request.Url = block.Labels[0]
-	request.Method = DELETE
+	req.Url = block.Labels[0]
+	req.Method = DELETE
 
 	for name, attr := range body.Attributes {
 		switch name {
 		case "name":
-			value, diagnostics := attr.Expr.Value(ctx)
-			if diagnostics.HasErrors() {
-				continue
+			value, err := r.parseNameAttribute(ctx, attr)
+			if err != nil {
+				return nil, err
 			}
-			request.Name = value.AsString()
+			req.Name = value
 
 		case "body":
 			value, diagnostics := attr.Expr.Value(ctx)
 			if diagnostics.HasErrors() {
-				continue
+				return nil, diagnostics
 			}
 
-			request.RawBody = []byte(value.AsString())
+			req.RawBody = []byte(value.AsString())
 
 		case "contentType":
 			value, diagnostics := attr.Expr.Value(ctx)
 			if diagnostics.HasErrors() {
-				continue
+				return nil, diagnostics
 			}
 
-			request.ContentType = value.AsString()
+			req.ContentType = value.AsString()
 
 		case "Options":
 			// FIXME: implement a string parsing for Options
 		}
 	}
 
-	return request, nil
+	return req, nil
 }
 
 func (r RequestDecoder) decodeHead(ctx *hcl.EvalContext, block *hcl.Block) (dsl.Step, error) {
-	deleteSchema := &hcl.BodySchema{
+	reqSchema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{
 				Name:     "name",
@@ -472,35 +464,35 @@ func (r RequestDecoder) decodeHead(ctx *hcl.EvalContext, block *hcl.Block) (dsl.
 		Blocks: []hcl.BlockHeaderSchema{},
 	}
 
-	body, diagnostics := block.Body.Content(deleteSchema)
+	body, diagnostics := block.Body.Content(reqSchema)
 	if diagnostics != nil && diagnostics.HasErrors() {
 		return nil, diagnostics.Errs()[0]
 	}
 
-	request := new(Request)
+	req := new(Request)
 
-	request.Url = block.Labels[0]
-	request.Method = HEAD
+	req.Url = block.Labels[0]
+	req.Method = HEAD
 
 	for name, attr := range body.Attributes {
 		switch name {
 		case "name":
-			value, diagnostics := attr.Expr.Value(ctx)
-			if diagnostics.HasErrors() {
-				continue
+			value, err := r.parseNameAttribute(ctx, attr)
+			if err != nil {
+				return nil, err
 			}
-			request.Name = value.AsString()
+			req.Name = value
 
 		case "Options":
 			// FIXME: implement a string parsing for Options
 		}
 	}
 
-	return request, nil
+	return req, nil
 }
 
 func (r RequestDecoder) decodeOptions(ctx *hcl.EvalContext, block *hcl.Block) (dsl.Step, error) {
-	deleteSchema := &hcl.BodySchema{
+	reqSchema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{
 				Name:     "name",
@@ -514,35 +506,35 @@ func (r RequestDecoder) decodeOptions(ctx *hcl.EvalContext, block *hcl.Block) (d
 		Blocks: []hcl.BlockHeaderSchema{},
 	}
 
-	body, diagnostics := block.Body.Content(deleteSchema)
+	body, diagnostics := block.Body.Content(reqSchema)
 	if diagnostics != nil && diagnostics.HasErrors() {
 		return nil, diagnostics.Errs()[0]
 	}
 
-	request := new(Request)
+	req := new(Request)
 
-	request.Url = block.Labels[0]
-	request.Method = OPTIONS
+	req.Url = block.Labels[0]
+	req.Method = OPTIONS
 
 	for name, attr := range body.Attributes {
 		switch name {
 		case "name":
-			value, diagnostics := attr.Expr.Value(ctx)
-			if diagnostics.HasErrors() {
-				continue
+			value, err := r.parseNameAttribute(ctx, attr)
+			if err != nil {
+				return nil, err
 			}
-			request.Name = value.AsString()
+			req.Name = value
 
 		case "Options":
 			// FIXME: implement a string parsing for Options
 		}
 	}
 
-	return request, nil
+	return req, nil
 }
 
 func (r RequestDecoder) decodeRequest(ctx *hcl.EvalContext, block *hcl.Block) (dsl.Step, error) {
-	requestSchema := &hcl.BodySchema{
+	reqSchema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{
 				Name:     "name",
@@ -568,45 +560,32 @@ func (r RequestDecoder) decodeRequest(ctx *hcl.EvalContext, block *hcl.Block) (d
 		Blocks: []hcl.BlockHeaderSchema{},
 	}
 
-	body, diagnostics := block.Body.Content(requestSchema)
+	body, diagnostics := block.Body.Content(reqSchema)
 	if diagnostics != nil && diagnostics.HasErrors() {
 		return nil, diagnostics.Errs()[0]
 	}
 
-	request := new(Request)
+	req := new(Request)
 
-	request.Method = Method(block.Labels[0])
-	request.Url = block.Labels[1]
+	req.Method = Method(block.Labels[0])
+	req.Url = block.Labels[1]
 
 	for name, attr := range body.Attributes {
 		switch name {
 		case "body":
-			value, diagnostics := attr.Expr.Value(ctx)
-			if diagnostics.HasErrors() {
-				continue
+			value, err := r.parseNameAttribute(ctx, attr)
+			if err != nil {
+				return nil, err
 			}
-
-			request.RawBody = []byte(value.AsString())
+			req.Name = value
 
 		case "parameters":
-			value, diagnostics := attr.Expr.Value(ctx)
-			if diagnostics.HasErrors() {
-				continue
+			parameters, err := r.parseParametersAttribute(ctx, attr)
+			if err != nil {
+				return nil, err
 			}
 
-			rawParameters := value.AsValueMap()
-			parameters := url.Values{}
-
-			for key, value := range rawParameters {
-				parsedValues := make([]string, 0)
-				for _, valueItem := range value.AsValueSlice() {
-					parsedValues = append(parsedValues, valueItem.AsString())
-				}
-
-				parameters[key] = parsedValues
-			}
-
-			request.Parameters = &parameters
+			req.Parameters = &parameters
 
 		case "contentType":
 			value, diagnostics := attr.Expr.Value(ctx)
@@ -614,12 +593,42 @@ func (r RequestDecoder) decodeRequest(ctx *hcl.EvalContext, block *hcl.Block) (d
 				continue
 			}
 
-			request.ContentType = value.AsString()
+			req.ContentType = value.AsString()
 
 		case "Options":
 			// FIXME: implement a string parsing for Options
 		}
 	}
 
-	return request, nil
+	return req, nil
+}
+
+func (r RequestDecoder) parseNameAttribute(ctx *hcl.EvalContext, attr *hcl.Attribute) (string, error) {
+	value, diagnostics := attr.Expr.Value(ctx)
+	if diagnostics.HasErrors() {
+		return "", diagnostics
+	}
+
+	return value.AsString(), nil
+}
+
+func (r RequestDecoder) parseParametersAttribute(ctx *hcl.EvalContext, attr *hcl.Attribute) (url.Values, error) {
+	value, diagnostics := attr.Expr.Value(ctx)
+	if diagnostics.HasErrors() {
+		return nil, diagnostics
+	}
+
+	rawParameters := value.AsValueMap()
+	parameters := url.Values{}
+
+	for key, value := range rawParameters {
+		parsedValues := make([]string, 0)
+		for _, valueItem := range value.AsValueSlice() {
+			parsedValues = append(parsedValues, valueItem.AsString())
+		}
+
+		parameters[key] = parsedValues
+	}
+
+	return parameters, nil
 }
