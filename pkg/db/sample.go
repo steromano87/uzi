@@ -8,7 +8,7 @@ import (
 
 type Sample struct {
 	ID            uint           `gorm:"primaryKey;autoincrement"`
-	Timestamp     datatypes.Date `gorm:"index;idx_timestamp"`
+	Timestamp     datatypes.Date `gorm:"index"`
 	Kind          string
 	Name          string
 	Duration      time.Duration
