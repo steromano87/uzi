@@ -7,22 +7,23 @@ import (
 	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/net"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	"runtime"
 	"time"
 )
 
-type HostMetricsCollector struct {
+type HostMetricsSender struct {
 	ctx       context.Context
 	messenger messaging.Messenger
 }
 
-func NewHostMetricsCollector(messenger messaging.Messenger) *HostMetricsCollector {
-	mc := new(HostMetricsCollector)
+func NewHostMetricsSender(messenger messaging.Messenger) *HostMetricsSender {
+	mc := new(HostMetricsSender)
 	mc.messenger = messenger
 
 	return mc
 }
 
-func (c HostMetricsCollector) Start(ctx context.Context, pollInterval time.Duration, measureInterval time.Duration) {
+func (p HostMetricsSender) Start(ctx context.Context, pollInterval time.Duration, measureInterval time.Duration) {
 	ticker := time.NewTicker(pollInterval)
 
 	go func() {
@@ -33,7 +34,7 @@ func (c HostMetricsCollector) Start(ctx context.Context, pollInterval time.Durat
 				return
 
 			case <-ticker.C:
-				err := c.collect(ctx, measureInterval)
+				err := p.gatherMetrics(ctx, measureInterval)
 				if err != nil {
 					continue
 				}
@@ -42,7 +43,7 @@ func (c HostMetricsCollector) Start(ctx context.Context, pollInterval time.Durat
 	}()
 }
 
-func (c HostMetricsCollector) collect(ctx context.Context, measureInterval time.Duration) error {
+func (p HostMetricsSender) gatherMetrics(ctx context.Context, measureInterval time.Duration) error {
 	cpuPercent, err := cpu.PercentWithContext(ctx, measureInterval, false)
 	if err != nil {
 		return err
@@ -53,7 +54,7 @@ func (c HostMetricsCollector) collect(ctx context.Context, measureInterval time.
 		return err
 	}
 
-	diskUsage, err := disk.UsageWithContext(ctx, c.getRootDir())
+	diskUsage, err := disk.UsageWithContext(ctx, p.getRootDir())
 	if err != nil {
 		return err
 	}
@@ -93,10 +94,15 @@ func (c HostMetricsCollector) collect(ctx context.Context, measureInterval time.
 		},
 	}
 
-	c.messenger.Send(messaging.NewRawMessage(messaging.HostMetricsMsgId, &messagePayload))
+	p.messenger.Send(messaging.NewRawMessage(messaging.HostMetricsMsgId, &messagePayload))
 	return nil
 }
 
-func (c HostMetricsCollector) getRootDir() string {
-	return "/"
+func (p HostMetricsSender) getRootDir() string {
+	switch runtime.GOOS {
+	case "windows":
+		return "C:\\"
+	default:
+		return "/"
+	}
 }

@@ -21,12 +21,12 @@ func (s *HostMetricsCollectorTestSuite) SetupTest() {
 }
 
 func (s *HostMetricsCollectorTestSuite) TestNewHostMetricsCollector() {
-	collector := telemetry.NewHostMetricsCollector(s.minionMessenger)
-	assert.IsType(s.T(), &telemetry.HostMetricsCollector{}, collector)
+	collector := telemetry.NewHostMetricsSender(s.minionMessenger)
+	assert.IsType(s.T(), &telemetry.HostMetricsSender{}, collector)
 }
 
 func (s *HostMetricsCollectorTestSuite) TestMetricsCollection() {
-	collector := telemetry.NewHostMetricsCollector(s.minionMessenger)
+	collector := telemetry.NewHostMetricsSender(s.minionMessenger)
 	ctx, cancelFunc := context.WithCancel(context.TODO())
 
 	pollingInterval := 250 * time.Millisecond
