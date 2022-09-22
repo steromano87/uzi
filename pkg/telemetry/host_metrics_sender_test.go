@@ -47,8 +47,8 @@ func (s *HostMetricsCollectorTestSuite) TestMetricsCollection() {
 				assert.Greater(s.T(), castPayload.CPU, 0.0)
 				assert.Greater(s.T(), castPayload.Memory.Total, uint64(0))
 				assert.LessOrEqual(s.T(), castPayload.Memory.Used, castPayload.Memory.Total)
-				assert.Greater(s.T(), castPayload.Disk.Total, uint64(0))
-				assert.LessOrEqual(s.T(), castPayload.Disk.Used, castPayload.Disk.Total)
+				assert.Greater(s.T(), castPayload.Storage.Total, uint64(0))
+				assert.LessOrEqual(s.T(), castPayload.Storage.Used, castPayload.Storage.Total)
 			}
 		}
 

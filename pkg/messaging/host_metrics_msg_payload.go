@@ -8,7 +8,7 @@ type HostMetricsPayload struct {
 		Total uint64
 		Used  uint64
 	}
-	Disk struct {
+	Storage struct {
 		Total uint64
 		Used  uint64
 	}

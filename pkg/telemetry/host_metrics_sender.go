@@ -78,7 +78,7 @@ func (p HostMetricsSender) gatherMetrics(ctx context.Context, measureInterval ti
 			Total: memUsage.Total,
 			Used:  memUsage.Used,
 		},
-		Disk: struct {
+		Storage: struct {
 			Total uint64
 			Used  uint64
 		}{
