@@ -60,6 +60,8 @@ func (m *Adapter) migrateAll(ctx context.Context) error {
 		Log{},
 		Sample{},
 		Transaction{},
+		Iteration{},
+		HostMetric{},
 	}}
 
 	return autoMigrator.migrate(ctx, m.DB)
