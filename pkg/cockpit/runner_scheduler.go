@@ -1,4 +1,4 @@
-package loading
+package cockpit
 
 import (
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
@@ -7,18 +7,18 @@ import (
 	"time"
 )
 
-type Scheduler struct {
-	Profile   Profiler
+type RunnerScheduler struct {
+	Profile   LoadProfile
 	Injectors []injector.RemoteReference
 }
 
-func (s Scheduler) Schedule(elapsed time.Duration) {
-	totalRunners := s.Profile.ShootersAt(elapsed)
+func (s RunnerScheduler) Schedule(elapsed time.Duration) {
+	totalRunners := s.Profile.At(elapsed)
 	runnersQuota := s.assignRunnersQuota(totalRunners)
 	s.sendRunnersQuotasUpdate(runnersQuota)
 }
 
-func (s Scheduler) assignRunnersQuota(totalRunners int) []int {
+func (s RunnerScheduler) assignRunnersQuota(totalRunners int) []int {
 	quotas := make([]int, len(s.Injectors))
 	remainingRunners := totalRunners
 
@@ -32,7 +32,7 @@ func (s Scheduler) assignRunnersQuota(totalRunners int) []int {
 	return quotas
 }
 
-func (s Scheduler) sendRunnersQuotasUpdate(shooterQuotas []int) {
+func (s RunnerScheduler) sendRunnersQuotasUpdate(shooterQuotas []int) {
 	for injectorIndex, quota := range shooterQuotas {
 		message := messaging.NewRunnerQuotaUpdateMessage(quota)
 		s.Injectors[injectorIndex].Messenger.Send(message)

@@ -1,61 +1,31 @@
-package loading_test
+package cockpit_test
 
 import (
+	"github.com/steromano87/harkonnen/v1/pkg/cockpit"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
-	"github.com/steromano87/harkonnen/v1/pkg/loading"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"testing"
 )
 
-///////////////////////////////////////////////////
-
-type MockedMessenger struct {
-	MessageForRead    messaging.Message
-	MessagesFromWrite []messaging.Message
-}
-
-func (m *MockedMessenger) Receive() (messaging.Message, error) {
-	return m.MessageForRead, nil
-}
-
-func (m *MockedMessenger) Send(message messaging.Message) error {
-	m.MessagesFromWrite = append(m.MessagesFromWrite, message)
-	return nil
-}
-
-func (m *MockedMessenger) SendPing() error {
-	panic("not required")
-}
-
-func (m *MockedMessenger) SendPong(_ string) error {
-	panic("not required")
-}
-
-func (m *MockedMessenger) Close() {
-	panic("not required")
-}
-
-///////////////////////////////////////////////////
-
 type SchedulerTestSuite struct {
 	suite.Suite
-	profile         loading.Profiler
-	scheduler       loading.Scheduler
+	profile         cockpit.LoadProfile
+	scheduler       cockpit.RunnerScheduler
 	bossMessenger   messaging.Messenger
 	minionMessenger messaging.Messenger
 }
 
 func (s *SchedulerTestSuite) SetupTest() {
-	s.profile = loading.LinearRamp{
-		Shooters:     10,
+	s.profile = cockpit.LinearRamp{
+		Runners:      10,
 		InitialDelay: 0,
 		RampUp:       0,
 		Sustain:      1000,
 		RampDown:     0,
 	}
-	s.scheduler = loading.Scheduler{
+	s.scheduler = cockpit.RunnerScheduler{
 		Profile:   s.profile,
 		Injectors: nil,
 	}

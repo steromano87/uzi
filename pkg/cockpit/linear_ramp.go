@@ -1,4 +1,4 @@
-package loading
+package cockpit
 
 import (
 	"errors"
@@ -8,7 +8,7 @@ import (
 
 const (
 	LinearRampType  = "linearRamp"
-	ShootersKey     = "shooters"
+	RunnersKey      = "runners"
 	InitialDelayKey = "initialDelay"
 	RampUpKey       = "rampUp"
 	SustainKey      = "sustain"
@@ -16,7 +16,7 @@ const (
 )
 
 type LinearRamp struct {
-	Shooters     int
+	Runners      int
 	InitialDelay time.Duration
 	RampUp       time.Duration
 	Sustain      time.Duration
@@ -24,13 +24,13 @@ type LinearRamp struct {
 }
 
 func ParseLinearRamp(rampSpec map[string]any) (LinearRamp, error) {
-	rawShooters, ok := rampSpec[ShootersKey]
+	rawShooters, ok := rampSpec[RunnersKey]
 	if !ok {
-		return LinearRamp{}, errors.New("field '" + ShootersKey + "' not set")
+		return LinearRamp{}, errors.New("field '" + RunnersKey + "' not set")
 	}
 	shooters, ok := rawShooters.(int)
 	if !ok {
-		return LinearRamp{}, errors.New("cannot parse '" + ShootersKey + "' field, expected int")
+		return LinearRamp{}, errors.New("cannot parse '" + RunnersKey + "' field, expected int")
 	}
 
 	rawInitialDelay, ok := rampSpec[InitialDelayKey]
@@ -71,7 +71,7 @@ func ParseLinearRamp(rampSpec map[string]any) (LinearRamp, error) {
 	rampDown, err := time.ParseDuration(rawRampDown.(string))
 
 	return LinearRamp{
-		Shooters:     shooters,
+		Runners:      shooters,
 		InitialDelay: initialDelay,
 		RampUp:       rampUp,
 		Sustain:      sustain,
@@ -79,7 +79,7 @@ func ParseLinearRamp(rampSpec map[string]any) (LinearRamp, error) {
 	}, nil
 }
 
-func (r LinearRamp) ShootersAt(elapsed time.Duration) int {
+func (r LinearRamp) At(elapsed time.Duration) int {
 	if elapsed < r.InitialDelay {
 		return 0
 	}
@@ -89,13 +89,13 @@ func (r LinearRamp) ShootersAt(elapsed time.Duration) int {
 	if partialElapsed < r.RampUp {
 		return int(
 			math.Round(
-				float64(r.Shooters) * (float64(partialElapsed.Nanoseconds()) / float64(r.RampUp.Nanoseconds()))))
+				float64(r.Runners) * (float64(partialElapsed.Nanoseconds()) / float64(r.RampUp.Nanoseconds()))))
 	}
 
 	partialElapsed = partialElapsed - r.RampUp
 
 	if partialElapsed < r.Sustain {
-		return r.Shooters
+		return r.Runners
 	}
 
 	partialElapsed = partialElapsed - r.Sustain
@@ -103,7 +103,7 @@ func (r LinearRamp) ShootersAt(elapsed time.Duration) int {
 	if partialElapsed < r.RampDown {
 		return int(
 			math.Round(
-				float64(r.Shooters) * float64(r.RampDown.Nanoseconds()-partialElapsed.Nanoseconds()) / float64(r.RampDown.Nanoseconds())))
+				float64(r.Runners) * float64(r.RampDown.Nanoseconds()-partialElapsed.Nanoseconds()) / float64(r.RampDown.Nanoseconds())))
 	}
 
 	return 0
