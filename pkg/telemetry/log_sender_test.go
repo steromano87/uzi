@@ -1,8 +1,9 @@
-package messaging_test
+package telemetry_test
 
 import (
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"io"
@@ -23,15 +24,15 @@ func (l *LogSenderTestSuite) SetupTest() {
 }
 
 func (l *LogSenderTestSuite) TestNewLogSender() {
-	dispatcher := messaging.NewLogSender(l.minionMessenger, 10)
+	dispatcher := telemetry.NewLogSender(l.minionMessenger, 10)
 
-	if assert.IsType(l.T(), &messaging.LogSender{}, dispatcher) {
+	if assert.IsType(l.T(), &telemetry.LogSender{}, dispatcher) {
 		assert.Implements(l.T(), (*io.Writer)(nil), dispatcher)
 	}
 }
 
 func (l *LogSenderTestSuite) TestWriteLogBelowBufferLimit() {
-	dispatcher := messaging.NewLogSender(l.minionMessenger, 10)
+	dispatcher := telemetry.NewLogSender(l.minionMessenger, 10)
 	logger := zerolog.New(dispatcher)
 	logger.Info().Msg("my first log")
 	logger.Info().Msg("my second log")
@@ -51,7 +52,7 @@ func (l *LogSenderTestSuite) TestWriteLogBelowBufferLimit() {
 }
 
 func (l *LogSenderTestSuite) TestWriteLogWithManualFlush() {
-	dispatcher := messaging.NewLogSender(l.minionMessenger, 10)
+	dispatcher := telemetry.NewLogSender(l.minionMessenger, 10)
 	logger := zerolog.New(dispatcher)
 	logger.Info().Msg("my first log")
 	logger.Info().Msg("my second log")
@@ -69,13 +70,17 @@ func (l *LogSenderTestSuite) TestWriteLogWithManualFlush() {
 	if assert.IsType(l.T(), messaging.Message{}, message) {
 		payload := message.Payload
 		if assert.IsType(l.T(), &messaging.RemoteLogPayload{}, payload) {
-			assert.Len(l.T(), payload.(*messaging.RemoteLogPayload).Logs, 2)
+			logLines := payload.(*messaging.RemoteLogPayload).Logs
+			if assert.Len(l.T(), logLines, 2) {
+				assert.Contains(l.T(), string(logLines[0]), "my first log")
+				assert.Contains(l.T(), string(logLines[1]), "my second log")
+			}
 		}
 	}
 }
 
 func (l *LogSenderTestSuite) TestWriteLogWithAutomaticFlush() {
-	dispatcher := messaging.NewLogSender(l.minionMessenger, 2)
+	dispatcher := telemetry.NewLogSender(l.minionMessenger, 2)
 	logger := zerolog.New(dispatcher)
 	logger.Info().Msg("my first log")
 	logger.Info().Msg("my second log")
@@ -92,11 +97,15 @@ func (l *LogSenderTestSuite) TestWriteLogWithAutomaticFlush() {
 	if assert.IsType(l.T(), messaging.Message{}, message) {
 		payload := message.Payload
 		if assert.IsType(l.T(), &messaging.RemoteLogPayload{}, payload) {
-			assert.Len(l.T(), payload.(*messaging.RemoteLogPayload).Logs, 2)
+			logLines := payload.(*messaging.RemoteLogPayload).Logs
+			if assert.Len(l.T(), logLines, 2) {
+				assert.Contains(l.T(), string(logLines[0]), "my first log")
+				assert.Contains(l.T(), string(logLines[1]), "my second log")
+			}
 		}
 	}
 }
 
-func TestLogDispatcherTestSuite(t *testing.T) {
+func TestLogSenderTestSuite(t *testing.T) {
 	suite.Run(t, new(LogSenderTestSuite))
 }
