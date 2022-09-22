@@ -2,11 +2,13 @@ package db
 
 import (
 	"github.com/mitchellh/hashstructure/v2"
+	"gorm.io/datatypes"
 	"time"
 )
 
 type Sample struct {
-	baseRecord
+	ID            uint           `gorm:"primaryKey;autoincrement"`
+	Timestamp     datatypes.Date `gorm:"index;idx_timestamp"`
 	Kind          string
 	Name          string
 	Duration      time.Duration

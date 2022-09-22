@@ -1,13 +1,14 @@
 package db
 
 import (
-	"time"
+	"gorm.io/datatypes"
 )
 
 type Transaction struct {
-	baseRecord
-	Name    string    `gorm:"index"`
-	Started time.Time `gorm:"type:uint"`
-	Ended   time.Time `gorm:"type:uint"`
-	Passed  bool
+	ID        uint `gorm:"primaryKey;autoincrement"`
+	Iteration uint
+	Name      string         `gorm:"index"`
+	Started   datatypes.Date `gorm:"type:uint"`
+	Ended     datatypes.Date `gorm:"type:uint"`
+	Passed    bool
 }

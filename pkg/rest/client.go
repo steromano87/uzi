@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
+	"gorm.io/datatypes"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -104,7 +105,7 @@ func (c *Client) Execute(request Request) error {
 			FinalURL:   finalURL,
 		},
 	}
-	sample.Timestamp = startTime
+	sample.Timestamp = datatypes.Date(startTime)
 
 	c.ctx.SampleSender().Collect(sample)
 
