@@ -26,7 +26,7 @@ func (s *SamplePayload) UnmarshalJSON(bytes []byte) error {
 
 	samples, ok := intermediate[SampleMsgId].([]db.Sample)
 	if !ok {
-		return errors.New(fmt.Sprintf("error parsing samples '%s' field: %x", SampleMsgId, samples))
+		return errors.New(fmt.Sprintf("error parsing samples '%s' field: %+v", SampleMsgId, samples))
 	}
 
 	s.Samples = samples
