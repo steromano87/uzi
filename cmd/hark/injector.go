@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 )
 
 var injectorCmd = &cobra.Command{
@@ -18,7 +17,7 @@ var injectorCmd = &cobra.Command{
 		c := make(chan os.Signal)
 		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
-		zerolog.TimeFieldFormat = time.RFC3339Nano
+		zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMicro
 		consoleWriter := zerolog.NewConsoleWriter()
 		consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 		logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
