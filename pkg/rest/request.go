@@ -9,20 +9,18 @@ import (
 	"strings"
 )
 
-type Method string
-
 const (
-	GET     = Method("GET")
-	POST    = Method("POST")
-	PUT     = Method("PUT")
-	PATCH   = Method("PATCH")
-	DELETE  = Method("DELETE")
-	HEAD    = Method("HEAD")
-	OPTIONS = Method("OPTIONS")
+	GET     = "GET"
+	POST    = "POST"
+	PUT     = "PUT"
+	PATCH   = "PATCH"
+	DELETE  = "DELETE"
+	HEAD    = "HEAD"
+	OPTIONS = "OPTIONS"
 )
 
 type Request struct {
-	Method
+	Method      string
 	Url         string
 	Name        string
 	Parameters  *url.Values

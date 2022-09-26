@@ -38,7 +38,7 @@ func (l *LogSender) Write(p []byte) (n int, err error) {
 }
 
 func (l *LogSender) Flush() {
-	logMessage := messaging.NewRemoteLogMessage(l.queuedLogs)
+	logMessage, _ := messaging.NewMessage(messaging.LogMsgType, l.queuedLogs)
 	l.messenger.Send(logMessage)
 	l.queuedLogs = make([]json.RawMessage, 0)
 }

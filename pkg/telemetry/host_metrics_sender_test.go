@@ -2,6 +2,7 @@ package telemetry_test
 
 import (
 	"context"
+	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
@@ -39,16 +40,17 @@ func (s *HostMetricsCollectorTestSuite) TestMetricsCollection() {
 	select {
 	case message := <-s.bossMessenger.Receive():
 		if assert.Equal(s.T(), messaging.HostMetricsMsgId, message.Type) {
-			payload := message.Payload
+			payload, err := message.DecodePayload()
+			if assert.NoError(s.T(), err) {
+				if assert.IsType(s.T(), db.HostMetric{}, payload) {
+					castPayload := payload.(db.HostMetric)
 
-			if assert.IsType(s.T(), &messaging.HostMetricsPayload{}, payload) {
-				castPayload := payload.(*messaging.HostMetricsPayload)
-
-				assert.Greater(s.T(), castPayload.CPU, 0.0)
-				assert.Greater(s.T(), castPayload.Memory.Total, uint64(0))
-				assert.LessOrEqual(s.T(), castPayload.Memory.Used, castPayload.Memory.Total)
-				assert.Greater(s.T(), castPayload.Storage.Total, uint64(0))
-				assert.LessOrEqual(s.T(), castPayload.Storage.Used, castPayload.Storage.Total)
+					assert.Greater(s.T(), castPayload.CPU, 0.0)
+					assert.Greater(s.T(), castPayload.Memory.Total, uint64(0))
+					assert.LessOrEqual(s.T(), castPayload.Memory.Used, castPayload.Memory.Total)
+					assert.Greater(s.T(), castPayload.Storage.Total, uint64(0))
+					assert.LessOrEqual(s.T(), castPayload.Storage.Used, castPayload.Storage.Total)
+				}
 			}
 		}
 

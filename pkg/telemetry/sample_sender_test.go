@@ -1,8 +1,9 @@
-package messaging_test
+package telemetry_test
 
 import (
 	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"testing"
@@ -19,15 +20,15 @@ func (s *SampleSenderTestSuite) SetupTest() {
 }
 
 func (s *SampleSenderTestSuite) TestNewSampleSender() {
-	sender := messaging.NewSampleSender(s.minionMessenger, 10)
+	sender := telemetry.NewSampleSender(s.minionMessenger, 10)
 
-	assert.IsType(s.T(), &messaging.SampleSender{}, sender)
+	assert.IsType(s.T(), &telemetry.SampleSender{}, sender)
 }
 
 func (s *SampleSenderTestSuite) TestCollectBelowBufferLimit() {
 	sample := db.Sample{}
 
-	sender := messaging.NewSampleSender(s.minionMessenger, 10)
+	sender := telemetry.NewSampleSender(s.minionMessenger, 10)
 	sender.Collect(sample)
 	sender.Collect(sample)
 
@@ -48,7 +49,7 @@ func (s *SampleSenderTestSuite) TestCollectBelowBufferLimit() {
 func (s *SampleSenderTestSuite) TestSampleSendingWithManualFlush() {
 	sample := db.Sample{}
 
-	sender := messaging.NewSampleSender(s.minionMessenger, 10)
+	sender := telemetry.NewSampleSender(s.minionMessenger, 10)
 	sender.Collect(sample)
 	sender.Collect(sample)
 
@@ -64,9 +65,10 @@ func (s *SampleSenderTestSuite) TestSampleSendingWithManualFlush() {
 	}
 
 	if assert.IsType(s.T(), messaging.Message{}, message) {
-		payload := message.Payload
-		if assert.IsType(s.T(), &messaging.SamplePayload{}, payload) {
-			assert.Len(s.T(), payload.(*messaging.SamplePayload).Samples, 2)
+		payload, err := message.DecodePayload()
+		if assert.NoError(s.T(), err) {
+			assert.IsType(s.T(), []db.Sample{}, payload)
+			assert.Len(s.T(), payload, 2)
 		}
 	}
 }
@@ -74,7 +76,7 @@ func (s *SampleSenderTestSuite) TestSampleSendingWithManualFlush() {
 func (s *SampleSenderTestSuite) TestSampleSendingWithAutomaticFlush() {
 	sample := db.Sample{}
 
-	sender := messaging.NewSampleSender(s.minionMessenger, 2)
+	sender := telemetry.NewSampleSender(s.minionMessenger, 2)
 	sender.Collect(sample)
 	sender.Collect(sample)
 
@@ -88,9 +90,10 @@ func (s *SampleSenderTestSuite) TestSampleSendingWithAutomaticFlush() {
 	}
 
 	if assert.IsType(s.T(), messaging.Message{}, message) {
-		payload := message.Payload
-		if assert.IsType(s.T(), &messaging.SamplePayload{}, payload) {
-			assert.Len(s.T(), payload.(*messaging.SamplePayload).Samples, 2)
+		payload, err := message.DecodePayload()
+		if assert.NoError(s.T(), err) {
+			assert.IsType(s.T(), []db.Sample{}, payload)
+			assert.Len(s.T(), payload, 2)
 		}
 	}
 }

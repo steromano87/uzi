@@ -1,7 +1,9 @@
 package db
 
 import (
+	"errors"
 	"github.com/mitchellh/hashstructure/v2"
+	"github.com/mitchellh/mapstructure"
 	"gorm.io/datatypes"
 	"time"
 )
@@ -19,4 +21,16 @@ type Sample struct {
 
 func (s Sample) Hash() (uint64, error) {
 	return hashstructure.Hash(s.Data, hashstructure.FormatV2, nil)
+}
+
+func (s Sample) DecodeData() (any, error) {
+	switch s.Kind {
+	case RestSampleType:
+		var data RestSampleData
+		err := mapstructure.Decode(s.Data, &data)
+		return data, err
+
+	default:
+		return nil, errors.New("unknown sample type " + s.Kind)
+	}
 }

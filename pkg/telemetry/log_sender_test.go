@@ -2,6 +2,7 @@ package telemetry_test
 
 import (
 	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
@@ -68,12 +69,15 @@ func (l *LogSenderTestSuite) TestWriteLogWithManualFlush() {
 	}
 
 	if assert.IsType(l.T(), messaging.Message{}, message) {
-		payload := message.Payload
-		if assert.IsType(l.T(), &messaging.RemoteLogPayload{}, payload) {
-			logLines := payload.(*messaging.RemoteLogPayload).Logs
-			if assert.Len(l.T(), logLines, 2) {
-				assert.Contains(l.T(), string(logLines[0]), "my first log")
-				assert.Contains(l.T(), string(logLines[1]), "my second log")
+		payload, err := message.DecodePayload()
+
+		if assert.NoError(l.T(), err) {
+			if assert.IsType(l.T(), []db.Log{}, payload) {
+				logLines := payload.([]db.Log)
+				if assert.Len(l.T(), logLines, 2) {
+					assert.Equal(l.T(), "my first log", logLines[0].Message)
+					assert.Equal(l.T(), "my second log", logLines[1].Message)
+				}
 			}
 		}
 	}
@@ -95,12 +99,15 @@ func (l *LogSenderTestSuite) TestWriteLogWithAutomaticFlush() {
 	}
 
 	if assert.IsType(l.T(), messaging.Message{}, message) {
-		payload := message.Payload
-		if assert.IsType(l.T(), &messaging.RemoteLogPayload{}, payload) {
-			logLines := payload.(*messaging.RemoteLogPayload).Logs
-			if assert.Len(l.T(), logLines, 2) {
-				assert.Contains(l.T(), string(logLines[0]), "my first log")
-				assert.Contains(l.T(), string(logLines[1]), "my second log")
+		payload, err := message.DecodePayload()
+
+		if assert.NoError(l.T(), err) {
+			if assert.IsType(l.T(), []db.Log{}, payload) {
+				logLines := payload.([]db.Log)
+				if assert.Len(l.T(), logLines, 2) {
+					assert.Equal(l.T(), "my first log", logLines[0].Message)
+					assert.Equal(l.T(), "my second log", logLines[1].Message)
+				}
 			}
 		}
 	}

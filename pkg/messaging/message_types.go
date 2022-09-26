@@ -1,5 +1,11 @@
 package messaging
 
 const (
-	ShooterQuotaUpdate = "SHOOTER_QUOTA_UPDATE"
+	PingMsgType        = "PING"
+	PongMsgType        = "PONG"
+	SampleMsgType      = "SAMPLE"
+	MostMetricsMsgType = "HOST_METRICS"
+	EventMsgType       = "EVENT"
+	AcknowledgeMsgType = "ACK"
+	LogMsgType         = "LOG"
 )

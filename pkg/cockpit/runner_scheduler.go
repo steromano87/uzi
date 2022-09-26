@@ -1,6 +1,7 @@
 package cockpit
 
 import (
+	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"math"
@@ -32,9 +33,9 @@ func (s RunnerScheduler) assignRunnersQuota(totalRunners int) []int {
 	return quotas
 }
 
-func (s RunnerScheduler) sendRunnersQuotasUpdate(shooterQuotas []int) {
-	for injectorIndex, quota := range shooterQuotas {
-		message := messaging.NewRunnerQuotaUpdateMessage(quota)
+func (s RunnerScheduler) sendRunnersQuotasUpdate(runnerQuotas []int) {
+	for injectorIndex, quota := range runnerQuotas {
+		message, _ := messaging.NewMessage(messaging.EventMsgType, db.NewRunnersQuotaUpdateEvent(quota))
 		s.Injectors[injectorIndex].Messenger.Send(message)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/steromano87/harkonnen/v1/pkg/project"
+	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 )
 
@@ -14,7 +15,7 @@ type Context struct {
 	logger       *zerolog.Logger
 	config       *project.Config
 	messenger    messaging.Messenger
-	sampleSender *messaging.SampleSender
+	sampleSender *telemetry.SampleSender
 
 	vars              *variables.Holder
 	iterationsCounter *IterationsCounter
@@ -34,7 +35,7 @@ func NewContext(ctx context.Context, config *project.Config, logger *zerolog.Log
 		logger:               logger,
 		config:               config,
 		messenger:            messenger,
-		sampleSender:         messaging.NewSampleSender(messenger, sampleSenderBufferSize),
+		sampleSender:         telemetry.NewSampleSender(messenger, sampleSenderBufferSize),
 		vars:                 variables.NewHolder(),
 		iterationsCounter:    iterCounter,
 		status:               Ready,
@@ -92,6 +93,6 @@ func (c *Context) Messenger() messaging.Messenger {
 	return c.messenger
 }
 
-func (c *Context) SampleSender() *messaging.SampleSender {
+func (c *Context) SampleSender() *telemetry.SampleSender {
 	return c.sampleSender
 }

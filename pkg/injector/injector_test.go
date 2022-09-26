@@ -6,6 +6,7 @@ import (
 	"context"
 	"github.com/Flaque/filet"
 	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/stretchr/testify/assert"
@@ -66,7 +67,7 @@ func (s *InjectorTestSuite) TestPingMessageHandling() {
 
 	responseMessage, ok := <-s.bossMessenger.Receive()
 	if assert.True(s.T(), ok) {
-		assert.Equal(s.T(), messaging.PongMsgId, responseMessage.Type)
+		assert.Equal(s.T(), messaging.PongMsgType, responseMessage.Type)
 		assert.NotEmpty(s.T(), responseMessage.AnswersTo)
 	}
 }
@@ -119,12 +120,13 @@ func (s *InjectorTestSuite) TestWorkingFolderInitMessageHandling() {
 	_ = zipWriter.Close()
 	require.NoError(s.T(), err)
 
-	workDirMessage := messaging.NewWorkingFolderInitMsgID(compressedBytes.Bytes())
+	workDirMessage, _ := messaging.NewMessage(messaging.EventMsgType, db.NewWorkingFolderInitEvent(compressedBytes.Bytes()))
+
 	s.bossMessenger.Send(workDirMessage)
 
 	responseMessage, ok := <-s.bossMessenger.Receive()
 	if assert.True(s.T(), ok) {
-		assert.Equal(s.T(), messaging.AcknowledgeMsgID, responseMessage.Type)
+		assert.Equal(s.T(), messaging.AcknowledgeMsgType, responseMessage.Type)
 		assert.Equal(s.T(), workDirMessage.ID, responseMessage.AnswersTo)
 
 		if assert.DirExists(s.T(), inj.WorkingFolder()) {

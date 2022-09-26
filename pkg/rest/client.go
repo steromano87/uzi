@@ -92,12 +92,12 @@ func (c *Client) Execute(request Request) error {
 
 	// Create request sample
 	sample := db.Sample{
-		Kind:          SampleType,
+		Kind:          db.RestSampleType,
 		Name:          rawRequest.URL.String(),
 		Duration:      endTime.Sub(startTime),
 		SentBytes:     sentBytes,
 		ReceivedBytes: receivedBytes,
-		Data: SampleData{
+		Data: db.RestSampleData{
 			URL:        pureUrl,
 			Parameters: queryString,
 			Method:     request.Method,

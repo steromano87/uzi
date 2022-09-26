@@ -2,6 +2,7 @@ package cockpit_test
 
 import (
 	"github.com/steromano87/harkonnen/v1/pkg/cockpit"
+	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/stretchr/testify/assert"
@@ -46,7 +47,13 @@ func (s *SchedulerTestSuite) TestSingleInjectorQuota() {
 	message, ok := <-s.minionMessenger.Receive()
 
 	if assert.True(s.T(), ok) {
-		assert.Equal(s.T(), &messaging.RunnersQuotaUpdatePayload{Quota: 10}, message.Payload)
+		payload, err := message.DecodePayload()
+
+		if assert.NoError(s.T(), err) {
+			if assert.IsType(s.T(), db.Event{}, payload) {
+				assert.EqualValues(s.T(), 10, payload.(db.Event).Data["runnerQuota"])
+			}
+		}
 	}
 }
 
@@ -69,8 +76,21 @@ func (s *SchedulerTestSuite) TestTwoInjectorsWithSameWeight() {
 	secondMessage, ok := <-s.minionMessenger.Receive()
 
 	if assert.True(s.T(), ok) {
-		assert.Equal(s.T(), &messaging.RunnersQuotaUpdatePayload{Quota: 5}, firstMessage.Payload)
-		assert.Equal(s.T(), &messaging.RunnersQuotaUpdatePayload{Quota: 5}, secondMessage.Payload)
+		payload, err := firstMessage.DecodePayload()
+
+		if assert.NoError(s.T(), err) {
+			if assert.IsType(s.T(), db.Event{}, payload) {
+				assert.EqualValues(s.T(), 5, payload.(db.Event).Data["runnerQuota"])
+			}
+		}
+
+		payload, err = secondMessage.DecodePayload()
+
+		if assert.NoError(s.T(), err) {
+			if assert.IsType(s.T(), db.Event{}, payload) {
+				assert.EqualValues(s.T(), 5, payload.(db.Event).Data["runnerQuota"])
+			}
+		}
 	}
 }
 
@@ -93,8 +113,21 @@ func (s *SchedulerTestSuite) TestTwoInjectorsWithDifferentWeight() {
 	secondMessage, ok := <-s.minionMessenger.Receive()
 
 	if assert.True(s.T(), ok) {
-		assert.Equal(s.T(), &messaging.RunnersQuotaUpdatePayload{Quota: 8}, firstMessage.Payload)
-		assert.Equal(s.T(), &messaging.RunnersQuotaUpdatePayload{Quota: 2}, secondMessage.Payload)
+		payload, err := firstMessage.DecodePayload()
+
+		if assert.NoError(s.T(), err) {
+			if assert.IsType(s.T(), db.Event{}, payload) {
+				assert.EqualValues(s.T(), 8, payload.(db.Event).Data["runnerQuota"])
+			}
+		}
+
+		payload, err = secondMessage.DecodePayload()
+
+		if assert.NoError(s.T(), err) {
+			if assert.IsType(s.T(), db.Event{}, payload) {
+				assert.EqualValues(s.T(), 2, payload.(db.Event).Data["runnerQuota"])
+			}
+		}
 	}
 }
 
@@ -123,9 +156,29 @@ func (s *SchedulerTestSuite) TestThreeInjectorsWithDifferentWeight() {
 	thirdMessage, ok := <-s.minionMessenger.Receive()
 
 	if assert.True(s.T(), ok) {
-		assert.Equal(s.T(), &messaging.RunnersQuotaUpdatePayload{Quota: 6}, firstMessage.Payload)
-		assert.Equal(s.T(), &messaging.RunnersQuotaUpdatePayload{Quota: 2}, secondMessage.Payload)
-		assert.Equal(s.T(), &messaging.RunnersQuotaUpdatePayload{Quota: 2}, thirdMessage.Payload)
+		payload, err := firstMessage.DecodePayload()
+
+		if assert.NoError(s.T(), err) {
+			if assert.IsType(s.T(), db.Event{}, payload) {
+				assert.EqualValues(s.T(), 6, payload.(db.Event).Data["runnerQuota"])
+			}
+		}
+
+		payload, err = secondMessage.DecodePayload()
+
+		if assert.NoError(s.T(), err) {
+			if assert.IsType(s.T(), db.Event{}, payload) {
+				assert.EqualValues(s.T(), 2, payload.(db.Event).Data["runnerQuota"])
+			}
+		}
+
+		payload, err = thirdMessage.DecodePayload()
+
+		if assert.NoError(s.T(), err) {
+			if assert.IsType(s.T(), db.Event{}, payload) {
+				assert.EqualValues(s.T(), 2, payload.(db.Event).Data["runnerQuota"])
+			}
+		}
 	}
 }
 

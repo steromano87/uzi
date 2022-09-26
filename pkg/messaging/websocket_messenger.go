@@ -89,9 +89,9 @@ func (w *WebsocketMessenger) pumpOutgoingMessages() {
 
 		var wsMessageType int
 		switch message.Type {
-		case PingMsgId:
+		case PingMsgType:
 			wsMessageType = websocket.PingMessage
-		case PongMsgId:
+		case PongMsgType:
 			wsMessageType = websocket.PongMessage
 		default:
 			wsMessageType = websocket.TextMessage

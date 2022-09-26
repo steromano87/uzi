@@ -6,6 +6,7 @@ import (
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/net"
+	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"runtime"
 	"time"
@@ -69,7 +70,7 @@ func (p HostMetricsSender) gatherMetrics(ctx context.Context, measureInterval ti
 		return err
 	}
 
-	messagePayload := messaging.HostMetricsPayload{
+	messagePayload := db.HostMetric{
 		CPU: cpuPercent[0],
 		Memory: struct {
 			Total uint64
@@ -93,8 +94,8 @@ func (p HostMetricsSender) gatherMetrics(ctx context.Context, measureInterval ti
 			DownSpeed: float64(netUsageAfter[0].BytesRecv-netUsageBefore[0].BytesRecv) / measureInterval.Seconds(),
 		},
 	}
-
-	p.messenger.Send(messaging.NewRawMessage(messaging.HostMetricsMsgId, &messagePayload))
+	message, _ := messaging.NewMessage(messaging.HostMetricsMsgId, messagePayload)
+	p.messenger.Send(message)
 	return nil
 }
 

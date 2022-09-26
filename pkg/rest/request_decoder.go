@@ -567,7 +567,7 @@ func (r RequestDecoder) decodeRequest(ctx *hcl.EvalContext, block *hcl.Block) (d
 
 	req := new(Request)
 
-	req.Method = Method(block.Labels[0])
+	req.Method = block.Labels[0]
 	req.Url = block.Labels[1]
 
 	for name, attr := range body.Attributes {

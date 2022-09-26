@@ -1,15 +1,15 @@
-package rest
+package db
 
 import (
 	"net/url"
 )
 
-const SampleType = "REST"
+const RestSampleType = "REST"
 
-type SampleData struct {
+type RestSampleData struct {
 	URL        *url.URL
 	Parameters url.Values
-	Method
+	Method     string
 	IsRedirect bool
 	FinalURL   *url.URL
 }

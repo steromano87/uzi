@@ -52,21 +52,22 @@ func (s *LogCollectorTestSuite) TestCollectMultipleLogs() {
 		assert.Fail(s.T(), "no message was sent")
 	}
 
-	payload := message.Payload.(*messaging.RemoteLogPayload)
-
-	err := collector.Collect(payload)
+	payload, err := message.DecodePayload()
 	if assert.NoError(s.T(), err) {
-		var logs []db.Log
-		s.dbAdapter.Find(&logs)
+		err := collector.Collect(payload.([]db.Log))
+		if assert.NoError(s.T(), err) {
+			var logs []db.Log
+			s.dbAdapter.Find(&logs)
 
-		if assert.Len(s.T(), logs, 2) {
-			assert.Equal(s.T(), logs[0].Level, "info")
-			assert.Equal(s.T(), logs[0].Message, "my first log")
+			if assert.Len(s.T(), logs, 2) {
+				assert.Equal(s.T(), logs[0].Level, "info")
+				assert.Equal(s.T(), logs[0].Message, "my first log")
 
-			assert.Equal(s.T(), logs[1].Level, "info")
-			assert.Equal(s.T(), logs[1].Message, "my second log")
+				assert.Equal(s.T(), logs[1].Level, "info")
+				assert.Equal(s.T(), logs[1].Message, "my second log")
+			}
+
 		}
-
 	}
 }
 
