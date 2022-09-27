@@ -5,15 +5,15 @@ import (
 	"gorm.io/gorm"
 )
 
-type automigrator struct {
+type autoMigrator struct {
 	registeredEntities []any
 }
 
-func (a *automigrator) register(entity any) {
+func (a *autoMigrator) register(entity any) {
 	a.registeredEntities = append(a.registeredEntities, entity)
 }
 
-func (a *automigrator) migrate(ctx context.Context, db *gorm.DB) error {
+func (a *autoMigrator) migrate(ctx context.Context, db *gorm.DB) error {
 	for _, element := range a.registeredEntities {
 		err := db.WithContext(ctx).AutoMigrate(element)
 		if err != nil {

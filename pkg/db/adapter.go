@@ -56,7 +56,7 @@ func (m *Adapter) getDialector() (gorm.Dialector, error) {
 }
 
 func (m *Adapter) migrateAll(ctx context.Context) error {
-	autoMigrator := automigrator{[]any{
+	autoMigrator := autoMigrator{[]any{
 		Log{},
 		Sample{},
 		Transaction{},
