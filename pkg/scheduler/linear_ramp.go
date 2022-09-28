@@ -1,4 +1,4 @@
-package cockpit
+package scheduler
 
 import (
 	"errors"

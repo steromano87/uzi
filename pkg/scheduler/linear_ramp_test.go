@@ -1,7 +1,7 @@
-package cockpit_test
+package scheduler_test
 
 import (
-	"github.com/steromano87/harkonnen/v1/pkg/cockpit"
+	"github.com/steromano87/harkonnen/v1/pkg/scheduler"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
@@ -12,7 +12,7 @@ var initialDelay = "5s"
 var rampUp = "4s"
 var sustain = "10s"
 var rampDown = "2s"
-var testRamp, _ = cockpit.ParseLinearRamp(map[string]any{
+var testRamp, _ = scheduler.ParseLinearRamp(map[string]any{
 	"runners":      runners,
 	"initialDelay": initialDelay,
 	"rampUp":       rampUp,
@@ -21,8 +21,8 @@ var testRamp, _ = cockpit.ParseLinearRamp(map[string]any{
 })
 
 func TestRampCreation(t *testing.T) {
-	assert.IsType(t, cockpit.LinearRamp{}, testRamp)
-	assert.Implements(t, (*cockpit.LoadProfile)(nil), testRamp)
+	assert.IsType(t, scheduler.LinearRamp{}, testRamp)
+	assert.Implements(t, (*scheduler.LoadProfile)(nil), testRamp)
 }
 
 func TestRamp_At_BeforeStart(t *testing.T) {
