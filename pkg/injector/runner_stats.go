@@ -1,6 +1,7 @@
 package injector
 
 type RunnerStats struct {
+	Scheduled              int
 	Ready                  int
 	Started                int
 	Running                int

@@ -17,6 +17,7 @@ type RunnerDispatcher struct {
 	runners           []runnerHolder
 
 	iterationsCounter *pipeline.IterationsCounter
+	scheduledRunners  int
 	startedRunners    int
 	runnersWaitGroup  sync.WaitGroup
 }
@@ -54,6 +55,8 @@ func (d *RunnerDispatcher) Prepare(referencePipeline pipeline.Pipeline, instance
 }
 
 func (d *RunnerDispatcher) Dispatch(desiredInstances int) error {
+	d.scheduledRunners = desiredInstances
+
 	for desiredInstances > d.Stats().Started {
 		indexToStart, err := d.firstReadyRunnerIndex()
 		if err != nil {
@@ -96,7 +99,8 @@ func (d *RunnerDispatcher) IterationsCounter() *pipeline.IterationsCounter {
 
 func (d *RunnerDispatcher) Stats() RunnerStats {
 	stats := RunnerStats{
-		Started: d.startedRunners,
+		Scheduled: d.scheduledRunners,
+		Started:   d.startedRunners,
 	}
 
 	for _, currentRunner := range d.runners {
