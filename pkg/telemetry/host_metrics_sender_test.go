@@ -45,7 +45,7 @@ func (s *HostMetricsCollectorTestSuite) TestMetricsCollection() {
 				if assert.IsType(s.T(), db.HostMetric{}, payload) {
 					castPayload := payload.(db.HostMetric)
 
-					assert.Greater(s.T(), castPayload.CPU, 0.0)
+					assert.GreaterOrEqual(s.T(), castPayload.CPU, 0.0)
 					assert.Greater(s.T(), castPayload.Memory.Total, uint64(0))
 					assert.LessOrEqual(s.T(), castPayload.Memory.Used, castPayload.Memory.Total)
 					assert.Greater(s.T(), castPayload.Storage.Total, uint64(0))
