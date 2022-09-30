@@ -9,8 +9,8 @@ import (
 type Context struct {
 	context.Context
 
-	Logger *zerolog.Logger
-	Config *project.Config
+	logger *zerolog.Logger
+	config *project.Config
 }
 
 func NewContext(parentCtx context.Context, logger *zerolog.Logger, config *project.Config) (Context, context.CancelFunc) {
@@ -18,7 +18,15 @@ func NewContext(parentCtx context.Context, logger *zerolog.Logger, config *proje
 
 	return Context{
 		Context: ctx,
-		Logger:  logger,
-		Config:  config,
+		logger:  logger,
+		config:  config,
 	}, cancelFunc
+}
+
+func (c Context) Logger() *zerolog.Logger {
+	return c.logger
+}
+
+func (c Context) Config() *project.Config {
+	return c.config
 }
