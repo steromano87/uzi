@@ -1,11 +1,11 @@
 package scheduler
 
 import (
-	"context"
+	"github.com/steromano87/harkonnen/v1/pkg/context"
 	"time"
 )
 
 type Scheduler interface {
-	Start(ctx context.Context)
+	Start(ctx context.WithLogger)
 	At(elapsed time.Duration) map[string]int
 }
