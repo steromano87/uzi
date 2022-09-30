@@ -1,6 +1,6 @@
 name: My loading project with Harkonnen
 
-minHarkonnenVersion: ""
+harkonnenVersion: ""
 
 #################
 # Configuration #
@@ -11,6 +11,12 @@ messaging:
     bufferSize: 50
   samples:
     bufferSize: 10
+
+cockpit:
+  scheduler:
+    type: FixedInterval
+    spec:
+      updateInterval: 2s
 
 client:
   rest:
