@@ -22,7 +22,13 @@ type WithVariables interface {
 	Variables() *variables.Holder
 }
 
-type WithConfigAndLogger interface {
+type WithConfigLogger interface {
 	WithConfig
 	WithLogger
+}
+
+type WithConfigLoggerVariables interface {
+	WithConfig
+	WithLogger
+	WithVariables
 }
