@@ -156,7 +156,7 @@ func (c *Config) viperSetup() {
 
 	// Read default configuration
 	c.SetConfigType("yaml")
-	_ = c.ReadConfig(bytes.NewBufferString(DefaultProjectManifest))
+	_ = c.ReadConfig(bytes.NewBufferString(DefaultProjectConfigurationContent))
 
 	// Read configuration from environment
 	c.SetConfigName("harkonnen")
