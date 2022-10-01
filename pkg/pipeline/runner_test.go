@@ -4,9 +4,9 @@ import (
 	"context"
 	"github.com/Flaque/filet"
 	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/configuration"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/steromano87/harkonnen/v1/pkg/pipeline"
-	"github.com/steromano87/harkonnen/v1/pkg/project"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"sync"
@@ -36,7 +36,8 @@ func (s *RunnerTestSuite) SetupTest() {
 	s.backgroundCtx = context.TODO()
 	newCtx, cancelFunc := context.WithCancel(s.backgroundCtx)
 	s.backGroundCancelFunc = cancelFunc
-	s.ctx, s.cancelFunc = pipeline.NewContext(newCtx, project.NewConfig(), &logger, s.messenger, s.iterCounter)
+	config, _ := configuration.NewDefault()
+	s.ctx, s.cancelFunc = pipeline.NewContext(newCtx, config, &logger, s.messenger, s.iterCounter)
 }
 
 func (s *RunnerTestSuite) TestRunnerWithFixedIterations() {

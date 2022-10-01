@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/configuration"
 	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/steromano87/harkonnen/v1/pkg/pipeline"
-	"github.com/steromano87/harkonnen/v1/pkg/project"
 	"github.com/steromano87/harkonnen/v1/pkg/rest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -39,8 +39,8 @@ func (s *ClientTestSuite) SetupTest() {
 
 	s.bossMessenger, s.minionMessenger = messaging.NewChannelMessengerPair(100)
 
-	config := project.NewConfig()
-	config.Set("messaging.samples.bufferSize", 1)
+	config, _ := configuration.NewDefault()
+	config.Messaging.Samples.BufferSize = 1
 	s.ctx, _ = pipeline.NewContext(context.TODO(), config, &s.logger, s.minionMessenger, pipeline.NewIterationsCounter())
 
 	s.client = rest.NewClient(s.ctx)
@@ -519,8 +519,9 @@ func (s *ClientTestSuite) TestRequestMalformedUrl() {
 
 func (s *ClientTestSuite) TestRequestInvalidPartialUrl() {
 	baseUrl, _ := url.Parse(s.testServer.URL)
-	s.T().Setenv("HARK_CLIENT_REST_BASEURL", baseUrl.String())
-	s.ctx.Config().AutomaticEnv()
+	s.ctx.Config().Viper.Set("client.rest.baseUrl", baseUrl.String())
+	s.ctx.Config().Viper.Set("client.rest.followRedirects", false)
+	_ = s.ctx.Config().Update()
 
 	invalidPartialUrl := "test"
 
@@ -537,10 +538,9 @@ func (s *ClientTestSuite) TestRequestInvalidPartialUrl() {
 }
 
 func (s *ClientTestSuite) TestRequestWithRedirect_WithoutRedirectSetting() {
-	s.T().Setenv("HARK_CLIENT_REST_FOLLOWREDIRECTS", "false")
 	baseUrl, _ := url.Parse(s.testServer.URL)
-	s.T().Setenv("HARK_CLIENT_REST_BASEURL", baseUrl.String())
-	s.ctx.Config().AutomaticEnv()
+	s.ctx.Config().Client.Rest.BaseUrl = baseUrl.String()
+	s.ctx.Config().Client.Rest.FollowRedirects = false
 
 	request := rest.Request{
 		Method:     rest.GET,
@@ -588,10 +588,9 @@ func (s *ClientTestSuite) TestRequestWithRedirect_WithoutRedirectSetting() {
 }
 
 func (s *ClientTestSuite) TestRequestWithRedirect_WithRedirectSetting() {
-	s.T().Setenv("HARK_CLIENT_REST_FOLLOWREDIRECTS", "true")
 	baseUrl, _ := url.Parse(s.testServer.URL)
-	s.T().Setenv("HARK_CLIENT_REST_BASEURL", baseUrl.String())
-	s.ctx.Config().AutomaticEnv()
+	s.ctx.Config().Client.Rest.BaseUrl = baseUrl.String()
+	s.ctx.Config().Client.Rest.FollowRedirects = true
 
 	request := rest.Request{
 		Method:     rest.GET,

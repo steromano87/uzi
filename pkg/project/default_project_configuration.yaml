@@ -24,8 +24,7 @@ logging:
 cockpit:
   scheduler:
     type: FixedInterval
-    spec:
-      updateInterval: 2s
+    updateInterval: 2s
 
 client:
   rest:

@@ -17,14 +17,12 @@ const restClientVariablesKey = "restClient"
 
 type Client struct {
 	ctx         dsl.StepContext
-	config      Config
 	innerClient http.Client
 }
 
 func NewClient(ctx dsl.StepContext) *Client {
 	client := new(Client)
 	client.ctx = ctx
-	client.config = NewConfig(ctx)
 	client.buildInnerClient()
 
 	return client
@@ -37,8 +35,8 @@ func (c *Client) Execute(request Request) error {
 	var baseUrl *url.URL
 	var err error
 
-	if c.config.BaseUrl() != "" {
-		baseUrl, err = url.Parse(c.config.BaseUrl())
+	if c.ctx.Config().Client.Rest.BaseUrl != "" {
+		baseUrl, err = url.Parse(c.ctx.Config().Client.Rest.BaseUrl)
 		if err != nil {
 			return err
 		}
@@ -175,21 +173,21 @@ func (c *Client) calculateSentReceivedBytes(response *http.Response) (sent uint6
 func (c *Client) buildInnerClient() {
 	client := http.Client{}
 
-	if c.config.KeepCookies() {
+	if c.ctx.Config().Client.Rest.KeepCookies {
 		client.Jar, _ = cookiejar.New(&cookiejar.Options{})
 	}
 
-	client.Timeout = c.config.Timeout()
+	client.Timeout = c.ctx.Config().Client.Rest.Timeout
 
 	transport := http.Transport{
-		TLSHandshakeTimeout:   c.config.TLSHandshakeTimeout(),
-		DisableKeepAlives:     !c.config.EnableKeepAlive(),
-		DisableCompression:    !c.config.EnableCompression(),
-		MaxIdleConns:          c.config.MaxIdleConnections(),
-		MaxIdleConnsPerHost:   c.config.MaxIdleConnectionsPerHost(),
-		MaxConnsPerHost:       c.config.MaxConnectionsPerHost(),
-		IdleConnTimeout:       c.config.IdleConnectionTimeout(),
-		ResponseHeaderTimeout: c.config.ResponseHeaderTimeout(),
+		TLSHandshakeTimeout:   c.ctx.Config().Client.Rest.TLSHandshakeTimeout,
+		DisableKeepAlives:     !c.ctx.Config().Client.Rest.EnableKeepAlive,
+		DisableCompression:    !c.ctx.Config().Client.Rest.EnableCompression,
+		MaxIdleConns:          c.ctx.Config().Client.Rest.MaxIdleConnections,
+		MaxIdleConnsPerHost:   c.ctx.Config().Client.Rest.MaxIdleConnectionsPerHost,
+		MaxConnsPerHost:       c.ctx.Config().Client.Rest.MaxConnectionsPerHost,
+		IdleConnTimeout:       c.ctx.Config().Client.Rest.IdleConnectionTimeout,
+		ResponseHeaderTimeout: c.ctx.Config().Client.Rest.ResponseHeaderTimeout,
 	}
 
 	client.Transport = &transport
@@ -208,7 +206,7 @@ func (c *Client) disableRedirects() {
 }
 
 func (c *Client) setRedirectsFromConfig() {
-	if c.config.FollowRedirects() {
+	if c.ctx.Config().Client.Rest.FollowRedirects {
 		c.enableRedirects()
 	} else {
 		c.disableRedirects()

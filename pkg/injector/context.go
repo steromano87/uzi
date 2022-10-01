@@ -3,25 +3,26 @@ package injector
 import (
 	"context"
 	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/configuration"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
-	"github.com/steromano87/harkonnen/v1/pkg/project"
 )
 
 type Context struct {
 	context.Context
 
 	logger *zerolog.Logger
-	config *project.Config
+	config *configuration.Configuration
 	messaging.Messenger
 }
 
 func NewContext(parentCtx context.Context, logger *zerolog.Logger, messenger messaging.Messenger) (Context, context.CancelFunc) {
 	ctx, cancelFunc := context.WithCancel(parentCtx)
+	config, _ := configuration.NewDefault()
 
 	return Context{
 		Context:   ctx,
 		logger:    logger,
-		config:    project.NewConfig(),
+		config:    config,
 		Messenger: messenger,
 	}, cancelFunc
 }

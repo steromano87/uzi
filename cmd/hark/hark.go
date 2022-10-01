@@ -34,7 +34,7 @@ func registerGlobalPersistentFlags() {
 func registerWorkingFolderFlag(command *cobra.Command) {
 	command.Flags().StringVarP(&workingFolder, "folder", "f", ".", "project folder")
 
-	cobra.CheckErr(viper.BindPFlag("workingDir", command.Flags().Lookup("folder")))
+	cobra.CheckErr(viper.BindPFlag("workingFolder", command.Flags().Lookup("folder")))
 }
 
 func registerSubcommand(command *cobra.Command) {

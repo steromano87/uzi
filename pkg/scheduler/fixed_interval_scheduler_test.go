@@ -4,9 +4,9 @@ import (
 	"context"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/cockpit"
+	"github.com/steromano87/harkonnen/v1/pkg/configuration"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
-	"github.com/steromano87/harkonnen/v1/pkg/project"
 	"github.com/steromano87/harkonnen/v1/pkg/scheduler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -122,8 +122,9 @@ func (s *SchedulerTestSuite) TestRemoteReferenceUpdate() {
 	consoleWriter := zerolog.NewConsoleWriter()
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
+	config, _ := configuration.NewDefault()
 
-	ctx, cancelFunc := cockpit.NewContext(context.TODO(), &logger, project.NewConfig())
+	ctx, cancelFunc := cockpit.NewContext(context.TODO(), &logger, config)
 	go sched.Start(ctx)
 	time.Sleep(150 * time.Millisecond)
 	cancelFunc()

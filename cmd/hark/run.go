@@ -5,10 +5,12 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/steromano87/harkonnen/v1/pkg/cockpit"
+	"github.com/steromano87/harkonnen/v1/pkg/configuration"
 	"github.com/steromano87/harkonnen/v1/pkg/project"
 	"github.com/steromano87/harkonnen/v1/pkg/scheduler"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 )
 
@@ -27,16 +29,17 @@ func runRun(cmd *cobra.Command, args []string) {
 	mainCtx, cancelFunc := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancelFunc()
 
-	config := project.NewConfig()
+	config, err := configuration.New(filepath.Join(workingFolder, project.ConfigurationFile))
+	cobra.CheckErr(err)
 
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMicro
 	consoleWriter := zerolog.NewConsoleWriter()
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
 
-	logLevel, err := zerolog.ParseLevel(config.GetString("logging.level"))
+	logLevel, err := zerolog.ParseLevel(config.Logging.Level)
 	if err != nil {
-		logger.Warn().Str("logLevel", config.GetString("logging.level")).Msg("Unknown log level, defaulting to INFO level")
+		logger.Warn().Str("logLevel", config.Logging.Level).Msg("Unknown log level, defaulting to INFO level")
 		logLevel = zerolog.InfoLevel
 	}
 	zerolog.SetGlobalLevel(logLevel)

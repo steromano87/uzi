@@ -3,8 +3,8 @@ package pipeline
 import (
 	"context"
 	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/configuration"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
-	"github.com/steromano87/harkonnen/v1/pkg/project"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 )
@@ -13,7 +13,7 @@ type Context struct {
 	context.Context
 
 	logger       *zerolog.Logger
-	config       *project.Config
+	config       *configuration.Configuration
 	messenger    messaging.Messenger
 	sampleSender *telemetry.SampleSender
 
@@ -26,7 +26,7 @@ type Context struct {
 	plannedShutdownChan  chan struct{}
 }
 
-func NewContext(ctx context.Context, config *project.Config, logger *zerolog.Logger, messenger messaging.Messenger, iterCounter *IterationsCounter) (*Context, context.CancelFunc) {
+func NewContext(ctx context.Context, config *configuration.Configuration, logger *zerolog.Logger, messenger messaging.Messenger, iterCounter *IterationsCounter) (*Context, context.CancelFunc) {
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
 	sampleSenderBufferSize := config.GetInt("messaging.samples.bufferSize")
 
@@ -44,7 +44,7 @@ func NewContext(ctx context.Context, config *project.Config, logger *zerolog.Log
 	}, cancelFunc
 }
 
-func (c *Context) UpdateConfig(config *project.Config) {
+func (c *Context) UpdateConfig(config *configuration.Configuration) {
 	c.config = config
 }
 
@@ -77,7 +77,7 @@ func (c *Context) Logger() *zerolog.Logger {
 	return c.logger
 }
 
-func (c *Context) Config() *project.Config {
+func (c *Context) Config() *configuration.Configuration {
 	return c.config
 }
 

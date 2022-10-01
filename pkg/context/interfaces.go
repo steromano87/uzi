@@ -3,13 +3,13 @@ package context
 import (
 	"context"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/project"
+	"github.com/steromano87/harkonnen/v1/pkg/configuration"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 )
 
-type WithConfig interface {
+type WithConfiguration interface {
 	context.Context
-	Config() *project.Config
+	Config() *configuration.Configuration
 }
 
 type WithLogger interface {
@@ -22,13 +22,13 @@ type WithVariables interface {
 	Variables() *variables.Holder
 }
 
-type WithConfigLogger interface {
-	WithConfig
+type WithConfigurationLogger interface {
+	WithConfiguration
 	WithLogger
 }
 
 type WithConfigLoggerVariables interface {
-	WithConfig
+	WithConfiguration
 	WithLogger
 	WithVariables
 }

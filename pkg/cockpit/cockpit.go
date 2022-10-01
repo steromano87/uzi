@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"github.com/rs/zerolog"
-
 	harkonnenContext "github.com/steromano87/harkonnen/v1/pkg/context"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
@@ -13,7 +12,7 @@ import (
 )
 
 type Cockpit struct {
-	ctx                harkonnenContext.WithConfigLogger
+	ctx                harkonnenContext.WithConfigurationLogger
 	injectorReferences map[string]*injector.Reference
 
 	localInjector           *injector.Injector
@@ -26,7 +25,7 @@ type Cockpit struct {
 	variables variables.Holder
 }
 
-func New(ctx harkonnenContext.WithConfigLogger, loadProfile scheduler.LoadProfile) (*Cockpit, error) {
+func New(ctx harkonnenContext.WithConfigurationLogger, loadProfile scheduler.LoadProfile) (*Cockpit, error) {
 	cockpit := new(Cockpit)
 	cockpit.ctx = ctx
 	cockpit.loadProfile = loadProfile
@@ -60,6 +59,7 @@ func (c *Cockpit) Start() error {
 }
 
 func (c *Cockpit) parseInjectorReferences() error {
+	// Injector references are not directly parsed into the configuration to avoid circular reference issues
 	injectorsConfig := c.ctx.Config().Sub("injectors")
 	var injectorReferences map[string]*injector.Reference
 	err := injectorsConfig.Unmarshal(&injectorReferences)
@@ -79,7 +79,7 @@ func (c *Cockpit) initScheduler() error {
 		c.scheduler = scheduler.NewFixedIntervalScheduler(
 			c.loadProfile,
 			c.injectorReferences,
-			c.ctx.Config().GetDuration("cockpit.scheduler.spec.updateInterval"))
+			c.ctx.Config().Cockpit.Scheduler.UpdateInterval)
 
 	default:
 		return errors.New("unknown scheduler type: " + schedulerType)
@@ -114,7 +114,7 @@ func (c *Cockpit) connectToRemoteInjector(reference *injector.Reference) error {
 
 func (c *Cockpit) startLocalInjector(reference *injector.Reference) error {
 	c.contextLogger().Info().Msg("Starting local injector...")
-	bossMessenger, minionMessenger := messaging.NewChannelMessengerPair(c.ctx.Config().GetInt("messaging.messageCapacity"))
+	bossMessenger, minionMessenger := messaging.NewChannelMessengerPair(c.ctx.Config().Messaging.MessageCapacity)
 
 	c.localInjectorCtx, c.localInjectorCancelFunc = injector.NewContext(c.ctx, c.ctx.Logger(), minionMessenger)
 
