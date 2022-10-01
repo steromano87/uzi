@@ -1,5 +1,5 @@
 package configuration
 
 type LoggingConfiguration struct {
-	Level string `default:"info"`
+	Level string
 }

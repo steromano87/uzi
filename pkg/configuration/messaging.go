@@ -1,11 +1,11 @@
 package configuration
 
 type MessagingConfiguration struct {
-	MessageCapacity int `default:"2048"`
+	MessageCapacity int
 	Logging         struct {
-		BufferSize int `default:"50"`
+		BufferSize int
 	}
 	Samples struct {
-		BufferSize int `default:"10"`
+		BufferSize int
 	}
 }

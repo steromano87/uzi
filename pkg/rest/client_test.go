@@ -40,7 +40,8 @@ func (s *ClientTestSuite) SetupTest() {
 	s.bossMessenger, s.minionMessenger = messaging.NewChannelMessengerPair(100)
 
 	config, _ := configuration.NewDefault()
-	config.Messaging.Samples.BufferSize = 1
+	config.Viper.Set("messaging.samples.bufferSize", 1)
+	_ = config.Update()
 	s.ctx, _ = pipeline.NewContext(context.TODO(), config, &s.logger, s.minionMessenger, pipeline.NewIterationsCounter())
 
 	s.client = rest.NewClient(s.ctx)

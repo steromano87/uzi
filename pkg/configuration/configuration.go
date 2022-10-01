@@ -1,8 +1,9 @@
 package configuration
 
 import (
-	"github.com/mcuadros/go-defaults"
+	"bytes"
 	"github.com/spf13/viper"
+	"github.com/steromano87/harkonnen/v1/pkg/project"
 	"os"
 	"strings"
 )
@@ -16,9 +17,9 @@ const (
 type Configuration struct {
 	*viper.Viper
 
-	WorkingFolder    string `default:"."`
+	WorkingFolder    string
 	Name             string
-	HarkonnenVersion string `default:"all"`
+	HarkonnenVersion string
 	Messaging        MessagingConfiguration
 	Logging          LoggingConfiguration
 	Cockpit          CockpitConfiguration
@@ -30,13 +31,12 @@ type ClientConfiguration struct {
 }
 
 func New(configFile string) (*Configuration, error) {
-	config := new(Configuration)
-	defaults.SetDefaults(config)
+	config, err := NewDefault()
+	if err != nil {
+		return nil, err
+	}
 
-	// Viper setup
-	config.Viper = viper.New()
-
-	config.SetConfigType(Format)
+	// Read configuration file
 	fileReader, err := os.Open(configFile)
 	if err != nil {
 		return nil, err
@@ -50,10 +50,6 @@ func New(configFile string) (*Configuration, error) {
 		return nil, err
 	}
 
-	config.SetConfigName(Name)
-	config.SetEnvPrefix(EnvPrefix)
-	config.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	config.AutomaticEnv()
 	err = config.Update()
 
 	return config, err
@@ -61,15 +57,20 @@ func New(configFile string) (*Configuration, error) {
 
 func NewDefault() (*Configuration, error) {
 	config := new(Configuration)
-	defaults.SetDefaults(config)
 
 	// Viper setup
 	config.Viper = viper.New()
+	config.SetConfigType(Format)
+	err := config.ReadConfig(bytes.NewBufferString(project.DefaultProjectConfigurationContent))
+	if err != nil {
+		return nil, err
+	}
+
 	config.SetConfigName(Name)
 	config.SetEnvPrefix(EnvPrefix)
 	config.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	config.AutomaticEnv()
-	err := config.Update()
+	err = config.Update()
 
 	return config, err
 }

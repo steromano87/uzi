@@ -1,6 +1,6 @@
 name: My loading project with Harkonnen
 
-harkonnenVersion: ""
+harkonnenVersion: "all"
 
 #################
 # Configuration #
