@@ -12,28 +12,31 @@ import (
 )
 
 var injectorCmd = &cobra.Command{
-	Use: "injector",
-	Run: func(cmd *cobra.Command, args []string) {
-		c := make(chan os.Signal)
-		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	Use:   "injector",
+	Short: "Starts a remote injector",
+	Run:   runInjector,
+}
 
-		zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMicro
-		consoleWriter := zerolog.NewConsoleWriter()
-		consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
-		logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
-		logger.Info().Msg("Starting remote injector")
+func runInjector(cmd *cobra.Command, args []string) {
+	mainCtx, cancelFunc := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancelFunc()
 
-		// FIXME: correctly implement the websocket messenger
-		_, messenger := messaging.NewChannelMessengerPair(100)
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMicro
+	consoleWriter := zerolog.NewConsoleWriter()
+	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
+	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
+	logger.Info().Msg("Starting remote injector")
 
-		messagingCtx, _ := injector.NewContext(context.Background(), &logger, messenger)
-		inj, _ := injector.New(messagingCtx)
-		inj.Start()
-		logger.Info().Msg("Remote injector started, press Ctrl+C to stop it")
+	// FIXME: correctly implement the websocket messenger
+	_, messenger := messaging.NewChannelMessengerPair(100)
 
-		<-c
-		logger.Info().Msg("Starting graceful shutdown")
-		inj.Stop()
-		logger.Info().Msg("Gracefully shutdown completed")
-	},
+	messagingCtx, _ := injector.NewContext(mainCtx, &logger, messenger)
+	inj, _ := injector.New(messagingCtx)
+	inj.Start()
+	logger.Info().Msg("Remote injector started, press Ctrl+C to stop it")
+
+	<-mainCtx.Done()
+	logger.Info().Msg("Starting graceful shutdown")
+	inj.Stop()
+	logger.Info().Msg("Gracefully shutdown completed")
 }
