@@ -45,7 +45,7 @@ func (s *AdapterTestSuite) TestCreateNewSQLiteDBOnFile() {
 }
 
 func (s *AdapterTestSuite) TestCreateNewSQLiteDBOnMemory() {
-	adapter := db.NewAdapter(db.SQLite, "file::memory:?cache=shared")
+	adapter := db.NewAdapter(db.SQLite, db.SQLiteDSNForInMemoryDB)
 
 	err := adapter.Connect(context.TODO())
 	assert.NoError(s.T(), err)

@@ -24,7 +24,7 @@ func (s *LogCollectorTestSuite) SetupTest() {
 
 	s.ctx = context.TODO()
 	s.bossMessenger, s.minionMessenger = messaging.NewChannelMessengerPair(100)
-	s.dbAdapter = db.NewAdapter(db.SQLite, "file::memory:?cache=shared")
+	s.dbAdapter = db.NewAdapter(db.SQLite, db.SQLiteDSNForInMemoryDB)
 	_ = s.dbAdapter.Connect(s.ctx)
 }
 
