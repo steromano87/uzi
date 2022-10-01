@@ -1,11 +1,20 @@
 package injector
 
-import "github.com/steromano87/harkonnen/v1/pkg/messaging"
+import (
+	"fmt"
+	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+)
 
 type Reference struct {
-	Local             bool
-	Weight            int
-	ScheduledRunners  int
-	RemoteRunnerStats RunnerStats
+	Local              bool
+	Address            string
+	FailIfNotReachable bool
+	Weight             int
+	ScheduledRunners   int
+	RunnerStats        RunnerStats
 	messaging.Messenger
+}
+
+func (r Reference) String() string {
+	return fmt.Sprintf("Injector reference [local: %t, address: %s, weight: %d]", r.Local, r.Address, r.Weight)
 }
