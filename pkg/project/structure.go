@@ -1,8 +1,10 @@
 package project
 
 const (
+	SessionsFolder  = "sessions"
+	ProfilesFolder  = "profiles"
+	VariablesFolder = "variables"
+
 	ConfigurationFile = "harkonnen.yaml"
-	ResultsFolder     = "results"
-	ProfilesFolder    = "profiles"
-	VariablesFolder   = "variables"
+	DBDataFile        = "data.db"
 )

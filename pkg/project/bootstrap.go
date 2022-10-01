@@ -8,7 +8,7 @@ import (
 func Bootstrap(workingFolder string) error {
 	// Create required folders
 	foldersToCreate := []string{
-		ResultsFolder,
+		SessionsFolder,
 		ProfilesFolder,
 		VariablesFolder,
 	}
