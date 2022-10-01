@@ -12,21 +12,29 @@ import (
 )
 
 var initCmd = &cobra.Command{
-	Use:              "init",
-	Short:            "Initialize an empty project",
-	Run:              runInit,
-	TraverseChildren: true,
+	Use:   "init [flags] [working folder]",
+	Short: "Initialize an empty project",
+	Run:   runInit,
+	Args:  cobra.MaximumNArgs(1),
 }
 
 func init() {
-	initCmd.Flags().Bool("overwrite", false, "whether existing files should be wiped out when initializing a new project")
+	initCmd.Flags().Bool("overwrite", false, "wipe out all existing files in the selected folder before initializing a new project")
+	registerSubcommand(initCmd)
 }
 
 func runInit(cmd *cobra.Command, args []string) {
 	shouldOverwrite, _ := cmd.Flags().GetBool("overwrite")
 
-	// Check if selected folder is empty
-	workingFolderAbsPath, err := filepath.Abs(workingFolder)
+	// If no argument is passed, assume that the current folder is the working folder
+	var currentWorkingFolder string
+	if len(args) > 0 {
+		currentWorkingFolder = args[0]
+	} else {
+		currentWorkingFolder = "."
+	}
+
+	workingFolderAbsPath, err := filepath.Abs(currentWorkingFolder)
 	cobra.CheckErr(err)
 	empty, err := isEmpty(workingFolderAbsPath)
 	cobra.CheckErr(err)

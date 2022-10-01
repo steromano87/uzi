@@ -11,6 +11,11 @@ import (
 	"syscall"
 )
 
+func init() {
+	registerWorkingFolderFlag(injectorCmd)
+	registerSubcommand(injectorCmd)
+}
+
 var injectorCmd = &cobra.Command{
 	Use:   "injector",
 	Short: "Starts a remote injector",

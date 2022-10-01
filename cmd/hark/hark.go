@@ -10,8 +10,8 @@ import (
 var Version = "master"
 
 var (
-	workingFolder     string
-	configurationFile string
+	workingFolder string
+	debug         bool
 )
 
 var rootCmd = &cobra.Command{
@@ -24,20 +24,21 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	registerPersistentFlags()
-	registerSubcommands()
+	registerGlobalPersistentFlags()
 }
 
-func registerPersistentFlags() {
-	rootCmd.PersistentFlags().StringVarP(&workingFolder, "folder", "f", ".", "project folder")
-
-	cobra.CheckErr(viper.BindPFlag("workingDir", rootCmd.PersistentFlags().Lookup("folder")))
+func registerGlobalPersistentFlags() {
+	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "turns on debug mode")
 }
 
-func registerSubcommands() {
-	rootCmd.AddCommand(initCmd)
-	rootCmd.AddCommand(injectorCmd)
-	rootCmd.AddCommand(runCmd)
+func registerWorkingFolderFlag(command *cobra.Command) {
+	command.Flags().StringVarP(&workingFolder, "folder", "f", ".", "project folder")
+
+	cobra.CheckErr(viper.BindPFlag("workingDir", command.Flags().Lookup("folder")))
+}
+
+func registerSubcommand(command *cobra.Command) {
+	rootCmd.AddCommand(command)
 }
 
 func main() {

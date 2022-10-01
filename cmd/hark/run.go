@@ -12,6 +12,11 @@ import (
 	"syscall"
 )
 
+func init() {
+	registerWorkingFolderFlag(runCmd)
+	registerSubcommand(runCmd)
+}
+
 var runCmd = &cobra.Command{
 	Use:   "run",
 	Run:   runRun,
