@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"io"
@@ -38,12 +39,14 @@ func New(ctx Context) (*Injector, error) {
 func (i *Injector) Start() {
 	i.status = Ready
 	go i.handleIncomingMessages()
+	i.contextLogger().Info().Msg("Injector started")
 }
 
 func (i *Injector) Stop() {
 	i.cleanWorkingFolder()
 
 	i.status = Stopped
+	i.contextLogger().Info().Msg("Injector stopped")
 }
 
 func (i *Injector) Status() string {
@@ -57,7 +60,7 @@ func (i *Injector) WorkingFolder() string {
 func (i *Injector) handleIncomingMessages() {
 	select {
 	case <-i.ctx.Context.Done():
-		i.ctx.Logger().Info().Msg("Context canceled, exiting incoming message handling loop")
+		i.contextLogger().Info().Msg("Context canceled, exiting incoming message handling loop")
 		i.Stop()
 
 	case incomingMessage := <-i.ctx.Messenger.Receive():
@@ -73,9 +76,9 @@ func (i *Injector) handleIncomingMessages() {
 }
 
 func (i *Injector) handlePingMessage(message messaging.Message) {
-	i.ctx.Logger().Debug().Str("pingMsgID", message.ID).Msg("Received ping message")
+	i.contextLogger().Debug().Str("pingMsgID", message.ID).Msg("Received ping message")
 	i.ctx.SendPong(message.ID)
-	i.ctx.Logger().Debug().Str("pingMsgID", message.ID).Msg("Answered with pong message")
+	i.contextLogger().Debug().Str("pingMsgID", message.ID).Msg("Answered with pong message")
 }
 
 func (i *Injector) handleEventMessage(message messaging.Message) {
@@ -93,7 +96,7 @@ func (i *Injector) handleEventMessage(message messaging.Message) {
 }
 
 func (i *Injector) handleWorkingFolderInitEvent(message messaging.Message) {
-	i.ctx.Logger().Info().Str("ID", message.ID).Msg("Received compressed working folder, unzipping...")
+	i.contextLogger().Info().Str("ID", message.ID).Msg("Received compressed working folder, unzipping...")
 	payload, _ := message.DecodePayload()
 
 	// Once marshalled, compressed folder content will be base64 encoded, so we need to decode it first before reading
@@ -124,7 +127,7 @@ func (i *Injector) handleRunnerQuotaUpdateEvent(message messaging.Message) {
 	payload, _ := message.DecodePayload()
 	newRunnerQuota := payload.(db.Event).Data["runnerQuota"].(int)
 
-	i.ctx.Logger().Info().Str("ID", message.ID).Int("newQuota", newRunnerQuota).Msg("Received runners quota update message")
+	i.contextLogger().Info().Str("ID", message.ID).Int("newQuota", newRunnerQuota).Msg("Received runners quota update message")
 	i.ctx.Messenger.Send(messaging.NewAcknowledgeMessage(message.ID))
 }
 
@@ -134,15 +137,15 @@ func (i *Injector) initWorkingFolder() error {
 		return err
 	}
 	i.workingFolder = dir
-	i.ctx.Logger().Info().Str("workingFolder", i.workingFolder).Msg("Created temporary working folder")
+	i.contextLogger().Info().Str("workingFolder", i.workingFolder).Msg("Created temporary working folder")
 	return err
 }
 
 func (i *Injector) cleanWorkingFolder() {
-	i.ctx.Logger().Info().Str("workingFolder", i.workingFolder).Msg("Cleaning temporary working folder")
+	i.contextLogger().Info().Str("workingFolder", i.workingFolder).Msg("Cleaning temporary working folder")
 	err := os.RemoveAll(i.workingFolder)
 	if err != nil {
-		i.ctx.Logger().Error().Err(err).Str("workingFolder", i.workingFolder).Msg("Error cleaning temporary working folder")
+		i.contextLogger().Error().Err(err).Str("workingFolder", i.workingFolder).Msg("Error cleaning temporary working folder")
 	}
 }
 
@@ -190,8 +193,13 @@ func (i *Injector) unzipFile(f *zip.File) error {
 }
 
 func (i *Injector) replyWithError(requestMsgID string, err error, errorMessage string) {
-	i.ctx.Logger().Error().Err(err).Str("messageID", requestMsgID).Msg(errorMessage)
+	i.contextLogger().Error().Err(err).Str("messageID", requestMsgID).Msg(errorMessage)
 
 	errMessage, _ := messaging.NewAnswerMessage(messaging.EventMsgType, requestMsgID, db.NewErrorEvent(err))
 	i.ctx.Messenger.Send(errMessage)
+}
+
+func (i *Injector) contextLogger() *zerolog.Logger {
+	logger := i.ctx.Logger().With().Str("component", "injector").Logger()
+	return &logger
 }
