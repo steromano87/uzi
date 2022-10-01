@@ -16,6 +16,7 @@ var rootCmd = &cobra.Command{
 func main() {
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(injectorCmd)
+	rootCmd.AddCommand(runCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
