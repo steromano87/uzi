@@ -2,6 +2,8 @@ package db
 
 import "gorm.io/datatypes"
 
+const HostMetricsMsgId = "HOST_METRICS"
+
 type HostMetric struct {
 	Origin    string         `gorm:"primaryKey"`
 	Timestamp datatypes.Date `gorm:"primaryKey"`
