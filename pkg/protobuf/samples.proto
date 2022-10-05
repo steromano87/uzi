@@ -1,0 +1,25 @@
+syntax = "proto3";
+package message;
+option go_package = "github.com/steromano87/harkonnen/v1/pkg/protobuf/message";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+import "rest_sample.proto";
+
+message Samples {
+  repeated string sample = 1;
+}
+
+message Sample {
+  google.protobuf.Timestamp timestamp = 1;
+  google.protobuf.Duration duration = 2;
+
+  string name = 3;
+  uint64 sent_bytes = 4;
+  uint64 received_bytes = 5;
+
+  oneof sample_data {
+    sample.Rest rest = 100;
+  }
+}

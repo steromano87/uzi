@@ -1,0 +1,8 @@
+syntax = "proto3";
+package message;
+option go_package = "github.com/steromano87/harkonnen/v1/pkg/protobuf/message";
+
+message Acknowledge {
+  bool result = 1;
+  optional string comment = 2;
+}

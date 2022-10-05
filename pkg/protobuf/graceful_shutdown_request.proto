@@ -1,0 +1,9 @@
+syntax = "proto3";
+package message;
+option go_package = "github.com/steromano87/harkonnen/v1/pkg/protobuf/message";
+
+import "google/protobuf/duration.proto";
+
+message GracefulShutdownRequest {
+  google.protobuf.Duration timeout = 1;
+}

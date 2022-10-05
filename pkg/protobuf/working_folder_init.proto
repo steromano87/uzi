@@ -1,0 +1,12 @@
+syntax = "proto3";
+package message;
+option go_package = "github.com/steromano87/harkonnen/v1/pkg/protobuf/message";
+
+message WorkingFolderInit {
+  bytes compressed_working_folder = 1;
+  CompressionAlgorithm compression_algorithm = 2;
+}
+
+enum CompressionAlgorithm {
+  ZIP = 0;
+}

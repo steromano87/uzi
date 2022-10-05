@@ -1,0 +1,11 @@
+syntax = "proto3";
+package sample;
+option go_package = "github.com/steromano87/harkonnen/v1/pkg/protobuf/message/sample";
+
+message Rest {
+  string url = 1;
+  map<string, string> parameters = 2;
+  string method = 3;
+  bool is_redirect = 4;
+  string final_url = 5;
+}

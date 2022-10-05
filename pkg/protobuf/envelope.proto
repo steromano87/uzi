@@ -1,0 +1,22 @@
+syntax = "proto3";
+package message;
+option go_package = "github.com/steromano87/harkonnen/v1/pkg/protobuf/message";
+
+import "google/protobuf/timestamp.proto";
+
+import "acknowledge.proto";
+import "runners_quota_update.proto";
+import "working_folder_init.proto";
+
+message Envelope {
+  string id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  optional string answers_to = 3;
+
+  oneof Payload {
+    Acknowledge acknowledge = 100;
+    RunnersQuotaUpdate runners_quota_update = 101;
+    WorkingFolderInit working_folder_init = 102;
+
+  }
+}

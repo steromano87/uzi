@@ -1,0 +1,7 @@
+syntax = "proto3";
+package message;
+option go_package = "github.com/steromano87/harkonnen/v1/pkg/protobuf/message";
+
+message RunnersQuotaUpdate {
+  uint64 runners_quota = 1;
+}
