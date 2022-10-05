@@ -89,3 +89,6 @@ Temporary Items
 ### IntelliJ Idea
 .idea/
 *.iml
+
+### Protobuf
+*.pb.go
