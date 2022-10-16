@@ -1,7 +1,6 @@
 package injector
 
 import (
-	"fmt"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/utils"
@@ -84,20 +83,20 @@ func (i *Injector) handleWorkingFolderInitEvent(msg *message.Envelope) {
 
 	err := utils.UnzipFolder(compressedWorkingFolder, i.workingFolder)
 	if err != nil {
-		details := fmt.Sprintf("Encountered an error when unzipping compressed folder content: %s", err)
-		i.contextLogger().Error().Str("msgID", msg.GetId()).Err(err).Msg("Encountered an error when unzipping compressed folder content")
-		i.ctx.Send(message.NewAcknowledgeEnvelope(msg.GetId(), false, &details))
+		errorDescription := "Encountered an error when unzipping compressed folder content"
+		i.contextLogger().Error().Str("msgID", msg.GetId()).Err(err).Msg(errorDescription)
+		i.ctx.MessageBridge.Send(message.NewErrorAcknowledgeEnvelope(msg.GetId(), errorDescription, err))
 	}
 
 	i.contextLogger().Info().Str("msgID", msg.GetId()).Str("workingFolderPath", i.workingFolder).Msg("Successfully initialized working folder")
-	i.ctx.MessageBridge.Send(message.NewAcknowledgeEnvelope(msg.GetId(), true, nil))
+	i.ctx.MessageBridge.Send(message.NewPositiveAcknowledgeEnvelope(msg.GetId()))
 }
 
 func (i *Injector) handleRunnerQuotaUpdateEvent(msg *message.Envelope) {
 	newRunnerQuota := msg.GetRunnersQuotaUpdate().GetRunnersQuota()
 
 	i.contextLogger().Info().Str("msgID", msg.GetId()).Uint64("newQuota", newRunnerQuota).Msg("Received runners quota update message")
-	i.ctx.MessageBridge.Send(message.NewAcknowledgeEnvelope(msg.GetId(), true, nil))
+	i.ctx.MessageBridge.Send(message.NewPositiveAcknowledgeEnvelope(msg.GetId()))
 }
 
 func (i *Injector) initWorkingFolder() error {

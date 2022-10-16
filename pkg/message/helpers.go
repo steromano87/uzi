@@ -1,6 +1,7 @@
 package message
 
 import (
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/steromano87/harkonnen/v1/pkg/utils"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -35,6 +36,15 @@ func NewAcknowledgeEnvelope(answersTo string, ok bool, details *string) *Envelop
 	}
 
 	return NewResponseEnvelope(answersTo, ack)
+}
+
+func NewPositiveAcknowledgeEnvelope(answersTo string) *Envelope {
+	return NewAcknowledgeEnvelope(answersTo, true, nil)
+}
+
+func NewErrorAcknowledgeEnvelope(answersTo string, errorDescription string, err error) *Envelope {
+	details := fmt.Sprintf("%s: %s", errorDescription, err)
+	return NewAcknowledgeEnvelope(answersTo, false, &details)
 }
 
 func NewForcedShutdownRequestEnvelope() *Envelope {
