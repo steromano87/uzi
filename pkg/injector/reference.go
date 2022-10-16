@@ -12,7 +12,7 @@ type Reference struct {
 	Weight             int
 	ScheduledRunners   uint64
 	RunnerStats        RunnerStats
-	message.Bridge
+	MessageBridge      message.Bridge
 }
 
 func (r Reference) String() string {

@@ -36,8 +36,8 @@ func (s *SchedulerTestSuite) SetupTest() {
 func (s *SchedulerTestSuite) TestSingleInjectorQuota() {
 	injectorReferences := map[string]*injector.Reference{
 		"first": {
-			Weight: 1,
-			Bridge: s.bossMessenger,
+			Weight:        1,
+			MessageBridge: s.bossMessenger,
 		},
 	}
 
@@ -50,12 +50,12 @@ func (s *SchedulerTestSuite) TestSingleInjectorQuota() {
 func (s *SchedulerTestSuite) TestTwoInjectorsWithSameWeight() {
 	injectorReferences := map[string]*injector.Reference{
 		"first": {
-			Weight: 1,
-			Bridge: s.bossMessenger,
+			Weight:        1,
+			MessageBridge: s.bossMessenger,
 		},
 		"second": {
-			Weight: 1,
-			Bridge: s.bossMessenger,
+			Weight:        1,
+			MessageBridge: s.bossMessenger,
 		},
 	}
 	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 5*time.Second)
@@ -68,12 +68,12 @@ func (s *SchedulerTestSuite) TestTwoInjectorsWithSameWeight() {
 func (s *SchedulerTestSuite) TestTwoInjectorsWithDifferentWeight() {
 	injectorReferences := map[string]*injector.Reference{
 		"first": {
-			Weight: 8,
-			Bridge: s.bossMessenger,
+			Weight:        8,
+			MessageBridge: s.bossMessenger,
 		},
 		"second": {
-			Weight: 2,
-			Bridge: s.bossMessenger,
+			Weight:        2,
+			MessageBridge: s.bossMessenger,
 		},
 	}
 
@@ -87,16 +87,16 @@ func (s *SchedulerTestSuite) TestTwoInjectorsWithDifferentWeight() {
 func (s *SchedulerTestSuite) TestThreeInjectorsWithDifferentWeight() {
 	injectorReferences := map[string]*injector.Reference{
 		"first": {
-			Weight: 8,
-			Bridge: s.bossMessenger,
+			Weight:        8,
+			MessageBridge: s.bossMessenger,
 		},
 		"second": {
-			Weight: 2,
-			Bridge: s.bossMessenger,
+			Weight:        2,
+			MessageBridge: s.bossMessenger,
 		},
 		"third": {
-			Weight: 2,
-			Bridge: s.bossMessenger,
+			Weight:        2,
+			MessageBridge: s.bossMessenger,
 		},
 	}
 
@@ -111,8 +111,8 @@ func (s *SchedulerTestSuite) TestThreeInjectorsWithDifferentWeight() {
 func (s *SchedulerTestSuite) TestRemoteReferenceUpdate() {
 	injectorReferences := map[string]*injector.Reference{
 		"first": {
-			Weight: 1,
-			Bridge: s.bossMessenger,
+			Weight:        1,
+			MessageBridge: s.bossMessenger,
 		},
 	}
 

@@ -10,20 +10,20 @@ import (
 type Context struct {
 	context.Context
 
-	logger *zerolog.Logger
-	config *configuration.Configuration
-	message.Bridge
+	logger        *zerolog.Logger
+	config        *configuration.Configuration
+	MessageBridge message.Bridge
 }
 
-func NewContext(parentCtx context.Context, logger *zerolog.Logger, messenger message.Bridge) (Context, context.CancelFunc) {
+func NewContext(parentCtx context.Context, logger *zerolog.Logger, messageBridge message.Bridge) (Context, context.CancelFunc) {
 	ctx, cancelFunc := context.WithCancel(parentCtx)
 	config, _ := configuration.NewDefault()
 
 	return Context{
-		Context: ctx,
-		logger:  logger,
-		config:  config,
-		Bridge:  messenger,
+		Context:       ctx,
+		logger:        logger,
+		config:        config,
+		MessageBridge: messageBridge,
 	}, cancelFunc
 }
 

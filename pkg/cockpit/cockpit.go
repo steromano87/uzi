@@ -124,7 +124,7 @@ func (c *Cockpit) startLocalInjector(reference *injector.Reference) error {
 	}
 
 	c.localInjector = localInjector
-	reference.Bridge = bossMessenger
+	reference.MessageBridge = bossMessenger
 	c.localInjector.Start()
 	c.contextLogger().Info().Msg("Local injector started")
 	return nil

@@ -57,7 +57,7 @@ func (f *FixedIntervalScheduler) Start(ctx context.WithLogger) {
 						RunnersQuotaUpdate: &message.RunnersQuotaUpdate{RunnersQuota: quota},
 					}
 					msg := message.NewEnvelope(&payload)
-					f.injectors[injectorID].Bridge.Send(msg)
+					f.injectors[injectorID].MessageBridge.Send(msg)
 					f.injectors[injectorID].ScheduledRunners = quota
 				}
 			}
