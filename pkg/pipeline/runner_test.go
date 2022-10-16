@@ -5,7 +5,7 @@ import (
 	"github.com/Flaque/filet"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/configuration"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -20,7 +20,7 @@ type RunnerTestSuite struct {
 	backGroundCancelFunc context.CancelFunc
 	ctx                  *pipeline.Context
 	cancelFunc           context.CancelFunc
-	messenger            messaging.Messenger
+	messenger            message.Bridge
 	iterCounter          *pipeline.IterationsCounter
 }
 
@@ -30,7 +30,7 @@ func (s *RunnerTestSuite) SetupTest() {
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
 
-	s.messenger, _ = messaging.NewChannelMessengerPair(1)
+	s.messenger, _ = message.NewChannelBridgePair(1)
 	s.iterCounter = pipeline.NewIterationsCounter()
 
 	s.backgroundCtx = context.TODO()

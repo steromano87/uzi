@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/configuration"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 )
@@ -14,7 +14,7 @@ type Context struct {
 
 	logger       *zerolog.Logger
 	config       *configuration.Configuration
-	messenger    messaging.Messenger
+	messenger    message.Bridge
 	sampleSender *telemetry.SampleSender
 
 	vars              *variables.Holder
@@ -26,7 +26,7 @@ type Context struct {
 	plannedShutdownChan  chan struct{}
 }
 
-func NewContext(ctx context.Context, config *configuration.Configuration, logger *zerolog.Logger, messenger messaging.Messenger, iterCounter *IterationsCounter) (*Context, context.CancelFunc) {
+func NewContext(ctx context.Context, config *configuration.Configuration, logger *zerolog.Logger, messenger message.Bridge, iterCounter *IterationsCounter) (*Context, context.CancelFunc) {
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
 	sampleSenderBufferSize := config.GetInt("messaging.samples.bufferSize")
 
@@ -89,7 +89,7 @@ func (c *Context) Variables() *variables.Holder {
 	return c.vars
 }
 
-func (c *Context) Messenger() messaging.Messenger {
+func (c *Context) Messenger() message.Bridge {
 	return c.messenger
 }
 

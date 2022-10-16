@@ -7,17 +7,16 @@ import (
 	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/net"
 	"github.com/steromano87/harkonnen/v1/pkg/message"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"runtime"
 	"time"
 )
 
 type HostMetricsSender struct {
 	ctx       context.Context
-	messenger messaging.Messenger
+	messenger message.Bridge
 }
 
-func NewHostMetricsSender(messenger messaging.Messenger) *HostMetricsSender {
+func NewHostMetricsSender(messenger message.Bridge) *HostMetricsSender {
 	mc := new(HostMetricsSender)
 	mc.messenger = messenger
 

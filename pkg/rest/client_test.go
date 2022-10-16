@@ -7,7 +7,6 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/configuration"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
 	"github.com/steromano87/harkonnen/v1/pkg/message"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/steromano87/harkonnen/v1/pkg/pipeline"
 	"github.com/steromano87/harkonnen/v1/pkg/rest"
 	"github.com/stretchr/testify/assert"
@@ -24,8 +23,8 @@ type ClientTestSuite struct {
 	suite.Suite
 	ctx             dsl.StepContext
 	logger          zerolog.Logger
-	bossMessenger   messaging.Messenger
-	minionMessenger messaging.Messenger
+	bossMessenger   message.Bridge
+	minionMessenger message.Bridge
 
 	client     *rest.Client
 	testServer *httptest.Server
@@ -37,7 +36,7 @@ func (s *ClientTestSuite) SetupTest() {
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	s.logger = zerolog.New(consoleWriter).With().Timestamp().Logger()
 
-	s.bossMessenger, s.minionMessenger = messaging.NewChannelMessengerPair(100)
+	s.bossMessenger, s.minionMessenger = message.NewChannelBridgePair(100)
 
 	config, _ := configuration.NewDefault()
 	config.Viper.Set("messaging.samples.bufferSize", 1)

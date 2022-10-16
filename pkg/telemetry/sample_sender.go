@@ -2,19 +2,18 @@ package telemetry
 
 import (
 	"github.com/steromano87/harkonnen/v1/pkg/message"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"sync"
 )
 
 type SampleSender struct {
-	messenger  messaging.Messenger
+	messenger  message.Bridge
 	bufferSize int
 
 	queuedSamples []*message.Sample
 	mu            sync.Mutex
 }
 
-func NewSampleSender(messenger messaging.Messenger, bufferSize int) *SampleSender {
+func NewSampleSender(messenger message.Bridge, bufferSize int) *SampleSender {
 	sender := new(SampleSender)
 	sender.messenger = messenger
 	sender.bufferSize = bufferSize

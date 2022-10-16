@@ -6,7 +6,7 @@ import (
 	"github.com/rs/zerolog"
 	harkonnenContext "github.com/steromano87/harkonnen/v1/pkg/context"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/scheduler"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 )
@@ -114,7 +114,7 @@ func (c *Cockpit) connectToRemoteInjector(reference *injector.Reference) error {
 
 func (c *Cockpit) startLocalInjector(reference *injector.Reference) error {
 	c.contextLogger().Info().Msg("Starting local injector...")
-	bossMessenger, minionMessenger := messaging.NewChannelMessengerPair(c.ctx.Config().Messaging.MessageCapacity)
+	bossMessenger, minionMessenger := message.NewChannelBridgePair(c.ctx.Config().Messaging.MessageCapacity)
 
 	c.localInjectorCtx, c.localInjectorCancelFunc = injector.NewContext(c.ctx, c.ctx.Logger(), minionMessenger)
 
@@ -124,7 +124,7 @@ func (c *Cockpit) startLocalInjector(reference *injector.Reference) error {
 	}
 
 	c.localInjector = localInjector
-	reference.Messenger = bossMessenger
+	reference.Bridge = bossMessenger
 	c.localInjector.Start()
 	c.contextLogger().Info().Msg("Local injector started")
 	return nil

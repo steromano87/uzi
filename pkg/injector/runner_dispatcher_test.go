@@ -5,7 +5,7 @@ import (
 	"github.com/Flaque/filet"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -15,7 +15,7 @@ import (
 
 type SchedulerTestSuite struct {
 	suite.Suite
-	messenger  messaging.Messenger
+	messenger  message.Bridge
 	ctx        injector.Context
 	cancelFunc context.CancelFunc
 }
@@ -26,7 +26,7 @@ func (s *SchedulerTestSuite) SetupTest() {
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
 
-	s.messenger, _ = messaging.NewChannelMessengerPair(9999)
+	s.messenger, _ = message.NewChannelBridgePair(9999)
 	s.ctx, s.cancelFunc = injector.NewContext(context.TODO(), &logger, s.messenger)
 }
 

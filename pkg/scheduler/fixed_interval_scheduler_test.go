@@ -6,7 +6,7 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/cockpit"
 	"github.com/steromano87/harkonnen/v1/pkg/configuration"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/scheduler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -17,8 +17,8 @@ import (
 type SchedulerTestSuite struct {
 	suite.Suite
 	profile         scheduler.LoadProfile
-	bossMessenger   messaging.Messenger
-	minionMessenger messaging.Messenger
+	bossMessenger   message.Bridge
+	minionMessenger message.Bridge
 }
 
 func (s *SchedulerTestSuite) SetupTest() {
@@ -30,14 +30,14 @@ func (s *SchedulerTestSuite) SetupTest() {
 		RampDown:     0,
 	}
 
-	s.bossMessenger, s.minionMessenger = messaging.NewChannelMessengerPair(100)
+	s.bossMessenger, s.minionMessenger = message.NewChannelBridgePair(100)
 }
 
 func (s *SchedulerTestSuite) TestSingleInjectorQuota() {
 	injectorReferences := map[string]*injector.Reference{
 		"first": {
-			Weight:    1,
-			Messenger: s.bossMessenger,
+			Weight: 1,
+			Bridge: s.bossMessenger,
 		},
 	}
 
@@ -50,12 +50,12 @@ func (s *SchedulerTestSuite) TestSingleInjectorQuota() {
 func (s *SchedulerTestSuite) TestTwoInjectorsWithSameWeight() {
 	injectorReferences := map[string]*injector.Reference{
 		"first": {
-			Weight:    1,
-			Messenger: s.bossMessenger,
+			Weight: 1,
+			Bridge: s.bossMessenger,
 		},
 		"second": {
-			Weight:    1,
-			Messenger: s.bossMessenger,
+			Weight: 1,
+			Bridge: s.bossMessenger,
 		},
 	}
 	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 5*time.Second)
@@ -68,12 +68,12 @@ func (s *SchedulerTestSuite) TestTwoInjectorsWithSameWeight() {
 func (s *SchedulerTestSuite) TestTwoInjectorsWithDifferentWeight() {
 	injectorReferences := map[string]*injector.Reference{
 		"first": {
-			Weight:    8,
-			Messenger: s.bossMessenger,
+			Weight: 8,
+			Bridge: s.bossMessenger,
 		},
 		"second": {
-			Weight:    2,
-			Messenger: s.bossMessenger,
+			Weight: 2,
+			Bridge: s.bossMessenger,
 		},
 	}
 
@@ -87,16 +87,16 @@ func (s *SchedulerTestSuite) TestTwoInjectorsWithDifferentWeight() {
 func (s *SchedulerTestSuite) TestThreeInjectorsWithDifferentWeight() {
 	injectorReferences := map[string]*injector.Reference{
 		"first": {
-			Weight:    8,
-			Messenger: s.bossMessenger,
+			Weight: 8,
+			Bridge: s.bossMessenger,
 		},
 		"second": {
-			Weight:    2,
-			Messenger: s.bossMessenger,
+			Weight: 2,
+			Bridge: s.bossMessenger,
 		},
 		"third": {
-			Weight:    2,
-			Messenger: s.bossMessenger,
+			Weight: 2,
+			Bridge: s.bossMessenger,
 		},
 	}
 
@@ -111,8 +111,8 @@ func (s *SchedulerTestSuite) TestThreeInjectorsWithDifferentWeight() {
 func (s *SchedulerTestSuite) TestRemoteReferenceUpdate() {
 	injectorReferences := map[string]*injector.Reference{
 		"first": {
-			Weight:    1,
-			Messenger: s.bossMessenger,
+			Weight: 1,
+			Bridge: s.bossMessenger,
 		},
 	}
 

@@ -2,7 +2,7 @@ package injector
 
 import (
 	"fmt"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	"github.com/steromano87/harkonnen/v1/pkg/message"
 )
 
 type Reference struct {
@@ -12,7 +12,7 @@ type Reference struct {
 	Weight             int
 	ScheduledRunners   uint64
 	RunnerStats        RunnerStats
-	messaging.Messenger
+	message.Bridge
 }
 
 func (r Reference) String() string {

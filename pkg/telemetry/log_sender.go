@@ -2,19 +2,18 @@ package telemetry
 
 import (
 	"github.com/steromano87/harkonnen/v1/pkg/message"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"sync"
 )
 
 type LogSender struct {
-	messenger  messaging.Messenger
+	messenger  message.Bridge
 	bufferSize int
 
 	queuedLogs [][]byte
 	mu         sync.Mutex
 }
 
-func NewLogSender(messenger messaging.Messenger, bufferSize int) *LogSender {
+func NewLogSender(messenger message.Bridge, bufferSize int) *LogSender {
 	dispatcher := new(LogSender)
 	dispatcher.messenger = messenger
 	dispatcher.bufferSize = bufferSize

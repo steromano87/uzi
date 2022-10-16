@@ -3,7 +3,6 @@ package telemetry_test
 import (
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/message"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -14,14 +13,14 @@ import (
 
 type LogSenderTestSuite struct {
 	suite.Suite
-	bossMessenger   messaging.Messenger
-	minionMessenger messaging.Messenger
+	bossMessenger   message.Bridge
+	minionMessenger message.Bridge
 }
 
 func (l *LogSenderTestSuite) SetupTest() {
 	zerolog.TimeFieldFormat = time.RFC3339Nano
 
-	l.bossMessenger, l.minionMessenger = messaging.NewChannelMessengerPair(100)
+	l.bossMessenger, l.minionMessenger = message.NewChannelBridgePair(100)
 }
 
 func (l *LogSenderTestSuite) TestNewLogSender() {

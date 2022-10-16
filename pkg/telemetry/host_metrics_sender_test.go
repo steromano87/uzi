@@ -3,7 +3,6 @@ package telemetry_test
 import (
 	"context"
 	"github.com/steromano87/harkonnen/v1/pkg/message"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -13,12 +12,12 @@ import (
 
 type HostMetricsCollectorTestSuite struct {
 	suite.Suite
-	bossMessenger   messaging.Messenger
-	minionMessenger messaging.Messenger
+	bossMessenger   message.Bridge
+	minionMessenger message.Bridge
 }
 
 func (s *HostMetricsCollectorTestSuite) SetupTest() {
-	s.bossMessenger, s.minionMessenger = messaging.NewChannelMessengerPair(100)
+	s.bossMessenger, s.minionMessenger = message.NewChannelBridgePair(100)
 }
 
 func (s *HostMetricsCollectorTestSuite) TestNewHostMetricsCollector() {

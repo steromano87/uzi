@@ -6,7 +6,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"github.com/steromano87/harkonnen/v1/pkg/message"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -17,8 +16,8 @@ import (
 
 type InjectorTestSuite struct {
 	suite.Suite
-	bossMessenger   messaging.Messenger
-	minionMessenger messaging.Messenger
+	bossMessenger   message.Bridge
+	minionMessenger message.Bridge
 	ctx             injector.Context
 	cancelFunc      context.CancelFunc
 }
@@ -29,7 +28,7 @@ func (s *InjectorTestSuite) SetupTest() {
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
 
-	s.bossMessenger, s.minionMessenger = messaging.NewChannelMessengerPair(100)
+	s.bossMessenger, s.minionMessenger = message.NewChannelBridgePair(100)
 	s.ctx, s.cancelFunc = injector.NewContext(context.TODO(), &logger, s.minionMessenger)
 }
 

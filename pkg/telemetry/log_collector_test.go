@@ -5,7 +5,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/message"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -15,8 +14,8 @@ import (
 type LogCollectorTestSuite struct {
 	suite.Suite
 	ctx             context.Context
-	bossMessenger   messaging.Messenger
-	minionMessenger messaging.Messenger
+	bossMessenger   message.Bridge
+	minionMessenger message.Bridge
 	dbAdapter       *db.Adapter
 }
 
@@ -24,7 +23,7 @@ func (s *LogCollectorTestSuite) SetupTest() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMicro
 
 	s.ctx = context.TODO()
-	s.bossMessenger, s.minionMessenger = messaging.NewChannelMessengerPair(100)
+	s.bossMessenger, s.minionMessenger = message.NewChannelBridgePair(100)
 	s.dbAdapter = db.NewAdapter(db.SQLite, db.SQLiteDSNForInMemoryDB)
 	_ = s.dbAdapter.Connect(s.ctx)
 }

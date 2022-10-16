@@ -1,65 +1,64 @@
-package messaging
+package message
 
 import (
 	"context"
 	"github.com/gorilla/websocket"
-	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"google.golang.org/protobuf/proto"
 	"sync"
 )
 
-type WebsocketMessenger struct {
+type WebsocketBridge struct {
 	ctx context.Context
 
 	connection *websocket.Conn
 	sendMu     sync.Mutex
 	recvMu     sync.Mutex
-	sendChan   chan *message.Envelope
-	recvChan   chan *message.Envelope
+	sendChan   chan *Envelope
+	recvChan   chan *Envelope
 
 	closeChan chan struct{}
 }
 
-func NewWebsocketMessenger(conn *websocket.Conn, channelBuffer int) *WebsocketMessenger {
-	messenger := new(WebsocketMessenger)
-	messenger.connection = conn
-	messenger.sendChan = make(chan *message.Envelope, channelBuffer)
-	messenger.recvChan = make(chan *message.Envelope, channelBuffer)
+func NewWebsocketBridge(conn *websocket.Conn, channelBuffer int) *WebsocketBridge {
+	bridge := new(WebsocketBridge)
+	bridge.connection = conn
+	bridge.sendChan = make(chan *Envelope, channelBuffer)
+	bridge.recvChan = make(chan *Envelope, channelBuffer)
 
-	return messenger
+	return bridge
 }
 
-func (w *WebsocketMessenger) Start(ctx context.Context) {
+func (w *WebsocketBridge) Start(ctx context.Context) {
 	w.ctx = ctx
 	go w.pumpIncomingMessages()
 	go w.pumpOutgoingMessages()
 }
 
-func (w *WebsocketMessenger) Send(message *message.Envelope) {
+func (w *WebsocketBridge) Send(message *Envelope) {
 	w.sendChan <- message
 }
 
-func (w *WebsocketMessenger) Receive() <-chan *message.Envelope {
+func (w *WebsocketBridge) Receive() <-chan *Envelope {
 	return w.recvChan
 }
 
-func (w *WebsocketMessenger) SendPing() {
-	payload := message.Envelope_Ping{Ping: &message.Ping{}}
-	msg := message.NewEnvelope(&payload)
+func (w *WebsocketBridge) SendPing() {
+	payload := Envelope_Ping{Ping: &Ping{}}
+	msg := NewEnvelope(&payload)
 	w.Send(msg)
 }
 
-func (w *WebsocketMessenger) SendPong(pingMsgID string) {
-	payload := message.Envelope_Pong{Pong: &message.Pong{}}
-	msg := message.NewResponseEnvelope(pingMsgID, &payload)
+func (w *WebsocketBridge) SendPong(pingMsgID string) {
+	payload := Envelope_Pong{Pong: &Pong{}}
+	msg := NewResponseEnvelope(pingMsgID, &payload)
 	w.Send(msg)
 }
 
-func (w *WebsocketMessenger) Close() {
+func (w *WebsocketBridge) Close() {
 	w.closeChan <- struct{}{}
 }
 
-func (w *WebsocketMessenger) pumpIncomingMessages() {
+func (w *WebsocketBridge) pumpIncomingMessages() {
 	for {
 		_, rawBytes, err := w.connection.ReadMessage()
 		if err != nil {
@@ -70,7 +69,7 @@ func (w *WebsocketMessenger) pumpIncomingMessages() {
 		}
 
 		// TODO: add different messages handling (ping, pong, closure, etc)
-		var envelope message.Envelope
+		var envelope Envelope
 		err = proto.Unmarshal(rawBytes, &envelope)
 		if err != nil {
 			continue
@@ -80,7 +79,7 @@ func (w *WebsocketMessenger) pumpIncomingMessages() {
 	}
 }
 
-func (w *WebsocketMessenger) pumpOutgoingMessages() {
+func (w *WebsocketBridge) pumpOutgoingMessages() {
 	select {
 	case <-w.ctx.Done():
 		return
@@ -94,9 +93,9 @@ func (w *WebsocketMessenger) pumpOutgoingMessages() {
 
 		var wsMessageType int
 		switch msg.Payload.(type) {
-		case *message.Envelope_Ping:
+		case *Envelope_Ping:
 			wsMessageType = websocket.PingMessage
-		case *message.Envelope_Pong:
+		case *Envelope_Pong:
 			wsMessageType = websocket.PongMessage
 		default:
 			wsMessageType = websocket.TextMessage

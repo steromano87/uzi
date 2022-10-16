@@ -57,7 +57,7 @@ func (i *Injector) handleIncomingMessages() {
 		i.contextLogger().Info().Msg("Context canceled, exiting incoming message handling loop")
 		i.Stop()
 
-	case incomingMessage := <-i.ctx.Messenger.Receive():
+	case incomingMessage := <-i.ctx.Bridge.Receive():
 		switch incomingMessage.GetPayload().(type) {
 		case *message.Envelope_Ping:
 			i.handlePingMessage(incomingMessage)
@@ -90,14 +90,14 @@ func (i *Injector) handleWorkingFolderInitEvent(msg *message.Envelope) {
 	}
 
 	i.contextLogger().Info().Str("msgID", msg.GetId()).Str("workingFolderPath", i.workingFolder).Msg("Successfully initialized working folder")
-	i.ctx.Messenger.Send(message.NewAcknowledgeEnvelope(msg.GetId(), true, nil))
+	i.ctx.Bridge.Send(message.NewAcknowledgeEnvelope(msg.GetId(), true, nil))
 }
 
 func (i *Injector) handleRunnerQuotaUpdateEvent(msg *message.Envelope) {
 	newRunnerQuota := msg.GetRunnersQuotaUpdate().GetRunnersQuota()
 
 	i.contextLogger().Info().Str("msgID", msg.GetId()).Uint64("newQuota", newRunnerQuota).Msg("Received runners quota update message")
-	i.ctx.Messenger.Send(message.NewAcknowledgeEnvelope(msg.GetId(), true, nil))
+	i.ctx.Bridge.Send(message.NewAcknowledgeEnvelope(msg.GetId(), true, nil))
 }
 
 func (i *Injector) initWorkingFolder() error {

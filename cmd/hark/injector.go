@@ -5,7 +5,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"os"
 	"os/signal"
 	"syscall"
@@ -33,7 +33,7 @@ func runInjector(cmd *cobra.Command, args []string) {
 	logger.Info().Msg("Starting remote injector")
 
 	// FIXME: correctly implement the websocket messenger
-	_, messenger := messaging.NewChannelMessengerPair(100)
+	_, messenger := message.NewChannelBridgePair(100)
 
 	messagingCtx, _ := injector.NewContext(mainCtx, &logger, messenger)
 	inj, _ := injector.New(messagingCtx)
