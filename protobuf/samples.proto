@@ -5,7 +5,7 @@ option go_package = "github.com/steromano87/harkonnen/v1/pkg/message";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/duration.proto";
 
-import "rest_sample.proto";
+import "sample/rest_sample.proto";
 
 message Samples {
   repeated Sample sample = 1;
