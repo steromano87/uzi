@@ -1,8 +1,8 @@
 package telemetry
 
 import (
-	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	"github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
 	"sync"
 )
 
@@ -10,7 +10,7 @@ type SampleSender struct {
 	messenger  messaging.Messenger
 	bufferSize int
 
-	queuedSamples []db.Sample
+	queuedSamples []*message.Sample
 	mu            sync.Mutex
 }
 
@@ -18,12 +18,12 @@ func NewSampleSender(messenger messaging.Messenger, bufferSize int) *SampleSende
 	sender := new(SampleSender)
 	sender.messenger = messenger
 	sender.bufferSize = bufferSize
-	sender.queuedSamples = make([]db.Sample, 0)
+	sender.queuedSamples = make([]*message.Sample, 0)
 
 	return sender
 }
 
-func (s *SampleSender) Collect(sample db.Sample) {
+func (s *SampleSender) Collect(sample *message.Sample) {
 	s.mu.Lock()
 	s.queuedSamples = append(s.queuedSamples, sample)
 	s.mu.Unlock()
@@ -36,12 +36,10 @@ func (s *SampleSender) Collect(sample db.Sample) {
 func (s *SampleSender) Flush() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	sampleMessage, err := messaging.NewMessage(messaging.SampleMsgType, s.queuedSamples)
-	if err != nil {
-		// TODO: add error remote logging
-		return
-	}
 
-	s.messenger.Send(sampleMessage)
-	s.queuedSamples = make([]db.Sample, 0)
+	payload := message.Envelope_Samples{Samples: &message.Samples{Sample: s.queuedSamples}}
+	msg := message.NewEnvelope(&payload)
+
+	s.messenger.Send(msg)
+	s.queuedSamples = make([]*message.Sample, 0)
 }

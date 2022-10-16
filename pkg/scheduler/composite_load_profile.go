@@ -6,8 +6,8 @@ type CompositeLoadProfile struct {
 	LoadProfiles []LoadProfile
 }
 
-func (c CompositeLoadProfile) At(elapsed time.Duration) int {
-	var totalLoad int
+func (c CompositeLoadProfile) At(elapsed time.Duration) uint64 {
+	var totalLoad uint64
 
 	for _, profile := range c.LoadProfiles {
 		totalLoad += profile.At(elapsed)

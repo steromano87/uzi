@@ -7,5 +7,5 @@ import (
 
 type Scheduler interface {
 	Start(ctx context.WithLogger)
-	At(elapsed time.Duration) map[string]int
+	At(elapsed time.Duration) map[string]uint64
 }

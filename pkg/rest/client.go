@@ -2,9 +2,11 @@ package rest
 
 import (
 	"bytes"
-	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
-	"gorm.io/datatypes"
+	"github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
+	sample2 "github.com/steromano87/harkonnen/v1/pkg/protobuf/message/sample"
+	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -89,21 +91,20 @@ func (c *Client) Execute(request Request) error {
 	finalURL := response.Request.URL
 
 	// Create request sample
-	sample := db.Sample{
-		Kind:          db.RestSampleType,
+	sample := &message.Sample{
+		Timestamp:     timestamppb.New(startTime),
+		Duration:      durationpb.New(endTime.Sub(startTime)),
 		Name:          rawRequest.URL.String(),
-		Duration:      endTime.Sub(startTime),
 		SentBytes:     sentBytes,
 		ReceivedBytes: receivedBytes,
-		Data: db.RestSampleData{
-			URL:        pureUrl,
-			Parameters: queryString,
-			Method:     request.Method,
-			IsRedirect: originalURL != finalURL,
-			FinalURL:   finalURL,
-		},
+		SampleData: &message.Sample_Rest{Rest: &sample2.Rest{
+			Url:         pureUrl.String(),
+			QueryString: queryString.Encode(),
+			Method:      request.Method,
+			IsRedirect:  originalURL != finalURL,
+			FinalUrl:    finalURL.String(),
+		}},
 	}
-	sample.Timestamp = datatypes.Date(startTime)
 
 	c.ctx.SampleSender().Collect(sample)
 

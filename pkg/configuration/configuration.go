@@ -3,7 +3,7 @@ package configuration
 import (
 	"bytes"
 	"github.com/spf13/viper"
-	"github.com/steromano87/harkonnen/v1/pkg/project"
+	"github.com/steromano87/harkonnen/v1/pkg/workingfolder"
 	"os"
 	"strings"
 )
@@ -61,7 +61,7 @@ func NewDefault() (*Configuration, error) {
 	// Viper setup
 	config.Viper = viper.New()
 	config.SetConfigType(Format)
-	err := config.ReadConfig(bytes.NewBufferString(project.DefaultProjectConfigurationContent))
+	err := config.ReadConfig(bytes.NewBufferString(workingfolder.DefaultProjectConfigurationContent))
 	if err != nil {
 		return nil, err
 	}

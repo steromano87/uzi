@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/spf13/cobra"
-	"github.com/steromano87/harkonnen/v1/pkg/project"
+	"github.com/steromano87/harkonnen/v1/pkg/workingfolder"
 	"io"
 	"os"
 	"path"
@@ -57,7 +57,7 @@ func runInit(cmd *cobra.Command, args []string) {
 	}
 
 	// Bootstrap a new project
-	cobra.CheckErr(project.Bootstrap(workingFolderAbsPath))
+	cobra.CheckErr(workingfolder.Bootstrap(workingFolderAbsPath))
 
 	println("New project initialized at " + workingFolderAbsPath)
 }

@@ -6,8 +6,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/steromano87/harkonnen/v1/pkg/cockpit"
 	"github.com/steromano87/harkonnen/v1/pkg/configuration"
-	"github.com/steromano87/harkonnen/v1/pkg/project"
 	"github.com/steromano87/harkonnen/v1/pkg/scheduler"
+	"github.com/steromano87/harkonnen/v1/pkg/workingfolder"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -29,7 +29,7 @@ func runRun(cmd *cobra.Command, args []string) {
 	mainCtx, cancelFunc := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancelFunc()
 
-	config, err := configuration.New(filepath.Join(workingFolder, project.ConfigurationFile))
+	config, err := configuration.New(filepath.Join(workingFolder, workingfolder.ConfigurationFile))
 	cobra.CheckErr(err)
 
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMicro

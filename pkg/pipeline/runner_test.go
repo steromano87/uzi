@@ -30,7 +30,7 @@ func (s *RunnerTestSuite) SetupTest() {
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
 
-	s.messenger = messaging.NewChannelMessenger(make(chan messaging.Message), make(chan messaging.Message))
+	s.messenger, _ = messaging.NewChannelMessengerPair(1)
 	s.iterCounter = pipeline.NewIterationsCounter()
 
 	s.backgroundCtx = context.TODO()

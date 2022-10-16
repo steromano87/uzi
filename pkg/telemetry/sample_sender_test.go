@@ -1,8 +1,8 @@
 package telemetry_test
 
 import (
-	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	"github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -26,7 +26,7 @@ func (s *SampleSenderTestSuite) TestNewSampleSender() {
 }
 
 func (s *SampleSenderTestSuite) TestCollectBelowBufferLimit() {
-	sample := db.Sample{}
+	sample := &message.Sample{}
 
 	sender := telemetry.NewSampleSender(s.minionMessenger, 10)
 	sender.Collect(sample)
@@ -47,7 +47,7 @@ func (s *SampleSenderTestSuite) TestCollectBelowBufferLimit() {
 }
 
 func (s *SampleSenderTestSuite) TestSampleSendingWithManualFlush() {
-	sample := db.Sample{}
+	sample := &message.Sample{}
 
 	sender := telemetry.NewSampleSender(s.minionMessenger, 10)
 	sender.Collect(sample)
@@ -55,45 +55,45 @@ func (s *SampleSenderTestSuite) TestSampleSendingWithManualFlush() {
 
 	sender.Flush()
 
-	var message messaging.Message
+	var msg *message.Envelope
 
 	select {
-	case message = <-s.bossMessenger.Receive():
+	case msg = <-s.bossMessenger.Receive():
 
 	default:
-		assert.Fail(s.T(), "no message was sent")
+		assert.Fail(s.T(), "no msg was sent")
 	}
 
-	if assert.IsType(s.T(), messaging.Message{}, message) {
-		payload, err := message.DecodePayload()
-		if assert.NoError(s.T(), err) {
-			assert.IsType(s.T(), []db.Sample{}, payload)
-			assert.Len(s.T(), payload, 2)
+	if assert.IsType(s.T(), &message.Envelope{}, msg) {
+		payload := msg.GetSamples()
+		if assert.NotNil(s.T(), payload) {
+			assert.IsType(s.T(), []*message.Sample{}, payload.GetSample())
+			assert.Len(s.T(), payload.GetSample(), 2)
 		}
 	}
 }
 
 func (s *SampleSenderTestSuite) TestSampleSendingWithAutomaticFlush() {
-	sample := db.Sample{}
+	sample := &message.Sample{}
 
 	sender := telemetry.NewSampleSender(s.minionMessenger, 2)
 	sender.Collect(sample)
 	sender.Collect(sample)
 
-	var message messaging.Message
+	var msg *message.Envelope
 
 	select {
-	case message = <-s.bossMessenger.Receive():
+	case msg = <-s.bossMessenger.Receive():
 
 	default:
-		assert.Fail(s.T(), "no message was sent")
+		assert.Fail(s.T(), "no msg was sent")
 	}
 
-	if assert.IsType(s.T(), messaging.Message{}, message) {
-		payload, err := message.DecodePayload()
-		if assert.NoError(s.T(), err) {
-			assert.IsType(s.T(), []db.Sample{}, payload)
-			assert.Len(s.T(), payload, 2)
+	if assert.IsType(s.T(), &message.Envelope{}, msg) {
+		payload := msg.GetSamples()
+		if assert.NotNil(s.T(), payload) {
+			assert.IsType(s.T(), []*message.Sample{}, payload.GetSample())
+			assert.Len(s.T(), payload.GetSample(), 2)
 		}
 	}
 }

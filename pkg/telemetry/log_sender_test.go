@@ -2,8 +2,8 @@ package telemetry_test
 
 import (
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	"github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -59,24 +59,24 @@ func (l *LogSenderTestSuite) TestWriteLogWithManualFlush() {
 	logger.Info().Msg("my second log")
 
 	dispatcher.Flush()
-	var message messaging.Message
+	var msg *message.Envelope
 
 	select {
-	case message = <-l.bossMessenger.Receive():
+	case msg = <-l.bossMessenger.Receive():
 
 	default:
-		assert.Fail(l.T(), "no message was sent")
+		assert.Fail(l.T(), "no msg was sent")
 	}
 
-	if assert.IsType(l.T(), messaging.Message{}, message) {
-		payload, err := message.DecodePayload()
+	if assert.IsType(l.T(), &message.Envelope{}, msg) {
+		payload := msg.GetLogs()
 
-		if assert.NoError(l.T(), err) {
-			if assert.IsType(l.T(), []db.Log{}, payload) {
-				logLines := payload.([]db.Log)
+		if assert.NotNil(l.T(), payload) {
+			if assert.IsType(l.T(), &message.Logs{}, payload) {
+				logLines := payload.GetLog()
 				if assert.Len(l.T(), logLines, 2) {
-					assert.Equal(l.T(), "my first log", logLines[0].Message)
-					assert.Equal(l.T(), "my second log", logLines[1].Message)
+					assert.Contains(l.T(), string(logLines[0]), "my first log")
+					assert.Contains(l.T(), string(logLines[1]), "my second log")
 				}
 			}
 		}
@@ -89,24 +89,24 @@ func (l *LogSenderTestSuite) TestWriteLogWithAutomaticFlush() {
 	logger.Info().Msg("my first log")
 	logger.Info().Msg("my second log")
 
-	var message messaging.Message
+	var msg *message.Envelope
 
 	select {
-	case message = <-l.bossMessenger.Receive():
+	case msg = <-l.bossMessenger.Receive():
 
 	default:
-		assert.Fail(l.T(), "no message was sent")
+		assert.Fail(l.T(), "no msg was sent")
 	}
 
-	if assert.IsType(l.T(), messaging.Message{}, message) {
-		payload, err := message.DecodePayload()
+	if assert.IsType(l.T(), &message.Envelope{}, msg) {
+		payload := msg.GetLogs()
 
-		if assert.NoError(l.T(), err) {
-			if assert.IsType(l.T(), []db.Log{}, payload) {
-				logLines := payload.([]db.Log)
+		if assert.NotNil(l.T(), payload) {
+			if assert.IsType(l.T(), &message.Logs{}, payload) {
+				logLines := payload.GetLog()
 				if assert.Len(l.T(), logLines, 2) {
-					assert.Equal(l.T(), "my first log", logLines[0].Message)
-					assert.Equal(l.T(), "my second log", logLines[1].Message)
+					assert.Contains(l.T(), string(logLines[0]), "my first log")
+					assert.Contains(l.T(), string(logLines[1]), "my second log")
 				}
 			}
 		}

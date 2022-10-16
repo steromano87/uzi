@@ -3,9 +3,8 @@ package scheduler
 import (
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/context"
-	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	message2 "github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
 	"math"
 	"sort"
 	"time"
@@ -52,9 +51,13 @@ func (f *FixedIntervalScheduler) Start(ctx context.WithLogger) {
 				lastScheduledQuota := f.injectors[injectorID].ScheduledRunners
 
 				if quota != lastScheduledQuota {
-					f.contextLogger(ctx).Info().Str("injectorID", injectorID).Int("quota", quota).Int("lastScheduledQuota", lastScheduledQuota).Msg("Current quota differs from last scheduled quota, sending quota update message")
-					message, _ := messaging.NewMessage(messaging.EventMsgType, db.NewRunnersQuotaUpdateEvent(quota))
-					f.injectors[injectorID].Messenger.Send(message)
+					f.contextLogger(ctx).Info().Str("injectorID", injectorID).Uint64("quota", quota).Uint64("lastScheduledQuota", lastScheduledQuota).Msg("Current quota differs from last scheduled quota, sending quota update message")
+
+					payload := message2.Envelope_RunnersQuotaUpdate{
+						RunnersQuotaUpdate: &message2.RunnersQuotaUpdate{RunnersQuota: quota},
+					}
+					msg := message2.NewEnvelope(&payload)
+					f.injectors[injectorID].Messenger.Send(msg)
 					f.injectors[injectorID].ScheduledRunners = quota
 				}
 			}
@@ -66,11 +69,11 @@ func (f *FixedIntervalScheduler) Start(ctx context.WithLogger) {
 	}
 }
 
-func (f *FixedIntervalScheduler) At(elapsed time.Duration) map[string]int {
+func (f *FixedIntervalScheduler) At(elapsed time.Duration) map[string]uint64 {
 	totalRunners := f.loadProfile.At(elapsed)
 	remainingRunners := totalRunners
 	remainingWeights := f.totalWeights
-	quotas := make(map[string]int)
+	quotas := make(map[string]uint64)
 
 	// Order keys to get a stable, ordered iteration on a map, see https://stackoverflow.com/a/18342865
 	keys := make([]string, 0)
@@ -81,7 +84,7 @@ func (f *FixedIntervalScheduler) At(elapsed time.Duration) map[string]int {
 	sort.Strings(keys)
 
 	for _, k := range keys {
-		quotas[k] = int(math.Floor(float64(remainingRunners) * float64(f.injectors[k].Weight) / float64(remainingWeights)))
+		quotas[k] = uint64(math.Floor(float64(remainingRunners) * float64(f.injectors[k].Weight) / float64(remainingWeights)))
 		remainingRunners -= quotas[k]
 		remainingWeights -= f.injectors[k].Weight
 	}

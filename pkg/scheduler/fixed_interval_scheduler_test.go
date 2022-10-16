@@ -44,7 +44,7 @@ func (s *SchedulerTestSuite) TestSingleInjectorQuota() {
 	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 5*time.Second)
 	quotas := sched.At(1 * time.Second)
 
-	assert.Equal(s.T(), 10, quotas["first"])
+	assert.EqualValues(s.T(), 10, quotas["first"])
 }
 
 func (s *SchedulerTestSuite) TestTwoInjectorsWithSameWeight() {
@@ -61,8 +61,8 @@ func (s *SchedulerTestSuite) TestTwoInjectorsWithSameWeight() {
 	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 5*time.Second)
 	quotas := sched.At(1 * time.Second)
 
-	assert.Equal(s.T(), 5, quotas["first"], "first weight is wrong")
-	assert.Equal(s.T(), 5, quotas["second"], "second weight is wrong")
+	assert.EqualValues(s.T(), 5, quotas["first"], "first weight is wrong")
+	assert.EqualValues(s.T(), 5, quotas["second"], "second weight is wrong")
 }
 
 func (s *SchedulerTestSuite) TestTwoInjectorsWithDifferentWeight() {
@@ -80,8 +80,8 @@ func (s *SchedulerTestSuite) TestTwoInjectorsWithDifferentWeight() {
 	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 5*time.Second)
 	quotas := sched.At(1 * time.Second)
 
-	assert.Equal(s.T(), 8, quotas["first"], "first weight is wrong")
-	assert.Equal(s.T(), 2, quotas["second"], "second weight is wrong")
+	assert.EqualValues(s.T(), 8, quotas["first"], "first weight is wrong")
+	assert.EqualValues(s.T(), 2, quotas["second"], "second weight is wrong")
 }
 
 func (s *SchedulerTestSuite) TestThreeInjectorsWithDifferentWeight() {
@@ -103,9 +103,9 @@ func (s *SchedulerTestSuite) TestThreeInjectorsWithDifferentWeight() {
 	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 5*time.Second)
 	quotas := sched.At(1 * time.Second)
 
-	assert.Equal(s.T(), 6, quotas["first"], "first weight is wrong")
-	assert.Equal(s.T(), 2, quotas["second"], "second weight is wrong")
-	assert.Equal(s.T(), 2, quotas["third"], "third weight is wrong")
+	assert.EqualValues(s.T(), 6, quotas["first"], "first weight is wrong")
+	assert.EqualValues(s.T(), 2, quotas["second"], "second weight is wrong")
+	assert.EqualValues(s.T(), 2, quotas["third"], "third weight is wrong")
 }
 
 func (s *SchedulerTestSuite) TestRemoteReferenceUpdate() {
@@ -129,7 +129,7 @@ func (s *SchedulerTestSuite) TestRemoteReferenceUpdate() {
 	time.Sleep(150 * time.Millisecond)
 	cancelFunc()
 
-	assert.Equal(s.T(), 10, injectorReferences["first"].ScheduledRunners)
+	assert.EqualValues(s.T(), 10, injectorReferences["first"].ScheduledRunners)
 }
 
 func TestSchedulerTestSuite(t *testing.T) {

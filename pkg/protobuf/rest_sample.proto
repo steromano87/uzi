@@ -4,7 +4,7 @@ option go_package = "github.com/steromano87/harkonnen/v1/pkg/protobuf/message/sa
 
 message Rest {
   string url = 1;
-  map<string, string> parameters = 2;
+  string query_string = 2;
   string method = 3;
   bool is_redirect = 4;
   string final_url = 5;

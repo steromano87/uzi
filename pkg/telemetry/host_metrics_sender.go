@@ -6,8 +6,8 @@ import (
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/net"
-	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	"github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
 	"runtime"
 	"time"
 )
@@ -70,32 +70,24 @@ func (p HostMetricsSender) gatherMetrics(ctx context.Context, measureInterval ti
 		return err
 	}
 
-	messagePayload := db.HostMetric{
-		CPU: cpuPercent[0],
-		Memory: struct {
-			Total uint64
-			Used  uint64
-		}{
+	payload := message.Envelope_HostMetrics{HostMetrics: &message.HostMetrics{
+		Cpu: cpuPercent[0],
+		Memory: &message.HostMetrics_Memory{
 			Total: memUsage.Total,
 			Used:  memUsage.Used,
 		},
-		Storage: struct {
-			Total uint64
-			Used  uint64
-		}{
+		Storage: &message.HostMetrics_Storage{
 			Total: diskUsage.Total,
 			Used:  diskUsage.Used,
 		},
-		Network: struct {
-			UpSpeed   float64
-			DownSpeed float64
-		}{
+		Network: &message.HostMetrics_Network{
 			UpSpeed:   float64(netUsageAfter[0].BytesSent-netUsageBefore[0].BytesSent) / measureInterval.Seconds(),
 			DownSpeed: float64(netUsageAfter[0].BytesRecv-netUsageBefore[0].BytesRecv) / measureInterval.Seconds(),
 		},
-	}
-	message, _ := messaging.NewMessage(messaging.HostMetricsMsgId, messagePayload)
-	p.messenger.Send(message)
+	}}
+
+	msg := message.NewEnvelope(&payload)
+	p.messenger.Send(msg)
 	return nil
 }
 

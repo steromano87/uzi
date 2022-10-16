@@ -10,7 +10,7 @@ type Reference struct {
 	Address            string
 	FailIfNotReachable bool
 	Weight             int
-	ScheduledRunners   int
+	ScheduledRunners   uint64
 	RunnerStats        RunnerStats
 	messaging.Messenger
 }

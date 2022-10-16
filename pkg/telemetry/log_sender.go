@@ -1,8 +1,8 @@
 package telemetry
 
 import (
-	"encoding/json"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	"github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
 	"sync"
 )
 
@@ -10,7 +10,7 @@ type LogSender struct {
 	messenger  messaging.Messenger
 	bufferSize int
 
-	queuedLogs []json.RawMessage
+	queuedLogs [][]byte
 	mu         sync.Mutex
 }
 
@@ -18,17 +18,17 @@ func NewLogSender(messenger messaging.Messenger, bufferSize int) *LogSender {
 	dispatcher := new(LogSender)
 	dispatcher.messenger = messenger
 	dispatcher.bufferSize = bufferSize
-	dispatcher.queuedLogs = make([]json.RawMessage, 0)
+	dispatcher.queuedLogs = make([][]byte, 0)
 
 	return dispatcher
 }
 
 func (l *LogSender) Write(p []byte) (n int, err error) {
 	l.mu.Lock()
-	defer l.mu.Unlock()
 	bytesToWrite := make([]byte, len(p))
 	copy(bytesToWrite, p)
 	l.queuedLogs = append(l.queuedLogs, bytesToWrite)
+	l.mu.Unlock()
 
 	if len(l.queuedLogs) >= l.bufferSize {
 		l.Flush()
@@ -38,7 +38,12 @@ func (l *LogSender) Write(p []byte) (n int, err error) {
 }
 
 func (l *LogSender) Flush() {
-	logMessage, _ := messaging.NewMessage(messaging.LogMsgType, l.queuedLogs)
-	l.messenger.Send(logMessage)
-	l.queuedLogs = make([]json.RawMessage, 0)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	payload := message.Envelope_Logs{Logs: &message.Logs{Log: l.queuedLogs}}
+	msg := message.NewEnvelope(&payload)
+
+	l.messenger.Send(msg)
+	l.queuedLogs = make([][]byte, 0)
 }

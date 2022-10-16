@@ -26,7 +26,7 @@ func (s *SchedulerTestSuite) SetupTest() {
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
 
-	s.messenger = messaging.NewChannelMessenger(make(chan messaging.Message, 9999), make(chan messaging.Message, 9999))
+	s.messenger, _ = messaging.NewChannelMessengerPair(9999)
 	s.ctx, s.cancelFunc = injector.NewContext(context.TODO(), &logger, s.messenger)
 }
 

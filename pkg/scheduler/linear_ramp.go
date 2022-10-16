@@ -16,7 +16,7 @@ const (
 )
 
 type LinearRamp struct {
-	Runners      int
+	Runners      uint64
 	InitialDelay time.Duration
 	RampUp       time.Duration
 	Sustain      time.Duration
@@ -28,7 +28,7 @@ func ParseLinearRamp(rampSpec map[string]any) (LinearRamp, error) {
 	if !ok {
 		return LinearRamp{}, errors.New("field '" + RunnersKey + "' not set")
 	}
-	shooters, ok := rawShooters.(int)
+	shooters, ok := rawShooters.(uint64)
 	if !ok {
 		return LinearRamp{}, errors.New("cannot parse '" + RunnersKey + "' field, expected int")
 	}
@@ -79,7 +79,7 @@ func ParseLinearRamp(rampSpec map[string]any) (LinearRamp, error) {
 	}, nil
 }
 
-func (r LinearRamp) At(elapsed time.Duration) int {
+func (r LinearRamp) At(elapsed time.Duration) uint64 {
 	if elapsed < r.InitialDelay {
 		return 0
 	}
@@ -87,7 +87,7 @@ func (r LinearRamp) At(elapsed time.Duration) int {
 	partialElapsed := elapsed - r.InitialDelay
 
 	if partialElapsed < r.RampUp {
-		return int(
+		return uint64(
 			math.Round(
 				float64(r.Runners) * (float64(partialElapsed.Nanoseconds()) / float64(r.RampUp.Nanoseconds()))))
 	}
@@ -101,7 +101,7 @@ func (r LinearRamp) At(elapsed time.Duration) int {
 	partialElapsed = partialElapsed - r.Sustain
 
 	if partialElapsed < r.RampDown {
-		return int(
+		return uint64(
 			math.Round(
 				float64(r.Runners) * float64(r.RampDown.Nanoseconds()-partialElapsed.Nanoseconds()) / float64(r.RampDown.Nanoseconds())))
 	}

@@ -2,8 +2,9 @@ package messaging
 
 import (
 	"context"
-	"encoding/json"
 	"github.com/gorilla/websocket"
+	"github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
+	"google.golang.org/protobuf/proto"
 	"sync"
 )
 
@@ -13,8 +14,8 @@ type WebsocketMessenger struct {
 	connection *websocket.Conn
 	sendMu     sync.Mutex
 	recvMu     sync.Mutex
-	sendChan   chan Message
-	recvChan   chan Message
+	sendChan   chan *message.Envelope
+	recvChan   chan *message.Envelope
 
 	closeChan chan struct{}
 }
@@ -22,8 +23,8 @@ type WebsocketMessenger struct {
 func NewWebsocketMessenger(conn *websocket.Conn, channelBuffer int) *WebsocketMessenger {
 	messenger := new(WebsocketMessenger)
 	messenger.connection = conn
-	messenger.sendChan = make(chan Message, channelBuffer)
-	messenger.recvChan = make(chan Message, channelBuffer)
+	messenger.sendChan = make(chan *message.Envelope, channelBuffer)
+	messenger.recvChan = make(chan *message.Envelope, channelBuffer)
 
 	return messenger
 }
@@ -34,20 +35,24 @@ func (w *WebsocketMessenger) Start(ctx context.Context) {
 	go w.pumpOutgoingMessages()
 }
 
-func (w *WebsocketMessenger) Send(message Message) {
+func (w *WebsocketMessenger) Send(message *message.Envelope) {
 	w.sendChan <- message
 }
 
-func (w *WebsocketMessenger) Receive() <-chan Message {
+func (w *WebsocketMessenger) Receive() <-chan *message.Envelope {
 	return w.recvChan
 }
 
 func (w *WebsocketMessenger) SendPing() {
-	w.Send(NewPingMessage())
+	payload := message.Envelope_Ping{Ping: &message.Ping{}}
+	msg := message.NewEnvelope(&payload)
+	w.Send(msg)
 }
 
 func (w *WebsocketMessenger) SendPong(pingMsgID string) {
-	w.Send(NewPongMessage(pingMsgID))
+	payload := message.Envelope_Pong{Pong: &message.Pong{}}
+	msg := message.NewResponseEnvelope(pingMsgID, &payload)
+	w.Send(msg)
 }
 
 func (w *WebsocketMessenger) Close() {
@@ -65,13 +70,13 @@ func (w *WebsocketMessenger) pumpIncomingMessages() {
 		}
 
 		// TODO: add different messages handling (ping, pong, closure, etc)
-		var message Message
-		err = json.Unmarshal(rawBytes, &message)
+		var envelope message.Envelope
+		err = proto.Unmarshal(rawBytes, &envelope)
 		if err != nil {
 			continue
 		}
 
-		w.recvChan <- message
+		w.recvChan <- &envelope
 	}
 }
 
@@ -81,17 +86,17 @@ func (w *WebsocketMessenger) pumpOutgoingMessages() {
 		return
 	case <-w.closeChan:
 		return
-	case message := <-w.sendChan:
-		rawBytes, err := json.Marshal(message)
+	case msg := <-w.sendChan:
+		rawBytes, err := proto.Marshal(msg)
 		if err != nil {
 			break
 		}
 
 		var wsMessageType int
-		switch message.Type {
-		case PingMsgType:
+		switch msg.Payload.(type) {
+		case *message.Envelope_Ping:
 			wsMessageType = websocket.PingMessage
-		case PongMsgType:
+		case *message.Envelope_Pong:
 			wsMessageType = websocket.PongMessage
 		default:
 			wsMessageType = websocket.TextMessage

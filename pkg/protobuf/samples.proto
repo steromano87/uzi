@@ -8,7 +8,7 @@ import "google/protobuf/duration.proto";
 import "rest_sample.proto";
 
 message Samples {
-  repeated string sample = 1;
+  repeated Sample sample = 1;
 }
 
 message Sample {

@@ -5,6 +5,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	"github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -43,18 +44,18 @@ func (s *LogCollectorTestSuite) TestCollectMultipleLogs() {
 	logger.Info().Msg("my second log")
 
 	dispatcher.Flush()
-	var message messaging.Message
+	var msg *message.Envelope
 
 	select {
-	case message = <-s.bossMessenger.Receive():
+	case msg = <-s.bossMessenger.Receive():
 
 	default:
-		assert.Fail(s.T(), "no message was sent")
+		assert.Fail(s.T(), "no msg was sent")
 	}
 
-	payload, err := message.DecodePayload()
-	if assert.NoError(s.T(), err) {
-		err := collector.Collect(payload.([]db.Log))
+	payload := msg.GetLogs()
+	if assert.NotNil(s.T(), payload) {
+		err := collector.Collect(payload)
 		if assert.NoError(s.T(), err) {
 			var logs []db.Log
 			s.dbAdapter.Find(&logs)

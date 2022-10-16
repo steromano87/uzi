@@ -2,8 +2,8 @@ package telemetry_test
 
 import (
 	"context"
-	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	message2 "github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -39,17 +39,15 @@ func (s *HostMetricsCollectorTestSuite) TestMetricsCollection() {
 
 	select {
 	case message := <-s.bossMessenger.Receive():
-		if assert.Equal(s.T(), messaging.HostMetricsMsgId, message.Type) {
-			payload, err := message.DecodePayload()
-			if assert.NoError(s.T(), err) {
-				if assert.IsType(s.T(), db.HostMetric{}, payload) {
-					castPayload := payload.(db.HostMetric)
-
-					assert.GreaterOrEqual(s.T(), castPayload.CPU, 0.0)
-					assert.Greater(s.T(), castPayload.Memory.Total, uint64(0))
-					assert.LessOrEqual(s.T(), castPayload.Memory.Used, castPayload.Memory.Total)
-					assert.Greater(s.T(), castPayload.Storage.Total, uint64(0))
-					assert.LessOrEqual(s.T(), castPayload.Storage.Used, castPayload.Storage.Total)
+		if assert.IsType(s.T(), &message2.Envelope_HostMetrics{}, message.Payload) {
+			payload := message.GetHostMetrics()
+			if assert.NotNil(s.T(), payload) {
+				if assert.IsType(s.T(), &message2.HostMetrics{}, payload) {
+					assert.GreaterOrEqual(s.T(), payload.GetCpu(), 0.0)
+					assert.Greater(s.T(), payload.GetMemory().GetTotal(), uint64(0))
+					assert.LessOrEqual(s.T(), payload.GetMemory().GetUsed(), payload.GetMemory().GetTotal())
+					assert.Greater(s.T(), payload.GetStorage().GetTotal(), uint64(0))
+					assert.LessOrEqual(s.T(), payload.GetStorage().GetUsed(), payload.GetStorage().GetTotal())
 				}
 			}
 		}

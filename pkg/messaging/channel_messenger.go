@@ -2,14 +2,15 @@ package messaging
 
 import (
 	"context"
+	"github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
 )
 
 type ChannelMessenger struct {
-	sendChan chan<- Message
-	recvChan <-chan Message
+	sendChan chan<- *message.Envelope
+	recvChan <-chan *message.Envelope
 }
 
-func NewChannelMessenger(sendChan chan Message, recvChan chan Message) *ChannelMessenger {
+func NewChannelMessenger(sendChan chan *message.Envelope, recvChan chan *message.Envelope) *ChannelMessenger {
 	messenger := new(ChannelMessenger)
 	messenger.sendChan = sendChan
 	messenger.recvChan = recvChan
@@ -18,8 +19,8 @@ func NewChannelMessenger(sendChan chan Message, recvChan chan Message) *ChannelM
 }
 
 func NewChannelMessengerPair(channelBuffer int) (bossMessenger *ChannelMessenger, minionMessenger *ChannelMessenger) {
-	bossToMinionChan := make(chan Message, channelBuffer)
-	minionToBossChan := make(chan Message, channelBuffer)
+	bossToMinionChan := make(chan *message.Envelope, channelBuffer)
+	minionToBossChan := make(chan *message.Envelope, channelBuffer)
 
 	return NewChannelMessenger(bossToMinionChan, minionToBossChan), NewChannelMessenger(minionToBossChan, bossToMinionChan)
 }
@@ -29,20 +30,24 @@ func NewChannelMessengerPair(channelBuffer int) (bossMessenger *ChannelMessenger
 func (m *ChannelMessenger) Start(_ context.Context) {
 }
 
-func (m *ChannelMessenger) Send(message Message) {
-	m.sendChan <- message
+func (m *ChannelMessenger) Send(msg *message.Envelope) {
+	m.sendChan <- msg
 }
 
-func (m *ChannelMessenger) Receive() <-chan Message {
+func (m *ChannelMessenger) Receive() <-chan *message.Envelope {
 	return m.recvChan
 }
 
 func (m *ChannelMessenger) SendPing() {
-	m.Send(NewPingMessage())
+	payload := message.Envelope_Ping{Ping: &message.Ping{}}
+	msg := message.NewEnvelope(&payload)
+	m.Send(msg)
 }
 
 func (m *ChannelMessenger) SendPong(pingMsgID string) {
-	m.Send(NewPongMessage(pingMsgID))
+	payload := message.Envelope_Pong{Pong: &message.Pong{}}
+	msg := message.NewResponseEnvelope(pingMsgID, &payload)
+	m.Send(msg)
 }
 
 // Close is a no-op, because there is no goroutine to stop

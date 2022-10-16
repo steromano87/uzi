@@ -1,19 +1,15 @@
 package injector_test
 
 import (
-	"archive/zip"
-	"bytes"
 	"context"
 	"github.com/Flaque/filet"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
+	"github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"io"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -67,8 +63,8 @@ func (s *InjectorTestSuite) TestPingMessageHandling() {
 
 	responseMessage, ok := <-s.bossMessenger.Receive()
 	if assert.True(s.T(), ok) {
-		assert.Equal(s.T(), messaging.PongMsgType, responseMessage.Type)
-		assert.NotEmpty(s.T(), responseMessage.AnswersTo)
+		assert.IsType(s.T(), &message.Envelope_Pong{}, responseMessage.GetPayload())
+		assert.NotNil(s.T(), responseMessage.GetAnswersTo())
 	}
 }
 
@@ -81,53 +77,17 @@ func (s *InjectorTestSuite) TestWorkingFolderInitMessageHandling() {
 
 	defer filet.CleanUp(s.T())
 
-	// Create compressed zip folder in memory
-	var compressedBytes bytes.Buffer
-	zipWriter := zip.NewWriter(&compressedBytes)
-	walker := func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		file, err := os.Open(path)
-		if err != nil {
-			return err
-		}
-		defer func() {
-			_ = file.Close()
-		}()
-
-		// Ensure that `path` is not absolute; it should not start with "/".
-		// This snippet happens to work because I don't use
-		// absolute paths, but ensure your real-world code
-		// transforms path into a zip-root relative path.
-		f, err := zipWriter.Create(path)
-		if err != nil {
-			return err
-		}
-
-		_, err = io.Copy(f, file)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	err := filepath.Walk(tempWorkingDir, walker)
-	_ = zipWriter.Close()
+	workDirMessage, err := message.NewWorkingFolderInitEnvelope(tempWorkingDir)
 	require.NoError(s.T(), err)
-
-	workDirMessage, _ := messaging.NewMessage(messaging.EventMsgType, db.NewWorkingFolderInitEvent(compressedBytes.Bytes()))
 
 	s.bossMessenger.Send(workDirMessage)
 
 	responseMessage, ok := <-s.bossMessenger.Receive()
 	if assert.True(s.T(), ok) {
-		assert.Equal(s.T(), messaging.AcknowledgeMsgType, responseMessage.Type)
-		assert.Equal(s.T(), workDirMessage.ID, responseMessage.AnswersTo)
+		if assert.IsType(s.T(), &message.Envelope_Acknowledge{}, responseMessage.GetPayload()) {
+			assert.Equal(s.T(), workDirMessage.GetId(), responseMessage.GetAnswersTo())
+			assert.True(s.T(), responseMessage.GetAcknowledge().GetOk())
+		}
 
 		if assert.DirExists(s.T(), inj.WorkingFolder()) {
 			assert.FileExists(s.T(), filepath.Join(inj.WorkingFolder(), tempFile.Name()))

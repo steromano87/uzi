@@ -7,6 +7,12 @@ import "google/protobuf/timestamp.proto";
 import "acknowledge.proto";
 import "runners_quota_update.proto";
 import "working_folder_init.proto";
+import "samples.proto";
+import "logs.proto";
+import "ping_pong.proto";
+import "host_metrics.proto";
+import "graceful_shutdown_request.proto";
+import "forced_shotdown_request.proto";
 
 message Envelope {
   string id = 1;
@@ -14,9 +20,22 @@ message Envelope {
   optional string answers_to = 3;
 
   oneof Payload {
+    // Keepalive/answer messages
     Acknowledge acknowledge = 100;
-    RunnersQuotaUpdate runners_quota_update = 101;
-    WorkingFolderInit working_folder_init = 102;
+    Ping ping = 101;
+    Pong pong = 102;
 
+    // Flow control messages
+    WorkingFolderInit working_folder_init = 200;
+
+    // Update/runtime messages
+    RunnersQuotaUpdate runners_quota_update = 300;
+    Samples samples = 301;
+    Logs logs = 302;
+    HostMetrics host_metrics = 303;
+
+    // Termination messages
+    GracefulShutdownRequest graceful_shutdown_request = 400;
+    ForcedShutdownRequest forced_shutdown_request = 401;
   }
 }

@@ -1,17 +1,11 @@
 package injector
 
 import (
-	"archive/zip"
-	"bytes"
-	"encoding/base64"
 	"fmt"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/db"
-	"github.com/steromano87/harkonnen/v1/pkg/messaging"
-	"io"
+	"github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
+	"github.com/steromano87/harkonnen/v1/pkg/utils"
 	"os"
-	"path/filepath"
-	"strings"
 )
 
 type Injector struct {
@@ -64,71 +58,46 @@ func (i *Injector) handleIncomingMessages() {
 		i.Stop()
 
 	case incomingMessage := <-i.ctx.Messenger.Receive():
-		switch incomingMessage.Type {
-		case messaging.PingMsgType:
+		switch incomingMessage.GetPayload().(type) {
+		case *message.Envelope_Ping:
 			i.handlePingMessage(incomingMessage)
-		case messaging.EventMsgType:
-			i.handleEventMessage(incomingMessage)
+
+		case *message.Envelope_WorkingFolderInit:
+			i.handleWorkingFolderInitEvent(incomingMessage)
+
 		default:
 			i.ctx.Logger().Warn().Msg("Received unknown message type")
 		}
 	}
 }
 
-func (i *Injector) handlePingMessage(message messaging.Message) {
-	i.contextLogger().Debug().Str("pingMsgID", message.ID).Msg("Received ping message")
-	i.ctx.SendPong(message.ID)
-	i.contextLogger().Debug().Str("pingMsgID", message.ID).Msg("Answered with pong message")
+func (i *Injector) handlePingMessage(msg *message.Envelope) {
+	i.contextLogger().Debug().Str("pingMsgID", msg.GetId()).Msg("Received ping message")
+	i.ctx.SendPong(msg.GetId())
+	i.contextLogger().Debug().Str("pingMsgID", msg.GetId()).Msg("Answered with pong message")
 }
 
-func (i *Injector) handleEventMessage(message messaging.Message) {
-	eventPayload, err := message.DecodePayload()
+func (i *Injector) handleWorkingFolderInitEvent(msg *message.Envelope) {
+	i.contextLogger().Info().Str("msgID", msg.GetId()).Msg("Received compressed working folder, unzipping...")
+
+	compressedWorkingFolder := msg.GetWorkingFolderInit().GetCompressedWorkingFolder()
+
+	err := utils.UnzipFolder(compressedWorkingFolder, i.workingFolder)
 	if err != nil {
-		i.replyWithError(message.ID, err, "Encountered error when parsing event message")
+		details := fmt.Sprintf("Encountered an error when unzipping compressed folder content: %s", err)
+		i.contextLogger().Error().Str("msgID", msg.GetId()).Err(err).Msg("Encountered an error when unzipping compressed folder content")
+		i.ctx.Send(message.NewAcknowledgeEnvelope(msg.GetId(), false, &details))
 	}
 
-	switch eventPayload.(db.Event).Kind {
-	case db.WorkingFolderInitEvent:
-		i.handleWorkingFolderInitEvent(message)
-	case db.RunnersQuotaUpdateRequestEvent:
-		i.handleRunnerQuotaUpdateEvent(message)
-	}
+	i.contextLogger().Info().Str("msgID", msg.GetId()).Str("workingFolderPath", i.workingFolder).Msg("Successfully initialized working folder")
+	i.ctx.Messenger.Send(message.NewAcknowledgeEnvelope(msg.GetId(), true, nil))
 }
 
-func (i *Injector) handleWorkingFolderInitEvent(message messaging.Message) {
-	i.contextLogger().Info().Str("ID", message.ID).Msg("Received compressed working folder, unzipping...")
-	payload, _ := message.DecodePayload()
+func (i *Injector) handleRunnerQuotaUpdateEvent(msg *message.Envelope) {
+	newRunnerQuota := msg.GetRunnersQuotaUpdate().GetRunnersQuota()
 
-	// Once marshalled, compressed folder content will be base64 encoded, so we need to decode it first before reading
-	compressedWorkingFolderBase64 := payload.(db.Event).Data["compressedFolder"].(string)
-	compressedWorkingFolder, err := base64.StdEncoding.DecodeString(compressedWorkingFolderBase64)
-	if err != nil {
-		i.replyWithError(message.ID, err, "Encountered error when Base64-decoding compressed folder content")
-	}
-
-	// Read byte content into zip reader
-	zipReader, err := zip.NewReader(bytes.NewReader(compressedWorkingFolder), int64(len(compressedWorkingFolder)))
-	if err != nil {
-		i.replyWithError(message.ID, err, "Encountered error when reading compressed folder byte stream")
-	}
-
-	// Iterate over zipped files and extract them to working folder
-	for _, file := range zipReader.File {
-		err = i.unzipFile(file)
-		if err != nil {
-			i.replyWithError(message.ID, err, "Encountered error when unzipping working folder")
-		}
-	}
-
-	i.ctx.Messenger.Send(messaging.NewAcknowledgeMessage(message.ID))
-}
-
-func (i *Injector) handleRunnerQuotaUpdateEvent(message messaging.Message) {
-	payload, _ := message.DecodePayload()
-	newRunnerQuota := payload.(db.Event).Data["runnerQuota"].(int)
-
-	i.contextLogger().Info().Str("ID", message.ID).Int("newQuota", newRunnerQuota).Msg("Received runners quota update message")
-	i.ctx.Messenger.Send(messaging.NewAcknowledgeMessage(message.ID))
+	i.contextLogger().Info().Str("msgID", msg.GetId()).Uint64("newQuota", newRunnerQuota).Msg("Received runners quota update message")
+	i.ctx.Messenger.Send(message.NewAcknowledgeEnvelope(msg.GetId(), true, nil))
 }
 
 func (i *Injector) initWorkingFolder() error {
@@ -147,56 +116,6 @@ func (i *Injector) cleanWorkingFolder() {
 	if err != nil {
 		i.contextLogger().Error().Err(err).Str("workingFolder", i.workingFolder).Msg("Error cleaning temporary working folder")
 	}
-}
-
-func (i *Injector) unzipFile(f *zip.File) error {
-	// Check if file paths are not vulnerable to Zip Slip
-	filePath := filepath.Join(i.workingFolder, f.Name)
-	if !strings.HasPrefix(filePath, filepath.Clean(i.workingFolder)+string(os.PathSeparator)) {
-		return fmt.Errorf("invalid file path: %s", filePath)
-	}
-
-	// Create directory tree
-	if f.FileInfo().IsDir() {
-		if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
-			return err
-		}
-		return nil
-	}
-
-	if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
-		return err
-	}
-
-	// Create a destination file for unzipped content
-	destinationFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = destinationFile.Close()
-	}()
-
-	// Unzip the content of a file and copy it to the destination file
-	zippedFile, err := f.Open()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = zippedFile.Close()
-	}()
-
-	if _, err := io.Copy(destinationFile, zippedFile); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (i *Injector) replyWithError(requestMsgID string, err error, errorMessage string) {
-	i.contextLogger().Error().Err(err).Str("messageID", requestMsgID).Msg(errorMessage)
-
-	errMessage, _ := messaging.NewAnswerMessage(messaging.EventMsgType, requestMsgID, db.NewErrorEvent(err))
-	i.ctx.Messenger.Send(errMessage)
 }
 
 func (i *Injector) contextLogger() *zerolog.Logger {

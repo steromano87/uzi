@@ -1,7 +1,9 @@
 package telemetry
 
 import (
+	"encoding/json"
 	"github.com/steromano87/harkonnen/v1/pkg/db"
+	"github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
 )
 
 type LogCollector struct {
@@ -16,8 +18,14 @@ func NewLogCollector(remoteInjectorName string, dbAdapter *db.Adapter) LogCollec
 	}
 }
 
-func (c LogCollector) Collect(logMessages []db.Log) error {
-	for _, logEntry := range logMessages {
+func (c LogCollector) Collect(logMessages *message.Logs) error {
+	for _, rawLogEntry := range logMessages.GetLog() {
+		var logEntry db.Log
+		err := json.Unmarshal(rawLogEntry, &logEntry)
+		if err != nil {
+			return err
+		}
+
 		result := c.dbAdapter.Create(&logEntry)
 		if result.Error != nil {
 			return result.Error
