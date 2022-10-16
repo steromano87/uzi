@@ -3,8 +3,8 @@ package rest
 import (
 	"bytes"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
-	"github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
-	sample2 "github.com/steromano87/harkonnen/v1/pkg/protobuf/message/sample"
+	"github.com/steromano87/harkonnen/v1/pkg/message"
+	"github.com/steromano87/harkonnen/v1/pkg/message/sample"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
@@ -91,13 +91,13 @@ func (c *Client) Execute(request Request) error {
 	finalURL := response.Request.URL
 
 	// Create request sample
-	sample := &message.Sample{
+	requestSample := &message.Sample{
 		Timestamp:     timestamppb.New(startTime),
 		Duration:      durationpb.New(endTime.Sub(startTime)),
 		Name:          rawRequest.URL.String(),
 		SentBytes:     sentBytes,
 		ReceivedBytes: receivedBytes,
-		SampleData: &message.Sample_Rest{Rest: &sample2.Rest{
+		SampleData: &message.Sample_Rest{Rest: &sample.Rest{
 			Url:         pureUrl.String(),
 			QueryString: queryString.Encode(),
 			Method:      request.Method,
@@ -106,7 +106,7 @@ func (c *Client) Execute(request Request) error {
 		}},
 	}
 
-	c.ctx.SampleSender().Collect(sample)
+	c.ctx.SampleSender().Collect(requestSample)
 
 	return c.saveLastResponse(response)
 }

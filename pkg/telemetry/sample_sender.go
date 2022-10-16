@@ -1,8 +1,8 @@
 package telemetry
 
 import (
+	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
-	"github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
 	"sync"
 )
 

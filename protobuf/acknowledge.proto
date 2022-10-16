@@ -1,6 +1,6 @@
 syntax = "proto3";
 package message;
-option go_package = "github.com/steromano87/harkonnen/v1/pkg/protobuf/message";
+option go_package = "github.com/steromano87/harkonnen/v1/pkg/message";
 
 message Acknowledge {
   bool ok = 1;

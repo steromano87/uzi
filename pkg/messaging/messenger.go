@@ -2,7 +2,7 @@ package messaging
 
 import (
 	"context"
-	"github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
+	"github.com/steromano87/harkonnen/v1/pkg/message"
 )
 
 type Messenger interface {

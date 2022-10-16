@@ -2,8 +2,8 @@ package telemetry_test
 
 import (
 	"context"
+	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
-	message2 "github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -38,11 +38,11 @@ func (s *HostMetricsCollectorTestSuite) TestMetricsCollection() {
 	cancelFunc()
 
 	select {
-	case message := <-s.bossMessenger.Receive():
-		if assert.IsType(s.T(), &message2.Envelope_HostMetrics{}, message.Payload) {
-			payload := message.GetHostMetrics()
+	case msg := <-s.bossMessenger.Receive():
+		if assert.IsType(s.T(), &message.Envelope_HostMetrics{}, msg.GetPayload()) {
+			payload := msg.GetHostMetrics()
 			if assert.NotNil(s.T(), payload) {
-				if assert.IsType(s.T(), &message2.HostMetrics{}, payload) {
+				if assert.IsType(s.T(), &message.HostMetrics{}, payload) {
 					assert.GreaterOrEqual(s.T(), payload.GetCpu(), 0.0)
 					assert.Greater(s.T(), payload.GetMemory().GetTotal(), uint64(0))
 					assert.LessOrEqual(s.T(), payload.GetMemory().GetUsed(), payload.GetMemory().GetTotal())

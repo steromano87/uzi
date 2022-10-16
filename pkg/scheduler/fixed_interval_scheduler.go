@@ -4,7 +4,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/context"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
-	message2 "github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
+	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"math"
 	"sort"
 	"time"
@@ -53,10 +53,10 @@ func (f *FixedIntervalScheduler) Start(ctx context.WithLogger) {
 				if quota != lastScheduledQuota {
 					f.contextLogger(ctx).Info().Str("injectorID", injectorID).Uint64("quota", quota).Uint64("lastScheduledQuota", lastScheduledQuota).Msg("Current quota differs from last scheduled quota, sending quota update message")
 
-					payload := message2.Envelope_RunnersQuotaUpdate{
-						RunnersQuotaUpdate: &message2.RunnersQuotaUpdate{RunnersQuota: quota},
+					payload := message.Envelope_RunnersQuotaUpdate{
+						RunnersQuotaUpdate: &message.RunnersQuotaUpdate{RunnersQuota: quota},
 					}
-					msg := message2.NewEnvelope(&payload)
+					msg := message.NewEnvelope(&payload)
 					f.injectors[injectorID].Messenger.Send(msg)
 					f.injectors[injectorID].ScheduledRunners = quota
 				}

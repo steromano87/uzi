@@ -6,8 +6,8 @@ import (
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/net"
+	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/messaging"
-	"github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
 	"runtime"
 	"time"
 )

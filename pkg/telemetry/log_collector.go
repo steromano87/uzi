@@ -3,7 +3,7 @@ package telemetry
 import (
 	"encoding/json"
 	"github.com/steromano87/harkonnen/v1/pkg/db"
-	"github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
+	"github.com/steromano87/harkonnen/v1/pkg/message"
 )
 
 type LogCollector struct {

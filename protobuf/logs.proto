@@ -1,0 +1,7 @@
+syntax = "proto3";
+package message;
+option go_package = "github.com/steromano87/harkonnen/v1/pkg/message";
+
+message Logs {
+  repeated bytes log = 1;
+}

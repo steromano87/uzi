@@ -3,7 +3,7 @@ package messaging
 import (
 	"context"
 	"github.com/gorilla/websocket"
-	"github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
+	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"google.golang.org/protobuf/proto"
 	"sync"
 )

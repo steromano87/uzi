@@ -3,7 +3,7 @@ package injector
 import (
 	"fmt"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/protobuf/message"
+	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/utils"
 	"os"
 )
