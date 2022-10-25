@@ -27,11 +27,12 @@ func NewResponseEnvelope(answersTo string, payload Payload) *Envelope {
 	}
 }
 
-func NewAcknowledgeEnvelope(answersTo string, ok bool, details *string) *Envelope {
+func NewAcknowledgeEnvelope(answersTo string, ok bool, details *string, newStatus *string) *Envelope {
 	ack := &Envelope_Acknowledge{
 		Acknowledge: &Acknowledge{
 			Ok:      ok,
 			Details: details,
+			Status:  newStatus,
 		},
 	}
 
@@ -39,12 +40,16 @@ func NewAcknowledgeEnvelope(answersTo string, ok bool, details *string) *Envelop
 }
 
 func NewPositiveAcknowledgeEnvelope(answersTo string) *Envelope {
-	return NewAcknowledgeEnvelope(answersTo, true, nil)
+	return NewAcknowledgeEnvelope(answersTo, true, nil, nil)
+}
+
+func NewStatusChangeAcknowledgeEnvelope(answersTo string, newStatus string) *Envelope {
+	return NewAcknowledgeEnvelope(answersTo, true, nil, &newStatus)
 }
 
 func NewErrorAcknowledgeEnvelope(answersTo string, errorDescription string, err error) *Envelope {
 	details := fmt.Sprintf("%s: %s", errorDescription, err)
-	return NewAcknowledgeEnvelope(answersTo, false, &details)
+	return NewAcknowledgeEnvelope(answersTo, false, &details, nil)
 }
 
 func NewForcedShutdownRequestEnvelope() *Envelope {
