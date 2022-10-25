@@ -13,6 +13,8 @@ import "ping_pong.proto";
 import "host_metrics.proto";
 import "graceful_shutdown_request.proto";
 import "forced_shotdown_request.proto";
+import "injector_status_update.proto";
+import "hello.proto";
 
 message Envelope {
   string id = 1;
@@ -26,13 +28,15 @@ message Envelope {
     Pong pong = 102;
 
     // Flow control messages
-    WorkingFolderInit working_folder_init = 200;
+    Hello hello = 200;
+    WorkingFolderInit working_folder_init = 201;
 
     // Update/runtime messages
     RunnersQuotaUpdate runners_quota_update = 300;
     Samples samples = 301;
     Logs logs = 302;
     HostMetrics host_metrics = 303;
+    InjectorStatusUpdate injector_status_update = 304;
 
     // Termination messages
     GracefulShutdownRequest graceful_shutdown_request = 400;

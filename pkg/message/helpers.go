@@ -27,6 +27,16 @@ func NewResponseEnvelope(answersTo string, payload Payload) *Envelope {
 	}
 }
 
+func NewHelloEnvelope(harkonnenVersion string) *Envelope {
+	hello := &Envelope_Hello{
+		Hello: &Hello{
+			HarkonnenVersion: harkonnenVersion,
+		},
+	}
+
+	return NewEnvelope(hello)
+}
+
 func NewAcknowledgeEnvelope(answersTo string, ok bool, details *string, newStatus *string) *Envelope {
 	ack := &Envelope_Acknowledge{
 		Acknowledge: &Acknowledge{
