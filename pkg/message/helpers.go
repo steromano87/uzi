@@ -58,7 +58,12 @@ func NewStatusChangeAcknowledgeEnvelope(answersTo string, newStatus string) *Env
 }
 
 func NewErrorAcknowledgeEnvelope(answersTo string, errorDescription string, err error) *Envelope {
-	details := fmt.Sprintf("%s: %s", errorDescription, err)
+	var details string
+	if err != nil {
+		details = fmt.Sprintf("%s: %s", errorDescription, err)
+	} else {
+		details = errorDescription
+	}
 	return NewAcknowledgeEnvelope(answersTo, false, &details, nil)
 }
 
