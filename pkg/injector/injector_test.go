@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"github.com/steromano87/harkonnen/v1/pkg/message"
+	"github.com/steromano87/harkonnen/v1/pkg/version"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -49,9 +50,53 @@ func (s *InjectorTestSuite) TestNewInjector() {
 func (s *InjectorTestSuite) TestStartNewInjector() {
 	inj, err := injector.New(s.ctx)
 	if assert.NoError(s.T(), err) {
-		assert.Equal(s.T(), injector.Stopped, inj.Status())
+		assert.Equal(s.T(), injector.StatusDisconnected, inj.Status())
 		inj.Start()
-		assert.Equal(s.T(), injector.Ready, inj.Status())
+		assert.Equal(s.T(), injector.StatusDisconnected, inj.Status())
+	}
+}
+
+func (s *InjectorTestSuite) TestHelloMessageHandlingWithCorrectVersion() {
+	inj, _ := injector.New(s.ctx)
+	inj.Start()
+	s.bossMessenger.Send(message.NewHelloEnvelope(version.Version))
+
+	responseMessage, ok := <-s.bossMessenger.Receive()
+	if assert.True(s.T(), ok) {
+		assert.IsType(s.T(), &message.Envelope_Acknowledge{}, responseMessage.GetPayload())
+		assert.True(s.T(), responseMessage.GetAcknowledge().GetOk())
+		assert.Equal(s.T(), injector.StatusConnected, inj.Status())
+		assert.Equal(s.T(), injector.StatusConnected, responseMessage.GetAcknowledge().GetStatus())
+	}
+}
+
+func (s *InjectorTestSuite) TestHelloMessageHandlingWithMismatchingVersion() {
+	inj, _ := injector.New(s.ctx)
+	inj.Start()
+	s.bossMessenger.Send(message.NewHelloEnvelope("0.0.0"))
+
+	responseMessage, ok := <-s.bossMessenger.Receive()
+	if assert.True(s.T(), ok) {
+		assert.IsType(s.T(), &message.Envelope_Acknowledge{}, responseMessage.GetPayload())
+		assert.False(s.T(), responseMessage.GetAcknowledge().GetOk())
+		assert.Equal(s.T(), injector.StatusDisconnected, inj.Status())
+		assert.Empty(s.T(), responseMessage.GetAcknowledge().GetStatus())
+		assert.Contains(s.T(), responseMessage.GetAcknowledge().GetDetails(), "mismatch")
+	}
+}
+
+func (s *InjectorTestSuite) TestHelloMessageHandlingWithInvalidVersion() {
+	inj, _ := injector.New(s.ctx)
+	inj.Start()
+	s.bossMessenger.Send(message.NewHelloEnvelope("invalid"))
+
+	responseMessage, ok := <-s.bossMessenger.Receive()
+	if assert.True(s.T(), ok) {
+		assert.IsType(s.T(), &message.Envelope_Acknowledge{}, responseMessage.GetPayload())
+		assert.False(s.T(), responseMessage.GetAcknowledge().GetOk())
+		assert.Equal(s.T(), injector.StatusDisconnected, inj.Status())
+		assert.Empty(s.T(), responseMessage.GetAcknowledge().GetStatus())
+		assert.Contains(s.T(), responseMessage.GetAcknowledge().GetDetails(), "invalid")
 	}
 }
 
@@ -91,6 +136,8 @@ func (s *InjectorTestSuite) TestWorkingFolderInitMessageHandling() {
 		if assert.DirExists(s.T(), inj.WorkingFolder()) {
 			assert.FileExists(s.T(), filepath.Join(inj.WorkingFolder(), tempFile.Name()))
 		}
+
+		assert.Equal(s.T(), injector.StatusInitialized, inj.Status())
 	}
 }
 

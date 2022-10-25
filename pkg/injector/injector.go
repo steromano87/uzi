@@ -1,9 +1,11 @@
 package injector
 
 import (
+	semver "github.com/hashicorp/go-version"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/utils"
+	"github.com/steromano87/harkonnen/v1/pkg/version"
 	"os"
 )
 
@@ -19,7 +21,7 @@ type Injector struct {
 func New(ctx Context) (*Injector, error) {
 	inj := new(Injector)
 	inj.ctx = ctx
-	inj.status = Stopped
+	inj.status = StatusDisconnected
 
 	err := inj.initWorkingFolder()
 	if err != nil {
@@ -30,7 +32,6 @@ func New(ctx Context) (*Injector, error) {
 }
 
 func (i *Injector) Start() {
-	i.status = Ready
 	go i.handleIncomingMessages()
 	i.contextLogger().Info().Msg("Injector started")
 }
@@ -38,7 +39,7 @@ func (i *Injector) Start() {
 func (i *Injector) Stop() {
 	i.cleanWorkingFolder()
 
-	i.status = Stopped
+	i.status = StatusStopped
 	i.contextLogger().Info().Msg("Injector stopped")
 }
 
@@ -58,11 +59,23 @@ func (i *Injector) handleIncomingMessages() {
 
 	case incomingMessage := <-i.ctx.MessageBridge.Receive():
 		switch incomingMessage.GetPayload().(type) {
+		case *message.Envelope_Hello:
+			i.handleHelloMessage(incomingMessage)
+
 		case *message.Envelope_Ping:
 			i.handlePingMessage(incomingMessage)
 
 		case *message.Envelope_WorkingFolderInit:
 			i.handleWorkingFolderInitEvent(incomingMessage)
+
+		case *message.Envelope_RunnersQuotaUpdate:
+			i.handleRunnerQuotaUpdateEvent(incomingMessage)
+
+		case *message.Envelope_GracefulShutdownRequest:
+			i.handleGracefulShutdownRequest(incomingMessage)
+
+		case *message.Envelope_ForcedShutdownRequest:
+			i.handleForcedShutdownRequest(incomingMessage)
 
 		default:
 			i.ctx.Logger().Warn().Msg("Received unknown message type")
@@ -70,10 +83,50 @@ func (i *Injector) handleIncomingMessages() {
 	}
 }
 
+func (i *Injector) handleHelloMessage(msg *message.Envelope) {
+	i.contextLogger().Info().Str("msgID", msg.GetId()).Msg("Received hello message")
+
+	injectorVersion, _ := semver.NewVersion(version.Version)
+	harkonnenVersion, err := semver.NewVersion(msg.GetHello().GetHarkonnenVersion())
+
+	if err != nil {
+		errorDescription := "Invalid cockpit version provided, cannot check for version matching"
+		i.contextLogger().Error().Err(err).Str(
+			"cockpitVersion", msg.GetHello().GetHarkonnenVersion(),
+		).Msg(errorDescription)
+		i.ctx.MessageBridge.Send(message.NewErrorAcknowledgeEnvelope(msg.GetId(), errorDescription, err))
+		return
+	}
+
+	if !harkonnenVersion.Equal(injectorVersion) {
+		errorDescription := "Cockpit and injector versions mismatch"
+		i.contextLogger().Error().Str(
+			"cockpitVersion", msg.GetHello().GetHarkonnenVersion(),
+		).Str(
+			"injectorVersion", version.Version,
+		).Msg(
+			errorDescription,
+		)
+		i.ctx.MessageBridge.Send(message.NewErrorAcknowledgeEnvelope(msg.GetId(), errorDescription, nil))
+		return
+	}
+
+	i.contextLogger().Info().Str(
+		"cockpitVersion", msg.GetHello().GetHarkonnenVersion(),
+	).Str(
+		"injectorVersion", version.Version,
+	).Msg(
+		"Cockpit and injector versions match, allowing connection from remote cockpit",
+	)
+
+	i.status = StatusConnected
+	i.ctx.MessageBridge.Send(message.NewStatusChangeAcknowledgeEnvelope(msg.GetId(), i.status))
+}
+
 func (i *Injector) handlePingMessage(msg *message.Envelope) {
-	i.contextLogger().Debug().Str("pingMsgID", msg.GetId()).Msg("Received ping message")
+	i.contextLogger().Debug().Str("msgID", msg.GetId()).Msg("Received ping message")
 	i.ctx.MessageBridge.SendPong(msg.GetId())
-	i.contextLogger().Debug().Str("pingMsgID", msg.GetId()).Msg("Answered with pong message")
+	i.contextLogger().Debug().Str("msgID", msg.GetId()).Msg("Answered with pong message")
 }
 
 func (i *Injector) handleWorkingFolderInitEvent(msg *message.Envelope) {
@@ -89,14 +142,30 @@ func (i *Injector) handleWorkingFolderInitEvent(msg *message.Envelope) {
 	}
 
 	i.contextLogger().Info().Str("msgID", msg.GetId()).Str("workingFolderPath", i.workingFolder).Msg("Successfully initialized working folder")
-	i.ctx.MessageBridge.Send(message.NewPositiveAcknowledgeEnvelope(msg.GetId()))
+	i.status = StatusInitialized
+	i.ctx.MessageBridge.Send(message.NewStatusChangeAcknowledgeEnvelope(msg.GetId(), i.status))
 }
 
 func (i *Injector) handleRunnerQuotaUpdateEvent(msg *message.Envelope) {
 	newRunnerQuota := msg.GetRunnersQuotaUpdate().GetRunnersQuota()
 
 	i.contextLogger().Info().Str("msgID", msg.GetId()).Uint64("newQuota", newRunnerQuota).Msg("Received runners quota update message")
+
+	if i.status == StatusInitialized {
+		i.status = StatusRunning
+		i.ctx.MessageBridge.Send(message.NewStatusChangeAcknowledgeEnvelope(msg.GetId(), i.status))
+	}
 	i.ctx.MessageBridge.Send(message.NewPositiveAcknowledgeEnvelope(msg.GetId()))
+}
+
+func (i *Injector) handleGracefulShutdownRequest(msg *message.Envelope) {
+	i.contextLogger().Info().Str("msgID", msg.GetId()).Msg("Received graceful shutdown request")
+	i.dispatcher.GracefulShutdown()
+}
+
+func (i *Injector) handleForcedShutdownRequest(msg *message.Envelope) {
+	i.contextLogger().Warn().Str("msgID", msg.GetId()).Msg("Received forced shutdown request")
+	i.dispatcher.ForcedShutdown()
 }
 
 func (i *Injector) initWorkingFolder() error {

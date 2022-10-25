@@ -1,7 +1,9 @@
 package injector
 
 const (
-	Stopped = "STOPPED"
-	Ready   = "READY"
-	Running = "RUNNING"
+	StatusDisconnected = "DISCONNECTED"
+	StatusConnected    = "CONNECTED"
+	StatusInitialized  = "INITIALIZED"
+	StatusRunning      = "RUNNING"
+	StatusStopped      = "STOPPED"
 )

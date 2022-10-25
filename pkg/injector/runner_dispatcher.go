@@ -93,6 +93,12 @@ func (d *RunnerDispatcher) GracefulShutdown() {
 	}
 }
 
+func (d *RunnerDispatcher) ForcedShutdown() {
+	for _, holder := range d.runners {
+		holder.cancelFunc()
+	}
+}
+
 func (d *RunnerDispatcher) IterationsCounter() *pipeline.IterationsCounter {
 	return d.iterationsCounter
 }
@@ -144,7 +150,7 @@ func (d *RunnerDispatcher) startPipeline(index int) error {
 	d.runners[index].runner.Start(&d.runnersWaitGroup, d.templatePipeline)
 
 	// Wait for the runner to be started before returning
-	for d.runners[index].ctx.Status() == Ready {
+	for d.runners[index].ctx.Status() == pipeline.Ready {
 		time.Sleep(time.Microsecond)
 	}
 
@@ -155,7 +161,7 @@ func (d *RunnerDispatcher) stopPipeline(index int) error {
 	run := d.runners[index]
 	run.ctx.SchedulePlannedShutdown()
 
-	for run.ctx.Status() == Running {
+	for run.ctx.Status() == pipeline.Running {
 		time.Sleep(time.Microsecond)
 	}
 
@@ -164,7 +170,7 @@ func (d *RunnerDispatcher) stopPipeline(index int) error {
 
 func (d *RunnerDispatcher) firstReadyRunnerIndex() (int, error) {
 	for index, run := range d.runners {
-		if run.ctx.Status() == Ready {
+		if run.ctx.Status() == pipeline.Ready {
 			return index, nil
 		}
 	}
@@ -174,7 +180,7 @@ func (d *RunnerDispatcher) firstReadyRunnerIndex() (int, error) {
 
 func (d *RunnerDispatcher) firstRunningRunnerIndex() (int, error) {
 	for index, run := range d.runners {
-		if run.ctx.Status() == Running {
+		if run.ctx.Status() == pipeline.Running {
 			return index, nil
 		}
 	}
