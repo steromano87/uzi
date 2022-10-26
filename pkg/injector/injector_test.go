@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"github.com/steromano87/harkonnen/v1/pkg/message"
+	"github.com/steromano87/harkonnen/v1/pkg/utils"
 	"github.com/steromano87/harkonnen/v1/pkg/version"
 	"github.com/steromano87/harkonnen/v1/pkg/workingfolder"
 	"github.com/stretchr/testify/assert"
@@ -115,8 +116,9 @@ func (s *InjectorTestSuite) TestWorkingFolderInitMessageHandlingWithValidConfigu
 
 	defer filet.CleanUp(s.T())
 
-	workDirMessage, err := message.NewWorkingFolderInitEnvelope(tempWorkingDir)
+	compressedWorkDir, err := utils.ZipFolder(tempWorkingDir)
 	require.NoError(s.T(), err)
+	workDirMessage := message.NewWorkingFolderInitEnvelope(compressedWorkDir)
 
 	s.bossMessenger.Send(workDirMessage)
 
@@ -143,8 +145,9 @@ func (s *InjectorTestSuite) TestWorkingFolderInitMessageHandlingWithInvalidConfi
 
 	defer filet.CleanUp(s.T())
 
-	workDirMessage, err := message.NewWorkingFolderInitEnvelope(tempWorkingDir)
+	compressedWorkDir, err := utils.ZipFolder(tempWorkingDir)
 	require.NoError(s.T(), err)
+	workDirMessage := message.NewWorkingFolderInitEnvelope(compressedWorkDir)
 
 	s.bossMessenger.Send(workDirMessage)
 
@@ -167,8 +170,9 @@ func (s *InjectorTestSuite) TestWorkingFolderInitMessageHandlingWithMissingConfi
 
 	defer filet.CleanUp(s.T())
 
-	workDirMessage, err := message.NewWorkingFolderInitEnvelope(tempWorkingDir)
+	compressedWorkDir, err := utils.ZipFolder(tempWorkingDir)
 	require.NoError(s.T(), err)
+	workDirMessage := message.NewWorkingFolderInitEnvelope(compressedWorkDir)
 
 	s.bossMessenger.Send(workDirMessage)
 

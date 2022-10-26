@@ -3,7 +3,6 @@ package message
 import (
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/steromano87/harkonnen/v1/pkg/utils"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"time"
@@ -81,16 +80,11 @@ func NewGracefulShutdownRequestEnvelope(timeout time.Duration) *Envelope {
 	})
 }
 
-func NewWorkingFolderInitEnvelope(workingFolder string) (*Envelope, error) {
-	compressedFolder, err := utils.ZipFolder(workingFolder)
-	if err != nil {
-		return nil, err
-	}
-
+func NewWorkingFolderInitEnvelope(compressedFolder []byte) *Envelope {
 	return NewEnvelope(&Envelope_WorkingFolderInit{
 		WorkingFolderInit: &WorkingFolderInit{
 			CompressedWorkingFolder: compressedFolder,
 			CompressionAlgorithm:    CompressionAlgorithm_ZIP,
 		},
-	}), nil
+	})
 }
