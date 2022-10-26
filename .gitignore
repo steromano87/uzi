@@ -92,3 +92,6 @@ Temporary Items
 
 ### Protobuf
 *.pb.go
+
+# Test folder
+test/
