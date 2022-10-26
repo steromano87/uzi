@@ -8,7 +8,9 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/scheduler"
+	"github.com/steromano87/harkonnen/v1/pkg/utils"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
+	"github.com/steromano87/harkonnen/v1/pkg/version"
 )
 
 type Cockpit struct {
@@ -29,6 +31,7 @@ func New(ctx harkonnenContext.WithConfigurationLogger, loadProfile scheduler.Loa
 	cockpit := new(Cockpit)
 	cockpit.ctx = ctx
 	cockpit.loadProfile = loadProfile
+	cockpit.injectorReferences = make(map[string]*injector.Reference)
 
 	err := cockpit.parseInjectorReferences()
 	if err != nil {
@@ -53,21 +56,34 @@ func (c *Cockpit) Start() error {
 		return err
 	}
 
+	err = c.sayHelloToAllInjectors()
+	if err != nil {
+		return err
+	}
+
+	err = c.sendCompressedWorkingFolderTollInjectors()
+	if err != nil {
+		return err
+	}
+
 	c.scheduler.Start(c.ctx)
 
 	return nil
 }
 
 func (c *Cockpit) parseInjectorReferences() error {
-	// Injector references are not directly parsed into the configuration to avoid circular reference issues
-	injectorsConfig := c.ctx.Config().Sub("injectors")
-	var injectorReferences map[string]*injector.Reference
-	err := injectorsConfig.Unmarshal(&injectorReferences)
-	if err != nil {
-		return err
-	}
+	injectorsConfig := c.ctx.Config().Injectors
 
-	c.injectorReferences = injectorReferences
+	for key, value := range injectorsConfig {
+		c.injectorReferences[key] = &injector.Reference{
+			Description: value.Description,
+			Address:     value.Address,
+			Local:       value.Local,
+			Optional:    value.Optional,
+			Weight:      value.Weight,
+		}
+	}
+	c.contextLogger().Info().Int("injectorsCount", len(c.injectorReferences)).Msg("Parsed injector entries")
 	return nil
 }
 
@@ -85,31 +101,47 @@ func (c *Cockpit) initScheduler() error {
 		return errors.New("unknown scheduler type: " + schedulerType)
 	}
 
+	c.contextLogger().Info().Str("schedulerType", schedulerType).Msg("Scheduler initialized")
+
 	return nil
 }
 
 func (c *Cockpit) connectToAllInjectors() error {
-	for _, reference := range c.injectorReferences {
+	c.contextLogger().Info().Msg("Connecting to all available injectors")
+
+	localInjectorCount := 0
+	for injectorID, reference := range c.injectorReferences {
+		c.contextLogger().Info().Str("injectorID", injectorID).Msg("Connecting to injector")
+
 		var err error
 		if reference.Local {
+			if localInjectorCount > 1 {
+				errorMessage := "A maximum of 1 local injector can be defined for a cockpit instance"
+				c.contextLogger().Error().Str("injectorID", injectorID).Msg(errorMessage)
+				return errors.New(errorMessage)
+			}
+
 			err = c.startLocalInjector(reference)
+			localInjectorCount++
+
 		} else {
 			err = c.connectToRemoteInjector(reference)
 		}
 
 		if err != nil {
-			c.contextLogger().Err(err).Interface("injectorReference", reference).Msg("Error when connecting to injector")
-			if reference.FailIfNotReachable {
+			if reference.Optional {
+				c.contextLogger().Warn().Err(err).Str("injectorID", injectorID).Msg(
+					"Error connecting to optional injector, skipping...")
+			} else {
+				c.contextLogger().Error().Err(err).Str("injectorID", injectorID).Msg("Error when connecting to injector")
 				return err
 			}
+		} else {
+			c.contextLogger().Info().Str("injectorID", injectorID).Msg("Successfully connected to injector")
 		}
 	}
 
 	return nil
-}
-
-func (c *Cockpit) connectToRemoteInjector(reference *injector.Reference) error {
-	panic("to be implemented")
 }
 
 func (c *Cockpit) startLocalInjector(reference *injector.Reference) error {
@@ -126,6 +158,34 @@ func (c *Cockpit) startLocalInjector(reference *injector.Reference) error {
 	c.localInjector = localInjector
 	reference.MessageBridge = bossMessenger
 	c.contextLogger().Info().Msg("Local injector started")
+	return nil
+}
+
+func (c *Cockpit) connectToRemoteInjector(reference *injector.Reference) error {
+	panic("to be implemented")
+}
+
+func (c *Cockpit) sayHelloToAllInjectors() error {
+	c.contextLogger().Info().Msg("Sending hello message to all available injectors...")
+	for injectorID, reference := range c.injectorReferences {
+		c.contextLogger().Info().Str("injectorID", injectorID).Msg("Sending hello message to injector")
+		reference.MessageBridge.Send(message.NewHelloEnvelope(version.Version))
+	}
+
+	return nil
+}
+
+func (c *Cockpit) sendCompressedWorkingFolderTollInjectors() error {
+	c.contextLogger().Info().Msg("Sending compressed working folder to all available injectors...")
+	compressedFolder, err := utils.ZipFolder(c.ctx.Config().WorkingFolder)
+	if err != nil {
+		return err
+	}
+
+	for _, reference := range c.injectorReferences {
+		reference.MessageBridge.Send(message.NewWorkingFolderInitEnvelope(compressedFolder))
+	}
+
 	return nil
 }
 
