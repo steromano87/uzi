@@ -2,7 +2,7 @@ package configuration
 
 import "time"
 
-type RestClientConfiguration struct {
+type RestClient struct {
 	Timeout                   time.Duration
 	BaseUrl                   string
 	FollowRedirects           bool

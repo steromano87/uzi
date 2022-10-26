@@ -1,5 +1,5 @@
 package configuration
 
-type LoggingConfiguration struct {
+type Logging struct {
 	Level string
 }

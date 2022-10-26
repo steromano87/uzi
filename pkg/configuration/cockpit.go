@@ -1,5 +1,5 @@
 package configuration
 
-type CockpitConfiguration struct {
-	Scheduler SchedulerConfiguration
+type Cockpit struct {
+	Scheduler Scheduler
 }

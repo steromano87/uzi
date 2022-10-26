@@ -1,6 +1,6 @@
 package configuration
 
-type MessagingConfiguration struct {
+type Messaging struct {
 	MessageCapacity int
 	Logging         struct {
 		BufferSize int

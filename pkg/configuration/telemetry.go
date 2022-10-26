@@ -1,5 +1,5 @@
 package configuration
 
 type TelemetryConfiguration struct {
-	HostMetrics HostMetricsConfiguration
+	HostMetrics HostMetrics
 }

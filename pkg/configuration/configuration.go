@@ -20,15 +20,16 @@ type Configuration struct {
 	WorkingFolder    string
 	Name             string
 	HarkonnenVersion string
-	Messaging        MessagingConfiguration
-	Logging          LoggingConfiguration
-	Cockpit          CockpitConfiguration
+	Injectors        map[string]Injector
+	Messaging        Messaging
+	Logging          Logging
+	Cockpit          Cockpit
 	Client           ClientConfiguration
 	Telemetry        TelemetryConfiguration
 }
 
 type ClientConfiguration struct {
-	Rest RestClientConfiguration
+	Rest RestClient
 }
 
 func New(configFile string) (*Configuration, error) {
