@@ -14,7 +14,7 @@ func Bootstrap(workingFolder string) error {
 	}
 
 	for _, folder := range foldersToCreate {
-		err := os.MkdirAll(filepath.Join(workingFolder, folder), os.ModeDir)
+		err := os.MkdirAll(filepath.Join(workingFolder, folder), 0755)
 		if err != nil {
 			return err
 		}
