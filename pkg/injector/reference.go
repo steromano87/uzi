@@ -6,13 +6,16 @@ import (
 )
 
 type Reference struct {
-	Local              bool
-	Address            string
-	FailIfNotReachable bool
-	Weight             int
-	ScheduledRunners   uint64
-	RunnerStats        RunnerStats
-	MessageBridge      message.Bridge
+	Description string
+	Address     string
+	Local       bool
+	Optional    bool
+	Weight      int
+
+	Status           string
+	ScheduledRunners uint64
+	RunnerStats      RunnerStats
+	MessageBridge    message.Bridge
 }
 
 func (r Reference) String() string {
