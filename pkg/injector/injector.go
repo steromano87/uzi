@@ -56,33 +56,35 @@ func (i *Injector) WorkingFolder() string {
 }
 
 func (i *Injector) handleIncomingMessages() {
-	select {
-	case <-i.ctx.Context.Done():
-		i.contextLogger().Info().Msg("Context canceled, exiting incoming message handling loop")
-		i.Stop()
+	for {
+		select {
+		case <-i.ctx.Context.Done():
+			i.contextLogger().Info().Msg("Context canceled, exiting incoming message handling loop")
+			i.Stop()
 
-	case incomingMessage := <-i.ctx.MessageBridge.Receive():
-		switch incomingMessage.GetPayload().(type) {
-		case *message.Envelope_Hello:
-			i.handleHelloMessage(incomingMessage)
+		case incomingMessage := <-i.ctx.MessageBridge.Receive():
+			switch incomingMessage.GetPayload().(type) {
+			case *message.Envelope_Hello:
+				i.handleHelloMessage(incomingMessage)
 
-		case *message.Envelope_Ping:
-			i.handlePingMessage(incomingMessage)
+			case *message.Envelope_Ping:
+				i.handlePingMessage(incomingMessage)
 
-		case *message.Envelope_WorkingFolderInit:
-			i.handleWorkingFolderInitEvent(incomingMessage)
+			case *message.Envelope_WorkingFolderInit:
+				i.handleWorkingFolderInitEvent(incomingMessage)
 
-		case *message.Envelope_RunnersQuotaUpdate:
-			i.handleRunnerQuotaUpdateEvent(incomingMessage)
+			case *message.Envelope_RunnersQuotaUpdate:
+				i.handleRunnerQuotaUpdateEvent(incomingMessage)
 
-		case *message.Envelope_GracefulShutdownRequest:
-			i.handleGracefulShutdownRequest(incomingMessage)
+			case *message.Envelope_GracefulShutdownRequest:
+				i.handleGracefulShutdownRequest(incomingMessage)
 
-		case *message.Envelope_ForcedShutdownRequest:
-			i.handleForcedShutdownRequest(incomingMessage)
+			case *message.Envelope_ForcedShutdownRequest:
+				i.handleForcedShutdownRequest(incomingMessage)
 
-		default:
-			i.ctx.Logger().Warn().Msg("Received unknown message type")
+			default:
+				i.ctx.Logger().Warn().Msg("Received unknown message type")
+			}
 		}
 	}
 }
