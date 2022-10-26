@@ -57,5 +57,5 @@ func runRun(cmd *cobra.Command, args []string) {
 	}
 
 	<-mainCtx.Done()
-	logger.Info().Msg("Graceful shutdown competed")
+	logger.Info().Msg("Graceful shutdown completed")
 }
