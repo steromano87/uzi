@@ -37,7 +37,6 @@ func runInjector(cmd *cobra.Command, args []string) {
 
 	messagingCtx, _ := injector.NewContext(mainCtx, &logger, messenger)
 	inj, _ := injector.New(messagingCtx)
-	inj.Start()
 	logger.Info().Msg("Remote injector started, press Ctrl+C to stop it")
 
 	<-mainCtx.Done()

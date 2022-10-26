@@ -1,17 +1,24 @@
 package injector
 
 import (
+	"context"
 	semver "github.com/hashicorp/go-version"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/message"
+	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/steromano87/harkonnen/v1/pkg/utils"
 	"github.com/steromano87/harkonnen/v1/pkg/version"
+	"github.com/steromano87/harkonnen/v1/pkg/workingfolder"
 	"os"
+	"path/filepath"
 )
 
 type Injector struct {
 	ctx        Context
 	dispatcher RunnerDispatcher
+
+	hostMetricsSender           *telemetry.HostMetricsSender
+	hostMetricsSenderCancelFunc context.CancelFunc
 
 	status string
 
@@ -28,17 +35,14 @@ func New(ctx Context) (*Injector, error) {
 		return nil, err
 	}
 
-	return inj, nil
-}
+	go inj.handleIncomingMessages()
 
-func (i *Injector) Start() {
-	go i.handleIncomingMessages()
-	i.contextLogger().Info().Msg("Injector started")
+	return inj, nil
 }
 
 func (i *Injector) Stop() {
 	i.cleanWorkingFolder()
-
+	i.stopAdditionalComponents()
 	i.status = StatusStopped
 	i.contextLogger().Info().Msg("Injector stopped")
 }
@@ -91,7 +95,7 @@ func (i *Injector) handleHelloMessage(msg *message.Envelope) {
 
 	if err != nil {
 		errorDescription := "Invalid cockpit version provided, cannot check for version matching"
-		i.contextLogger().Error().Err(err).Str(
+		i.contextLogger().Error().Str("msgID", msg.GetId()).Err(err).Str(
 			"cockpitVersion", msg.GetHello().GetHarkonnenVersion(),
 		).Msg(errorDescription)
 		i.ctx.MessageBridge.Send(message.NewErrorAcknowledgeEnvelope(msg.GetId(), errorDescription, err))
@@ -100,7 +104,7 @@ func (i *Injector) handleHelloMessage(msg *message.Envelope) {
 
 	if !harkonnenVersion.Equal(injectorVersion) {
 		errorDescription := "Cockpit and injector versions mismatch"
-		i.contextLogger().Error().Str(
+		i.contextLogger().Error().Str("msgID", msg.GetId()).Str(
 			"cockpitVersion", msg.GetHello().GetHarkonnenVersion(),
 		).Str(
 			"injectorVersion", version.Version,
@@ -111,7 +115,7 @@ func (i *Injector) handleHelloMessage(msg *message.Envelope) {
 		return
 	}
 
-	i.contextLogger().Info().Str(
+	i.contextLogger().Info().Str("msgID", msg.GetId()).Str(
 		"cockpitVersion", msg.GetHello().GetHarkonnenVersion(),
 	).Str(
 		"injectorVersion", version.Version,
@@ -139,9 +143,23 @@ func (i *Injector) handleWorkingFolderInitEvent(msg *message.Envelope) {
 		errorDescription := "Encountered an error when unzipping compressed folder content"
 		i.contextLogger().Error().Str("msgID", msg.GetId()).Err(err).Msg(errorDescription)
 		i.ctx.MessageBridge.Send(message.NewErrorAcknowledgeEnvelope(msg.GetId(), errorDescription, err))
+		return
 	}
 
-	i.contextLogger().Info().Str("msgID", msg.GetId()).Str("workingFolderPath", i.workingFolder).Msg("Successfully initialized working folder")
+	i.contextLogger().Info().Str("msgID", msg.GetId()).Str(
+		"workingFolderPath", i.workingFolder,
+	).Msg("Successfully initialized working folder")
+
+	err = i.parseConfigurationFromWorkingFolder()
+	if err != nil {
+		errorDescription := "Cannot parse configuration from provided working folder"
+		i.contextLogger().Error().Str("msgID", msg.GetId()).Err(err).Msg(errorDescription)
+		i.ctx.MessageBridge.Send(message.NewErrorAcknowledgeEnvelope(msg.GetId(), errorDescription, err))
+		return
+	}
+
+	i.contextLogger().Info().Str("msgID", msg.GetId()).Msg("Successfully parsed configuration from working folder")
+	i.startAdditionalComponents()
 	i.status = StatusInitialized
 	i.ctx.MessageBridge.Send(message.NewStatusChangeAcknowledgeEnvelope(msg.GetId(), i.status))
 }
@@ -149,7 +167,8 @@ func (i *Injector) handleWorkingFolderInitEvent(msg *message.Envelope) {
 func (i *Injector) handleRunnerQuotaUpdateEvent(msg *message.Envelope) {
 	newRunnerQuota := msg.GetRunnersQuotaUpdate().GetRunnersQuota()
 
-	i.contextLogger().Info().Str("msgID", msg.GetId()).Uint64("newQuota", newRunnerQuota).Msg("Received runners quota update message")
+	i.contextLogger().Info().Str("msgID", msg.GetId()).Uint64("newQuota", newRunnerQuota).Msg(
+		"Received runners quota update message")
 
 	if i.status == StatusInitialized {
 		i.status = StatusRunning
@@ -184,6 +203,30 @@ func (i *Injector) cleanWorkingFolder() {
 	if err != nil {
 		i.contextLogger().Error().Err(err).Str("workingFolder", i.workingFolder).Msg("Error cleaning temporary working folder")
 	}
+}
+
+func (i *Injector) startAdditionalComponents() {
+	if i.ctx.config.Telemetry.HostMetrics.Enabled {
+		i.hostMetricsSender = telemetry.NewHostMetricsSender(i.ctx.MessageBridge)
+		metricsCtx, metricsCancelFunc := context.WithCancel(i.ctx.Context)
+		i.hostMetricsSenderCancelFunc = metricsCancelFunc
+
+		i.hostMetricsSender.Start(
+			metricsCtx,
+			i.ctx.config.Telemetry.HostMetrics.PollInterval,
+			i.ctx.config.Telemetry.HostMetrics.MeasureInterval,
+		)
+	}
+}
+
+func (i *Injector) stopAdditionalComponents() {
+	if i.hostMetricsSender != nil {
+		i.hostMetricsSenderCancelFunc()
+	}
+}
+
+func (i *Injector) parseConfigurationFromWorkingFolder() error {
+	return i.ctx.config.Read(filepath.Join(i.workingFolder, workingfolder.ConfigurationFile))
 }
 
 func (i *Injector) contextLogger() *zerolog.Logger {

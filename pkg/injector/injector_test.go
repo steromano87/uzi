@@ -7,6 +7,7 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/version"
+	"github.com/steromano87/harkonnen/v1/pkg/workingfolder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -51,14 +52,11 @@ func (s *InjectorTestSuite) TestStartNewInjector() {
 	inj, err := injector.New(s.ctx)
 	if assert.NoError(s.T(), err) {
 		assert.Equal(s.T(), injector.StatusDisconnected, inj.Status())
-		inj.Start()
-		assert.Equal(s.T(), injector.StatusDisconnected, inj.Status())
 	}
 }
 
 func (s *InjectorTestSuite) TestHelloMessageHandlingWithCorrectVersion() {
 	inj, _ := injector.New(s.ctx)
-	inj.Start()
 	s.bossMessenger.Send(message.NewHelloEnvelope(version.Version))
 
 	responseMessage, ok := <-s.bossMessenger.Receive()
@@ -72,7 +70,6 @@ func (s *InjectorTestSuite) TestHelloMessageHandlingWithCorrectVersion() {
 
 func (s *InjectorTestSuite) TestHelloMessageHandlingWithMismatchingVersion() {
 	inj, _ := injector.New(s.ctx)
-	inj.Start()
 	s.bossMessenger.Send(message.NewHelloEnvelope("0.0.0"))
 
 	responseMessage, ok := <-s.bossMessenger.Receive()
@@ -87,7 +84,6 @@ func (s *InjectorTestSuite) TestHelloMessageHandlingWithMismatchingVersion() {
 
 func (s *InjectorTestSuite) TestHelloMessageHandlingWithInvalidVersion() {
 	inj, _ := injector.New(s.ctx)
-	inj.Start()
 	s.bossMessenger.Send(message.NewHelloEnvelope("invalid"))
 
 	responseMessage, ok := <-s.bossMessenger.Receive()
@@ -101,8 +97,7 @@ func (s *InjectorTestSuite) TestHelloMessageHandlingWithInvalidVersion() {
 }
 
 func (s *InjectorTestSuite) TestPingMessageHandling() {
-	inj, _ := injector.New(s.ctx)
-	inj.Start()
+	_, _ = injector.New(s.ctx)
 	s.bossMessenger.SendPing()
 
 	responseMessage, ok := <-s.bossMessenger.Receive()
@@ -112,12 +107,11 @@ func (s *InjectorTestSuite) TestPingMessageHandling() {
 	}
 }
 
-func (s *InjectorTestSuite) TestWorkingFolderInitMessageHandling() {
+func (s *InjectorTestSuite) TestWorkingFolderInitMessageHandlingWithValidConfiguration() {
 	inj, _ := injector.New(s.ctx)
-	inj.Start()
 
 	tempWorkingDir := filet.TmpDir(s.T(), "")
-	tempFile := filet.TmpFile(s.T(), tempWorkingDir, "sample")
+	filet.File(s.T(), filepath.Join(tempWorkingDir, workingfolder.ConfigurationFile), "")
 
 	defer filet.CleanUp(s.T())
 
@@ -134,10 +128,58 @@ func (s *InjectorTestSuite) TestWorkingFolderInitMessageHandling() {
 		}
 
 		if assert.DirExists(s.T(), inj.WorkingFolder()) {
-			assert.FileExists(s.T(), filepath.Join(inj.WorkingFolder(), tempFile.Name()))
+			assert.FileExists(s.T(), filepath.Join(inj.WorkingFolder(), workingfolder.ConfigurationFile))
 		}
 
 		assert.Equal(s.T(), injector.StatusInitialized, inj.Status())
+	}
+}
+
+func (s *InjectorTestSuite) TestWorkingFolderInitMessageHandlingWithInvalidConfiguration() {
+	inj, _ := injector.New(s.ctx)
+
+	tempWorkingDir := filet.TmpDir(s.T(), "")
+	filet.File(s.T(), filepath.Join(tempWorkingDir, workingfolder.ConfigurationFile), "fake")
+
+	defer filet.CleanUp(s.T())
+
+	workDirMessage, err := message.NewWorkingFolderInitEnvelope(tempWorkingDir)
+	require.NoError(s.T(), err)
+
+	s.bossMessenger.Send(workDirMessage)
+
+	responseMessage, ok := <-s.bossMessenger.Receive()
+	if assert.True(s.T(), ok) {
+		if assert.IsType(s.T(), &message.Envelope_Acknowledge{}, responseMessage.GetPayload()) {
+			assert.Equal(s.T(), workDirMessage.GetId(), responseMessage.GetAnswersTo())
+			assert.False(s.T(), responseMessage.GetAcknowledge().GetOk())
+		}
+
+		assert.NotEqual(s.T(), injector.StatusInitialized, inj.Status())
+	}
+}
+
+func (s *InjectorTestSuite) TestWorkingFolderInitMessageHandlingWithMissingConfiguration() {
+	inj, _ := injector.New(s.ctx)
+
+	tempWorkingDir := filet.TmpDir(s.T(), "")
+	filet.File(s.T(), filepath.Join(tempWorkingDir, "config.yaml"), "")
+
+	defer filet.CleanUp(s.T())
+
+	workDirMessage, err := message.NewWorkingFolderInitEnvelope(tempWorkingDir)
+	require.NoError(s.T(), err)
+
+	s.bossMessenger.Send(workDirMessage)
+
+	responseMessage, ok := <-s.bossMessenger.Receive()
+	if assert.True(s.T(), ok) {
+		if assert.IsType(s.T(), &message.Envelope_Acknowledge{}, responseMessage.GetPayload()) {
+			assert.Equal(s.T(), workDirMessage.GetId(), responseMessage.GetAnswersTo())
+			assert.False(s.T(), responseMessage.GetAcknowledge().GetOk())
+		}
+
+		assert.NotEqual(s.T(), injector.StatusInitialized, inj.Status())
 	}
 }
 

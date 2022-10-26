@@ -40,3 +40,9 @@ client:
     maxIdleConnectionsPerHost: 100
     enableKeepAlive: true
     enableCompression: true
+
+telemetry:
+  hostMetrics:
+    enabled: true
+    pollInterval: 15s
+    measureInterval: 250ms

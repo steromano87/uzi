@@ -24,6 +24,7 @@ type Configuration struct {
 	Logging          LoggingConfiguration
 	Cockpit          CockpitConfiguration
 	Client           ClientConfiguration
+	Telemetry        TelemetryConfiguration
 }
 
 type ClientConfiguration struct {
