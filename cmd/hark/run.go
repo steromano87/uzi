@@ -31,6 +31,7 @@ func runRun(cmd *cobra.Command, args []string) {
 
 	config, err := configuration.New(filepath.Join(workingFolder, workingfolder.ConfigurationFile))
 	cobra.CheckErr(err)
+	config.WorkingFolder = workingFolder
 
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMicro
 	consoleWriter := zerolog.NewConsoleWriter()
