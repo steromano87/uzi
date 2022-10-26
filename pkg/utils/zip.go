@@ -33,7 +33,7 @@ func ZipFolder(folder string) ([]byte, error) {
 		// This snippet happens to work because I don't use
 		// absolute paths, but ensure your real-world code
 		// transforms path into a zip-root relative path.
-		f, err := zipWriter.Create(path)
+		f, err := zipWriter.Create(strings.TrimPrefix(path, folder))
 		if err != nil {
 			return err
 		}
