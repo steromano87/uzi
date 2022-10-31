@@ -4,6 +4,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
+	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"runtime"
 )
 
@@ -12,36 +13,43 @@ type Main struct {
 	scheduledForGracefulShutdown bool
 }
 
+func (m *Main) Steps() []dsl.Step {
+	return m.steps
+}
+
 func (m *Main) Run(ctx *Context) error {
-	var err error
+	stepChan := make(chan error)
 
 	for _, step := range m.steps {
+		go func() {
+			stepChan <- step.Run(ctx)
+		}()
+
 		select {
 		case <-ctx.GracefulShutdown():
 			m.contextLogger(ctx).Info().Msg("Graceful shutdown requested")
 			m.scheduledForGracefulShutdown = true
-			ctx.status = GracefullyShuttingDown
+			ctx.status = injector.GracefullyShuttingDown
 
 		case <-ctx.PlannedShutdown():
 			m.contextLogger(ctx).Info().Msg("Planned shutdown requested")
 			m.scheduledForGracefulShutdown = true
-			ctx.status = Exiting
+			ctx.status = injector.Exiting
 
 		case <-ctx.Done():
 			m.contextLogger(ctx).Warn().Msg("Forced termination requested, exiting immediately...")
-			ctx.status = ForcefullyShuttingDown
+			ctx.status = injector.ForcefullyShuttingDown
 			runtime.Goexit()
 
-		default:
-			err = step.Run(ctx)
+		case err := <-stepChan:
 			if err != nil {
 				m.contextLogger(ctx).Error().Err(err).Msg("Error during Main loop execution, ending current loop")
-				break
+				return err
 			}
 		}
 	}
 
-	return err
+	return nil
 }
 
 func (m *Main) DecodeFromHCLBlock(ctx *hcl.EvalContext, block *hcl.Block) error {
