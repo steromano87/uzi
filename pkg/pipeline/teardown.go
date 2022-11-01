@@ -4,7 +4,6 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
-	"github.com/steromano87/harkonnen/v1/pkg/injector"
 )
 
 type Teardown struct {
@@ -13,35 +12,6 @@ type Teardown struct {
 
 func (t *Teardown) Steps() []dsl.Step {
 	return t.steps
-}
-
-func (t *Teardown) Run(ctx *Context) error {
-	stepChan := make(chan error)
-
-	for _, step := range t.steps {
-		go func() {
-			stepChan <- step.Run(ctx)
-		}()
-
-		select {
-		case <-ctx.GracefulShutdown():
-			t.contextLogger(ctx).Info().Msg("Graceful shutdown requested")
-			ctx.status = injector.GracefullyShuttingDown
-
-		case <-ctx.Done():
-			t.contextLogger(ctx).Warn().Msg("Forced termination requested, exiting immediately...")
-			ctx.status = injector.ForcefullyShuttingDown
-			return nil
-
-		case err := <-stepChan:
-			if err != nil {
-				t.contextLogger(ctx).Error().Err(err).Msg("Error encountered")
-				return err
-			}
-		}
-	}
-
-	return nil
 }
 
 func (t *Teardown) DecodeFromHCLBlock(ctx *hcl.EvalContext, block *hcl.Block) error {

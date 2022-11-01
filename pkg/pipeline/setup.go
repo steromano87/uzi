@@ -4,7 +4,6 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
-	"github.com/steromano87/harkonnen/v1/pkg/injector"
 )
 
 type Setup struct {
@@ -13,35 +12,6 @@ type Setup struct {
 
 func (s *Setup) Steps() []dsl.Step {
 	return s.steps
-}
-
-func (s *Setup) Run(ctx *Context) error {
-	stepChan := make(chan error)
-
-	for _, step := range s.steps {
-		go func() {
-			stepChan <- step.Run(ctx)
-		}()
-
-		select {
-		case <-ctx.GracefulShutdown():
-			s.contextLogger(ctx).Info().Msg("Graceful shutdown requested")
-			ctx.status = injector.GracefullyShuttingDown
-
-		case <-ctx.Done():
-			s.contextLogger(ctx).Warn().Msg("Forced termination requested, exiting immediately...")
-			ctx.status = injector.ForcefullyShuttingDown
-			return nil
-
-		case err := <-stepChan:
-			if err != nil {
-				s.contextLogger(ctx).Error().Err(err).Msg("Error encountered")
-				return err
-			}
-		}
-	}
-
-	return nil
 }
 
 func (s *Setup) DecodeFromHCLBlock(ctx *hcl.EvalContext, block *hcl.Block) error {

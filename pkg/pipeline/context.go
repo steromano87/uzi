@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/configuration"
-	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 )
@@ -12,35 +11,21 @@ import (
 type Context struct {
 	context.Context
 
-	logger       *zerolog.Logger
-	config       *configuration.Configuration
-	messenger    message.Bridge
-	sampleSender *telemetry.SampleSender
-
-	vars              *variables.Holder
-	iterationsCounter *IterationsCounter
-
-	status string
-
-	gracefulShutdownChan chan struct{}
-	plannedShutdownChan  chan struct{}
+	logger          *zerolog.Logger
+	config          *configuration.Configuration
+	sampleCollector *telemetry.SampleCollector
+	vars            *variables.Holder
 }
 
-func NewContext(ctx context.Context, config *configuration.Configuration, logger *zerolog.Logger, messenger message.Bridge, iterCounter *IterationsCounter) (*Context, context.CancelFunc) {
+func NewContext(ctx context.Context, config *configuration.Configuration, logger *zerolog.Logger, vars *variables.Holder) (*Context, context.CancelFunc) {
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
-	sampleSenderBufferSize := config.GetInt("messaging.samples.bufferSize")
 
 	return &Context{
-		Context:              cancelCtx,
-		logger:               logger,
-		config:               config,
-		messenger:            messenger,
-		sampleSender:         telemetry.NewSampleSender(messenger, sampleSenderBufferSize),
-		vars:                 variables.NewHolder(),
-		iterationsCounter:    iterCounter,
-		status:               Ready,
-		gracefulShutdownChan: make(chan struct{}),
-		plannedShutdownChan:  make(chan struct{}),
+		Context:         cancelCtx,
+		logger:          logger,
+		config:          config,
+		sampleCollector: telemetry.NewSampleCollector(),
+		vars:            vars,
 	}, cancelFunc
 }
 
@@ -53,26 +38,6 @@ func (c *Context) UpdateVariables(newVars variables.Holder) {
 	c.vars.UpdateIterVars(newVars.IterVars())
 }
 
-func (c *Context) Status() string {
-	return c.status
-}
-
-func (c *Context) PlannedShutdown() <-chan struct{} {
-	return c.plannedShutdownChan
-}
-
-func (c *Context) SchedulePlannedShutdown() {
-	c.plannedShutdownChan <- struct{}{}
-}
-
-func (c *Context) GracefulShutdown() <-chan struct{} {
-	return c.gracefulShutdownChan
-}
-
-func (c *Context) ScheduleGracefulShutdown() {
-	c.gracefulShutdownChan <- struct{}{}
-}
-
 func (c *Context) Logger() *zerolog.Logger {
 	return c.logger
 }
@@ -81,18 +46,10 @@ func (c *Context) Config() *configuration.Configuration {
 	return c.config
 }
 
-func (c *Context) IterationsCounter() *IterationsCounter {
-	return c.iterationsCounter
-}
-
 func (c *Context) Variables() *variables.Holder {
 	return c.vars
 }
 
-func (c *Context) Messenger() message.Bridge {
-	return c.messenger
-}
-
-func (c *Context) SampleSender() *telemetry.SampleSender {
-	return c.sampleSender
+func (c *Context) SampleCollector() *telemetry.SampleCollector {
+	return c.sampleCollector
 }
