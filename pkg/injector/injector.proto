@@ -1,0 +1,197 @@
+syntax = "proto3";
+package injector;
+option go_package = "github.com/steromano87/harkonnen/v1/pkg/injector";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+service Injector {
+  rpc Handshake(HandshakeRequest) returns (HandshakeResponse) {}
+  rpc Heartbeat(stream HeartbeatRequest) returns (stream HeartbeatResponse) {}
+  rpc Initialize(InitializationRequest) returns (InjectorStatus) {}
+  rpc SetRunnersQuota(RunnersQuota) returns (InjectorStatus) {}
+
+  rpc GetSamples(SampleRequest) returns (stream Sample) {}
+  rpc GetLogs(LogRequest) returns (stream Log) {}
+  rpc GetIterations(IterationRequest) returns (stream Iteration) {}
+  rpc GetTransactions(TransactionRequest) returns (stream Transaction) {}
+  rpc GetHostMetrics(HostMetricsRequest) returns (stream HostMetrics) {}
+
+  rpc GetRunnersStatus(RunnersStatusRequest) returns (RunnersStatus) {}
+  rpc GetInjectorStatus(InjectorStatusRequest) returns (InjectorStatus) {}
+
+  rpc Shutdown(ShutdownRequest) returns (InjectorStatus) {}
+}
+
+//////////////////////////////////////////
+
+message HandshakeRequest {
+  string cockpit_version = 1;
+}
+
+message HandshakeResponse {
+  string injector_version = 1;
+}
+
+//////////////////////////////////////////
+
+message HeartbeatRequest {
+  google.protobuf.Timestamp timestamp = 1;
+}
+
+message HeartbeatResponse {
+  google.protobuf.Timestamp timestamp = 1;
+}
+
+//////////////////////////////////////////
+
+message InitializationRequest {
+  WorkingFolder working_folder = 1;
+}
+
+message WorkingFolder {
+  bytes compressed_working_folder = 1;
+  CompressionAlgorithm compression_algorithm = 2;
+}
+
+//////////////////////////////////////////
+
+message RunnersQuota {
+  uint64 quota = 1;
+}
+
+//////////////////////////////////////////
+
+message SampleRequest {}
+
+message Sample {
+  google.protobuf.Timestamp timestamp = 1;
+  google.protobuf.Duration duration = 2;
+
+  string name = 3;
+  uint64 sent_bytes = 4;
+  uint64 received_bytes = 5;
+
+  oneof sample_data {
+    Rest rest = 100;
+  }
+
+  message Rest {
+    string url = 1;
+    string query_string = 2;
+    string method = 3;
+    bool is_redirect = 4;
+    string final_url = 5;
+  }
+}
+
+//////////////////////////////////////////
+
+message LogRequest {}
+
+message Log {
+  bytes entry = 1;
+}
+
+//////////////////////////////////////////
+
+message IterationRequest {}
+
+message Iteration {
+
+}
+
+//////////////////////////////////////////
+
+message TransactionRequest {}
+
+message Transaction {
+
+}
+
+//////////////////////////////////////////
+
+message HostMetricsRequest {}
+
+message HostMetrics {
+  google.protobuf.Timestamp timestamp = 1;
+  double cpu = 2;
+  Memory memory = 3;
+  Storage storage = 4;
+  Network network = 5;
+
+
+  message Memory {
+    uint64 total = 1;
+    uint64 used = 2;
+  }
+
+  message Storage {
+    uint64 total = 1;
+    uint64 used = 2;
+  }
+
+  message Network {
+    double up_speed = 1;
+    double down_speed = 2;
+  }
+}
+
+//////////////////////////////////////////
+
+message RunnersStatusRequest {}
+
+message RunnersStatus {
+  uint64 ready = 1;
+  uint64 running = 2;
+  uint64 exiting = 3;
+  uint64 completed = 4;
+
+  uint64 gracefully_stopping = 5;
+  uint64 gracefully_stopped = 6;
+
+  uint64 forcefully_stopping = 7;
+  uint64 forcefully_stopped = 8;
+
+  uint64 error = 9;
+
+  enum Status {
+    AVAILABLE = 0;
+    INITIALIZED = 1;
+    RUNNING = 2;
+    GRACEFULLY_STOPPING = 3;
+    STOPPED = 4;
+    ERROR = 5;
+  }
+}
+
+//////////////////////////////////////////
+
+message InjectorStatusRequest {}
+
+message InjectorStatus {
+  Status current = 1;
+  optional Status previous = 2;
+
+  enum Status {
+    READY = 0;
+    INITIALIZED = 1;
+    RUNNING = 2;
+    GRACEFULLY_STOPPING = 3;
+    FORCEFULLY_STOPPING = 4;
+    STOPPED = 5;
+  }
+}
+
+//////////////////////////////////////////
+
+message ShutdownRequest {
+  bool forced = 1;
+  google.protobuf.Duration timeout = 2;
+}
+
+//////////////////////////////////////////
+
+enum CompressionAlgorithm {
+  ZIP = 0;
+}
