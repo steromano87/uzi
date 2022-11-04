@@ -1,182 +1,183 @@
 package injector
 
+//go:generate sh -c "protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative *.proto"
+
 import (
 	"context"
-	semver "github.com/hashicorp/go-version"
 	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/configuration"
 	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/steromano87/harkonnen/v1/pkg/utils"
 	"github.com/steromano87/harkonnen/v1/pkg/version"
 	"github.com/steromano87/harkonnen/v1/pkg/workingfolder"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"os"
 	"path/filepath"
 )
 
 type Injector struct {
-	ctx        Context
+	UnimplementedInjectorServer
+
+	mainCtx         context.Context
+	childCtx        context.Context
+	childCancelFunc context.CancelFunc
+
 	dispatcher RunnerDispatcher
 
-	hostMetricsSender           *telemetry.HostMetricsSender
-	hostMetricsSenderCancelFunc context.CancelFunc
+	configuration *configuration.Configuration
+	logger        *zerolog.Logger
 
-	status string
+	telemetryServer *telemetry.Server
+
+	status InjectorStatus_Status
 
 	workingFolder string
 }
 
-func New(ctx Context) (*Injector, error) {
+func New(parentCtx context.Context, logger *zerolog.Logger) (*Injector, error) {
 	inj := new(Injector)
-	inj.ctx = ctx
-	inj.status = StatusDisconnected
+	inj.mainCtx = parentCtx
+	inj.childCtx, inj.childCancelFunc = context.WithCancel(parentCtx)
+	inj.configuration, _ = configuration.NewDefault()
+	inj.telemetryServer = telemetry.NewServer()
+
+	contextualizedLogger := logger.With().Str("component", "injector").Logger()
+	inj.logger = &contextualizedLogger
 
 	err := inj.initWorkingFolder()
 	if err != nil {
 		return nil, err
 	}
-
-	go inj.handleIncomingMessages()
+	inj.status = InjectorStatus_READY
 
 	return inj, nil
 }
 
+func (i *Injector) Handshake(_ context.Context, request *HandshakeRequest) (*HandshakeResponse, error) {
+	i.contextLogger().Info().Str("cockpitVersion", request.GetCockpitVersion()).Msg("Received handshake message")
+	return &HandshakeResponse{
+		InjectorVersion: version.Version,
+	}, nil
+}
+
+func (i *Injector) Heartbeat(Injector_HeartbeatServer) error {
+	return status.Errorf(codes.Unimplemented, "method Heartbeat not implemented")
+}
+
+func (i *Injector) Initialize(_ context.Context, request *InitializationRequest) (*InjectorStatus, error) {
+	i.contextLogger().Info().Msg("Received initialization request")
+
+	compressedWorkingFolder := request.GetWorkingFolder().GetCompressedWorkingFolder()
+	err := i.initializeWorkingFolder(compressedWorkingFolder)
+	if err != nil {
+		errorDescription := "Encountered an error during working folder initialization"
+		i.contextLogger().Error().Err(err).Msg(errorDescription)
+		return nil, status.Errorf(codes.Unknown, "%s: %s", errorDescription, err)
+	}
+
+	// Initialize all components
+	i.startHostMetricsCollector()
+	previousStatus := i.status
+	i.status = InjectorStatus_INITIALIZED
+
+	return &InjectorStatus{
+		Current:  i.status,
+		Previous: &previousStatus,
+	}, nil
+}
+
+func (i *Injector) initializeWorkingFolder(compressedWorkingFolder []byte) error {
+	i.contextLogger().Debug().Msg("Unzipping working folder...")
+	err := utils.UnzipFolder(compressedWorkingFolder, i.workingFolder)
+	if err != nil {
+		return nil
+	}
+	i.contextLogger().Info().Msg("Working folder successfully unzipped")
+
+	i.contextLogger().Debug().Msg("Reading configuration from working folder...")
+	err = i.configuration.Read(filepath.Join(i.workingFolder, workingfolder.ConfigurationFile))
+	if err != nil {
+		return nil
+	}
+	i.contextLogger().Info().Msg("Configuration successfully parsed")
+
+	return nil
+}
+
+func (i *Injector) startHostMetricsCollector() {
+	i.contextLogger().Info().Msg("Starting host metrics collector")
+	i.telemetryServer.StartHostMetricsCollection(
+		i.childCtx,
+		i.configuration.Telemetry.HostMetrics.PollInterval,
+		i.configuration.Telemetry.HostMetrics.MeasureInterval,
+	)
+	i.contextLogger().Info().Dur(
+		"pollInterval", i.configuration.Telemetry.HostMetrics.PollInterval,
+	).Dur(
+		"measureInterval", i.configuration.Telemetry.HostMetrics.MeasureInterval,
+	).Msg("Host metrics collector started")
+}
+
+func (i *Injector) SetRunnersQuota(_ context.Context, quota *RunnersQuota) (*InjectorStatus, error) {
+	newRunnerQuota := quota.GetQuota()
+
+	i.contextLogger().Info().Uint64("newQuota", newRunnerQuota).Msg("Received runners quota update request")
+
+	// Set status according to quota variation
+	previousStatus := i.status
+	if i.status == InjectorStatus_INITIALIZED && newRunnerQuota > 0 {
+		i.status = InjectorStatus_RUNNING
+	}
+
+	return &InjectorStatus{
+		Current:  i.status,
+		Previous: &previousStatus,
+	}, nil
+}
+
+func (i *Injector) GetRunnersStatus(ctx context.Context, request *RunnersStatusRequest) (*RunnersStatus, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (i *Injector) GetInjectorStatus(ctx context.Context, request *InjectorStatusRequest) (*InjectorStatus, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (i *Injector) Shutdown(_ context.Context, request *ShutdownRequest) (*InjectorStatus, error) {
+	i.contextLogger().Info().Bool("forcedShutdown", request.GetForced()).Msg("Received shutdown request")
+
+	previousStatus := i.status
+	if request.GetForced() {
+		i.dispatcher.ForcedShutdown()
+		i.status = InjectorStatus_FORCEFULLY_STOPPING
+	} else {
+		i.dispatcher.GracefulShutdown()
+		i.status = InjectorStatus_GRACEFULLY_STOPPING
+	}
+
+	return &InjectorStatus{
+		Current:  i.status,
+		Previous: &previousStatus,
+	}, nil
+}
+
 func (i *Injector) Stop() {
 	i.cleanWorkingFolder()
-	i.stopAdditionalComponents()
-	i.status = StatusStopped
+	i.childCancelFunc()
+	i.status = InjectorStatus_STOPPED
 	i.contextLogger().Info().Msg("Injector stopped")
 }
 
-func (i *Injector) Status() string {
+func (i *Injector) Status() InjectorStatus_Status {
 	return i.status
 }
 
 func (i *Injector) WorkingFolder() string {
 	return i.workingFolder
-}
-
-func (i *Injector) handleIncomingMessages() {
-	for {
-		select {
-		case <-i.ctx.Context.Done():
-			i.contextLogger().Info().Msg("Context canceled, exiting incoming message handling loop")
-			i.Stop()
-
-		case incomingMessage := <-i.ctx.MessageBridge.Receive():
-			switch incomingMessage.GetPayload().(type) {
-			case *message.Envelope_Hello:
-				i.handleHelloMessage(incomingMessage)
-
-			case *message.Envelope_Ping:
-				i.handlePingMessage(incomingMessage)
-
-			case *message.Envelope_WorkingFolderInit:
-				i.handleWorkingFolderInitEvent(incomingMessage)
-
-			case *message.Envelope_RunnersQuotaUpdate:
-				i.handleRunnerQuotaUpdateEvent(incomingMessage)
-
-			case *message.Envelope_GracefulShutdownRequest:
-				i.handleGracefulShutdownRequest(incomingMessage)
-
-			case *message.Envelope_ForcedShutdownRequest:
-				i.handleForcedShutdownRequest(incomingMessage)
-
-			default:
-				i.ctx.Logger().Warn().Msg("Received unknown message type")
-			}
-		}
-	}
-}
-
-func (i *Injector) handleHelloMessage(msg *message.Envelope) {
-	i.contextLogger().Info().Str("msgID", msg.GetId()).Msg("Received hello message")
-
-	injectorVersion, _ := semver.NewVersion(version.Version)
-	harkonnenVersion, err := semver.NewVersion(msg.GetHello().GetHarkonnenVersion())
-
-	if err != nil {
-		errorDescription := "Invalid cockpit version provided, cannot check for version matching"
-		i.contextLogger().Error().Str("msgID", msg.GetId()).Err(err).Str(
-			"cockpitVersion", msg.GetHello().GetHarkonnenVersion(),
-		).Msg(errorDescription)
-		i.ctx.MessageBridge.Send(message.NewErrorAcknowledgeEnvelope(msg.GetId(), errorDescription, err))
-		return
-	}
-
-	if !harkonnenVersion.Equal(injectorVersion) {
-		errorDescription := "Cockpit and injector versions mismatch"
-		i.contextLogger().Error().Str("msgID", msg.GetId()).Str(
-			"cockpitVersion", msg.GetHello().GetHarkonnenVersion(),
-		).Str(
-			"injectorVersion", version.Version,
-		).Msg(
-			errorDescription,
-		)
-		i.ctx.MessageBridge.Send(message.NewErrorAcknowledgeEnvelope(msg.GetId(), errorDescription, nil))
-		return
-	}
-
-	i.contextLogger().Info().Str("msgID", msg.GetId()).Str(
-		"cockpitVersion", msg.GetHello().GetHarkonnenVersion(),
-	).Str(
-		"injectorVersion", version.Version,
-	).Msg(
-		"Cockpit and injector versions match, allowing connection from remote cockpit",
-	)
-
-	i.status = StatusConnected
-	i.ctx.MessageBridge.Send(message.NewStatusChangeAcknowledgeEnvelope(msg.GetId(), i.status))
-}
-
-func (i *Injector) handlePingMessage(msg *message.Envelope) {
-	i.contextLogger().Debug().Str("msgID", msg.GetId()).Msg("Received ping message")
-	i.ctx.MessageBridge.SendPong(msg.GetId())
-	i.contextLogger().Debug().Str("msgID", msg.GetId()).Msg("Answered with pong message")
-}
-
-func (i *Injector) handleWorkingFolderInitEvent(msg *message.Envelope) {
-	i.contextLogger().Info().Str("msgID", msg.GetId()).Msg("Received compressed working folder, unzipping...")
-
-	compressedWorkingFolder := msg.GetWorkingFolderInit().GetCompressedWorkingFolder()
-
-	err := utils.UnzipFolder(compressedWorkingFolder, i.workingFolder)
-	if err != nil {
-		errorDescription := "Encountered an error when unzipping compressed folder content"
-		i.contextLogger().Error().Str("msgID", msg.GetId()).Err(err).Msg(errorDescription)
-		i.ctx.MessageBridge.Send(message.NewErrorAcknowledgeEnvelope(msg.GetId(), errorDescription, err))
-		return
-	}
-
-	i.contextLogger().Info().Str("msgID", msg.GetId()).Str(
-		"workingFolderPath", i.workingFolder,
-	).Msg("Successfully initialized working folder")
-
-	err = i.parseConfigurationFromWorkingFolder()
-	if err != nil {
-		errorDescription := "Cannot parse configuration from provided working folder"
-		i.contextLogger().Error().Str("msgID", msg.GetId()).Err(err).Msg(errorDescription)
-		i.ctx.MessageBridge.Send(message.NewErrorAcknowledgeEnvelope(msg.GetId(), errorDescription, err))
-		return
-	}
-
-	i.contextLogger().Info().Str("msgID", msg.GetId()).Msg("Successfully parsed configuration from working folder")
-	i.startAdditionalComponents()
-	i.status = StatusInitialized
-	i.ctx.MessageBridge.Send(message.NewStatusChangeAcknowledgeEnvelope(msg.GetId(), i.status))
-}
-
-func (i *Injector) handleRunnerQuotaUpdateEvent(msg *message.Envelope) {
-	newRunnerQuota := msg.GetRunnersQuotaUpdate().GetRunnersQuota()
-
-	i.contextLogger().Info().Str("msgID", msg.GetId()).Uint64("newQuota", newRunnerQuota).Msg(
-		"Received runners quota update message")
-
-	if i.status == StatusInitialized {
-		i.status = StatusRunning
-		i.ctx.MessageBridge.Send(message.NewStatusChangeAcknowledgeEnvelope(msg.GetId(), i.status))
-	}
-	i.ctx.MessageBridge.Send(message.NewPositiveAcknowledgeEnvelope(msg.GetId()))
 }
 
 func (i *Injector) handleGracefulShutdownRequest(msg *message.Envelope) {
@@ -207,31 +208,7 @@ func (i *Injector) cleanWorkingFolder() {
 	}
 }
 
-func (i *Injector) startAdditionalComponents() {
-	if i.ctx.config.Telemetry.HostMetrics.Enabled {
-		i.hostMetricsSender = telemetry.NewHostMetricsSender(i.ctx.MessageBridge)
-		metricsCtx, metricsCancelFunc := context.WithCancel(i.ctx.Context)
-		i.hostMetricsSenderCancelFunc = metricsCancelFunc
-
-		i.hostMetricsSender.Start(
-			metricsCtx,
-			i.ctx.config.Telemetry.HostMetrics.PollInterval,
-			i.ctx.config.Telemetry.HostMetrics.MeasureInterval,
-		)
-	}
-}
-
-func (i *Injector) stopAdditionalComponents() {
-	if i.hostMetricsSender != nil {
-		i.hostMetricsSenderCancelFunc()
-	}
-}
-
-func (i *Injector) parseConfigurationFromWorkingFolder() error {
-	return i.ctx.config.Read(filepath.Join(i.workingFolder, workingfolder.ConfigurationFile))
-}
-
 func (i *Injector) contextLogger() *zerolog.Logger {
-	logger := i.ctx.Logger().With().Str("component", "injector").Logger()
+	logger := i.logger.With().Str("component", "injector").Logger()
 	return &logger
 }

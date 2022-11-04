@@ -3,7 +3,6 @@ package telemetry_test
 import (
 	"context"
 	"github.com/steromano87/harkonnen/v1/pkg/message"
-	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"testing"
@@ -21,12 +20,12 @@ func (s *HostMetricsCollectorTestSuite) SetupTest() {
 }
 
 func (s *HostMetricsCollectorTestSuite) TestNewHostMetricsCollector() {
-	collector := telemetry.NewHostMetricsSender(s.minionMessenger)
-	assert.IsType(s.T(), &telemetry.HostMetricsSender{}, collector)
+	collector := NewHostMetricsSender(s.minionMessenger)
+	assert.IsType(s.T(), &HostMetricsSender{}, collector)
 }
 
 func (s *HostMetricsCollectorTestSuite) TestMetricsCollection() {
-	collector := telemetry.NewHostMetricsSender(s.minionMessenger)
+	collector := NewHostMetricsSender(s.minionMessenger)
 	ctx, cancelFunc := context.WithCancel(context.TODO())
 
 	pollingInterval := 250 * time.Millisecond

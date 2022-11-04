@@ -43,6 +43,5 @@ client:
 
 telemetry:
   hostMetrics:
-    enabled: true
     pollInterval: 15s
     measureInterval: 250ms

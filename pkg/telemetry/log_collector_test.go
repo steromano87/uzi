@@ -1,44 +1,58 @@
 package telemetry_test
 
 import (
-	"context"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/message"
-	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"io"
 	"testing"
+	"time"
 )
 
-type LogCollectorTestSuite struct {
+type LogSenderTestSuite struct {
 	suite.Suite
-	ctx             context.Context
 	bossMessenger   message.Bridge
 	minionMessenger message.Bridge
-	dbAdapter       *db.Adapter
 }
 
-func (s *LogCollectorTestSuite) SetupTest() {
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMicro
+func (l *LogSenderTestSuite) SetupTest() {
+	zerolog.TimeFieldFormat = time.RFC3339Nano
 
-	s.ctx = context.TODO()
-	s.bossMessenger, s.minionMessenger = message.NewChannelBridgePair(100)
-	s.dbAdapter = db.NewAdapter(db.SQLite, db.SQLiteDSNForInMemoryDB)
-	_ = s.dbAdapter.Connect(s.ctx)
+	l.bossMessenger, l.minionMessenger = message.NewChannelBridgePair(100)
 }
 
-func (s *LogCollectorTestSuite) TestNewLogCollector() {
-	collector := telemetry.NewLogCollector("myInjector", s.dbAdapter)
+func (l *LogSenderTestSuite) TestNewLogSender() {
+	dispatcher := NewLogSender(l.minionMessenger, 10)
 
-	assert.IsType(s.T(), telemetry.LogCollector{}, collector)
+	if assert.IsType(l.T(), &LogSender{}, dispatcher) {
+		assert.Implements(l.T(), (*io.Writer)(nil), dispatcher)
+	}
 }
 
-func (s *LogCollectorTestSuite) TestCollectMultipleLogs() {
-	collector := telemetry.NewLogCollector("myInjector", s.dbAdapter)
+func (l *LogSenderTestSuite) TestWriteLogBelowBufferLimit() {
+	dispatcher := NewLogSender(l.minionMessenger, 10)
+	logger := zerolog.New(dispatcher)
+	logger.Info().Msg("my first log")
+	logger.Info().Msg("my second log")
 
-	dispatcher := telemetry.NewLogSender(s.minionMessenger, 10)
-	logger := zerolog.New(dispatcher).With().Timestamp().Logger()
+	// Check that no message was actually sent
+	var noValue bool
+
+	select {
+	case <-l.bossMessenger.Receive():
+		noValue = false
+
+	default:
+		noValue = true
+	}
+
+	assert.True(l.T(), noValue)
+}
+
+func (l *LogSenderTestSuite) TestWriteLogWithManualFlush() {
+	dispatcher := NewLogSender(l.minionMessenger, 10)
+	logger := zerolog.New(dispatcher)
 	logger.Info().Msg("my first log")
 	logger.Info().Msg("my second log")
 
@@ -46,31 +60,57 @@ func (s *LogCollectorTestSuite) TestCollectMultipleLogs() {
 	var msg *message.Envelope
 
 	select {
-	case msg = <-s.bossMessenger.Receive():
+	case msg = <-l.bossMessenger.Receive():
 
 	default:
-		assert.Fail(s.T(), "no msg was sent")
+		assert.Fail(l.T(), "no msg was sent")
 	}
 
-	payload := msg.GetLogs()
-	if assert.NotNil(s.T(), payload) {
-		err := collector.Collect(payload)
-		if assert.NoError(s.T(), err) {
-			var logs []db.Log
-			s.dbAdapter.Find(&logs)
+	if assert.IsType(l.T(), &message.Envelope{}, msg) {
+		payload := msg.GetLogs()
 
-			if assert.Len(s.T(), logs, 2) {
-				assert.Equal(s.T(), logs[0].Level, "info")
-				assert.Equal(s.T(), logs[0].Message, "my first log")
-
-				assert.Equal(s.T(), logs[1].Level, "info")
-				assert.Equal(s.T(), logs[1].Message, "my second log")
+		if assert.NotNil(l.T(), payload) {
+			if assert.IsType(l.T(), &message.Logs{}, payload) {
+				logLines := payload.GetLog()
+				if assert.Len(l.T(), logLines, 2) {
+					assert.Contains(l.T(), string(logLines[0]), "my first log")
+					assert.Contains(l.T(), string(logLines[1]), "my second log")
+				}
 			}
-
 		}
 	}
 }
 
-func TestLogCollectorTestSuite(t *testing.T) {
-	suite.Run(t, new(LogCollectorTestSuite))
+func (l *LogSenderTestSuite) TestWriteLogWithAutomaticFlush() {
+	dispatcher := NewLogSender(l.minionMessenger, 2)
+	logger := zerolog.New(dispatcher)
+	logger.Info().Msg("my first log")
+	logger.Info().Msg("my second log")
+
+	var msg *message.Envelope
+
+	select {
+	case msg = <-l.bossMessenger.Receive():
+
+	default:
+		assert.Fail(l.T(), "no msg was sent")
+	}
+
+	if assert.IsType(l.T(), &message.Envelope{}, msg) {
+		payload := msg.GetLogs()
+
+		if assert.NotNil(l.T(), payload) {
+			if assert.IsType(l.T(), &message.Logs{}, payload) {
+				logLines := payload.GetLog()
+				if assert.Len(l.T(), logLines, 2) {
+					assert.Contains(l.T(), string(logLines[0]), "my first log")
+					assert.Contains(l.T(), string(logLines[1]), "my second log")
+				}
+			}
+		}
+	}
+}
+
+func TestLogSenderTestSuite(t *testing.T) {
+	suite.Run(t, new(LogSenderTestSuite))
 }

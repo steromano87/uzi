@@ -6,24 +6,25 @@ import (
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/net"
-	"github.com/steromano87/harkonnen/v1/pkg/message"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"runtime"
+	"sync"
 	"time"
 )
 
-type HostMetricsSender struct {
-	ctx       context.Context
-	messenger message.Bridge
+type HostMetricsCollector struct {
+	metrics []*HostMetrics
+	mu      sync.Mutex
 }
 
-func NewHostMetricsSender(messenger message.Bridge) *HostMetricsSender {
-	mc := new(HostMetricsSender)
-	mc.messenger = messenger
+func NewHostMetricsCollector() *HostMetricsCollector {
+	mc := new(HostMetricsCollector)
+	mc.metrics = make([]*HostMetrics, 0)
 
 	return mc
 }
 
-func (p HostMetricsSender) Start(ctx context.Context, pollInterval time.Duration, measureInterval time.Duration) {
+func (c *HostMetricsCollector) StartHostMetricsCollection(ctx context.Context, pollInterval time.Duration, measureInterval time.Duration) {
 	ticker := time.NewTicker(pollInterval)
 
 	go func() {
@@ -34,7 +35,7 @@ func (p HostMetricsSender) Start(ctx context.Context, pollInterval time.Duration
 				return
 
 			case <-ticker.C:
-				err := p.gatherMetrics(ctx, measureInterval)
+				err := c.gatherMetrics(ctx, measureInterval)
 				if err != nil {
 					continue
 				}
@@ -43,7 +44,7 @@ func (p HostMetricsSender) Start(ctx context.Context, pollInterval time.Duration
 	}()
 }
 
-func (p HostMetricsSender) gatherMetrics(ctx context.Context, measureInterval time.Duration) error {
+func (c *HostMetricsCollector) gatherMetrics(ctx context.Context, measureInterval time.Duration) error {
 	cpuPercent, err := cpu.PercentWithContext(ctx, measureInterval, false)
 	if err != nil {
 		return err
@@ -54,7 +55,7 @@ func (p HostMetricsSender) gatherMetrics(ctx context.Context, measureInterval ti
 		return err
 	}
 
-	diskUsage, err := disk.UsageWithContext(ctx, p.getRootDir())
+	diskUsage, err := disk.UsageWithContext(ctx, c.getRootDir())
 	if err != nil {
 		return err
 	}
@@ -69,28 +70,41 @@ func (p HostMetricsSender) gatherMetrics(ctx context.Context, measureInterval ti
 		return err
 	}
 
-	payload := message.Envelope_HostMetrics{HostMetrics: &message.HostMetrics{
-		Cpu: cpuPercent[0],
-		Memory: &message.HostMetrics_Memory{
+	metrics := HostMetrics{
+		Timestamp: timestamppb.Now(),
+		Cpu:       cpuPercent[0],
+		Memory: &HostMetrics_Memory{
 			Total: memUsage.Total,
 			Used:  memUsage.Used,
 		},
-		Storage: &message.HostMetrics_Storage{
+		Storage: &HostMetrics_Storage{
 			Total: diskUsage.Total,
 			Used:  diskUsage.Used,
 		},
-		Network: &message.HostMetrics_Network{
+		Network: &HostMetrics_Network{
 			UpSpeed:   float64(netUsageAfter[0].BytesSent-netUsageBefore[0].BytesSent) / measureInterval.Seconds(),
 			DownSpeed: float64(netUsageAfter[0].BytesRecv-netUsageBefore[0].BytesRecv) / measureInterval.Seconds(),
 		},
-	}}
+	}
 
-	msg := message.NewEnvelope(&payload)
-	p.messenger.Send(msg)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.metrics = append(c.metrics, &metrics)
+
 	return nil
 }
 
-func (p HostMetricsSender) getRootDir() string {
+func (c *HostMetricsCollector) GetHostMetrics() []*HostMetrics {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	var output []*HostMetrics
+	copy(output, c.metrics)
+	c.metrics = make([]*HostMetrics, 0)
+	return output
+}
+
+func (c *HostMetricsCollector) getRootDir() string {
 	switch runtime.GOOS {
 	case "windows":
 		return "C:\\"

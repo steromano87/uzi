@@ -2,7 +2,6 @@ package telemetry_test
 
 import (
 	"github.com/steromano87/harkonnen/v1/pkg/message"
-	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"testing"
@@ -19,15 +18,15 @@ func (s *SampleSenderTestSuite) SetupTest() {
 }
 
 func (s *SampleSenderTestSuite) TestNewSampleSender() {
-	sender := telemetry.NewSampleSender(s.minionMessenger, 10)
+	sender := NewSampleSender(s.minionMessenger, 10)
 
-	assert.IsType(s.T(), &telemetry.SampleSender{}, sender)
+	assert.IsType(s.T(), &SampleSender{}, sender)
 }
 
 func (s *SampleSenderTestSuite) TestCollectBelowBufferLimit() {
 	sample := &message.Sample{}
 
-	sender := telemetry.NewSampleSender(s.minionMessenger, 10)
+	sender := NewSampleSender(s.minionMessenger, 10)
 	sender.Collect(sample)
 	sender.Collect(sample)
 
@@ -48,7 +47,7 @@ func (s *SampleSenderTestSuite) TestCollectBelowBufferLimit() {
 func (s *SampleSenderTestSuite) TestSampleSendingWithManualFlush() {
 	sample := &message.Sample{}
 
-	sender := telemetry.NewSampleSender(s.minionMessenger, 10)
+	sender := NewSampleSender(s.minionMessenger, 10)
 	sender.Collect(sample)
 	sender.Collect(sample)
 
@@ -75,7 +74,7 @@ func (s *SampleSenderTestSuite) TestSampleSendingWithManualFlush() {
 func (s *SampleSenderTestSuite) TestSampleSendingWithAutomaticFlush() {
 	sample := &message.Sample{}
 
-	sender := telemetry.NewSampleSender(s.minionMessenger, 2)
+	sender := NewSampleSender(s.minionMessenger, 2)
 	sender.Collect(sample)
 	sender.Collect(sample)
 

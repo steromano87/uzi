@@ -1,10 +1,11 @@
-package pipeline_test
+package injector_test
 
 import (
 	"context"
 	"github.com/Flaque/filet"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/configuration"
+	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +22,7 @@ type RunnerTestSuite struct {
 	ctx                  *pipeline.Context
 	cancelFunc           context.CancelFunc
 	messenger            message.Bridge
-	iterCounter          *pipeline.IterationsCounter
+	iterCounter          *injector.IterationsCounter
 }
 
 func (s *RunnerTestSuite) SetupTest() {
@@ -31,7 +32,7 @@ func (s *RunnerTestSuite) SetupTest() {
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
 
 	s.messenger, _ = message.NewChannelBridgePair(1)
-	s.iterCounter = pipeline.NewIterationsCounter()
+	s.iterCounter = injector.NewIterationsCounter()
 
 	s.backgroundCtx = context.TODO()
 	newCtx, cancelFunc := context.WithCancel(s.backgroundCtx)
@@ -71,12 +72,12 @@ teardown {
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
 	s.ctx.IterationsCounter().SetMaxIterations(3)
-	runner := pipeline.NewRunner(s.ctx)
+	runner := injector.NewRunner(s.ctx)
 	waitGroup.Add(1)
 	runner.Start(&waitGroup, decodedPipeline)
 	waitGroup.Wait()
 
-	if assert.Equal(s.T(), pipeline.Completed, s.ctx.Status()) {
+	if assert.Equal(s.T(), injector.Completed, s.ctx.Status()) {
 		assert.EqualValues(s.T(), 3, s.ctx.IterationsCounter().CompletedIterations())
 		assert.EqualValues(s.T(), 3, s.ctx.IterationsCounter().PassedIterations())
 	}
@@ -112,7 +113,7 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	runner := pipeline.NewRunner(s.ctx)
+	runner := injector.NewRunner(s.ctx)
 	s.ctx.IterationsCounter().SetMaxIterations(9999)
 	waitGroup.Add(1)
 	runner.Start(&waitGroup, decodedPipeline)
@@ -121,7 +122,7 @@ teardown {
 	s.ctx.SchedulePlannedShutdown()
 	waitGroup.Wait()
 
-	if assert.Equal(s.T(), pipeline.Completed, s.ctx.Status()) {
+	if assert.Equal(s.T(), injector.Completed, s.ctx.Status()) {
 		assert.Less(s.T(), s.ctx.IterationsCounter().CompletedIterations(), uint64(9999))
 		assert.Equal(s.T(), s.ctx.IterationsCounter().CompletedIterations(), s.ctx.IterationsCounter().PassedIterations())
 	}
@@ -157,7 +158,7 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	runner := pipeline.NewRunner(s.ctx)
+	runner := injector.NewRunner(s.ctx)
 	s.ctx.IterationsCounter().SetMaxIterations(9999)
 	waitGroup.Add(1)
 	runner.Start(&waitGroup, decodedPipeline)
@@ -166,7 +167,7 @@ teardown {
 	s.ctx.ScheduleGracefulShutdown()
 	waitGroup.Wait()
 
-	if assert.Equal(s.T(), pipeline.Stopped, s.ctx.Status()) {
+	if assert.Equal(s.T(), injector.Stopped, s.ctx.Status()) {
 		assert.Less(s.T(), s.ctx.IterationsCounter().CompletedIterations(), uint64(9999))
 		assert.Equal(s.T(), s.ctx.IterationsCounter().CompletedIterations(), s.ctx.IterationsCounter().PassedIterations())
 	}
@@ -202,7 +203,7 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	runner := pipeline.NewRunner(s.ctx)
+	runner := injector.NewRunner(s.ctx)
 	s.ctx.IterationsCounter().SetMaxIterations(9999)
 	waitGroup.Add(1)
 	runner.Start(&waitGroup, decodedPipeline)
@@ -211,7 +212,7 @@ teardown {
 	s.cancelFunc()
 	waitGroup.Wait()
 
-	if assert.Equal(s.T(), pipeline.ForcefullyStopped, s.ctx.Status()) {
+	if assert.Equal(s.T(), injector.ForcefullyStopped, s.ctx.Status()) {
 		assert.Less(s.T(), s.ctx.IterationsCounter().CompletedIterations(), uint64(9999))
 		assert.Equal(s.T(), s.ctx.IterationsCounter().CompletedIterations(), s.ctx.IterationsCounter().PassedIterations())
 	}
@@ -247,7 +248,7 @@ teardown {
 	waitGroup := sync.WaitGroup{}
 
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-	runner := pipeline.NewRunner(s.ctx)
+	runner := injector.NewRunner(s.ctx)
 	s.ctx.IterationsCounter().SetMaxIterations(9999)
 	waitGroup.Add(1)
 	runner.Start(&waitGroup, decodedPipeline)
@@ -256,7 +257,7 @@ teardown {
 	s.backGroundCancelFunc()
 	waitGroup.Wait()
 
-	if assert.Equal(s.T(), pipeline.ForcefullyStopped, s.ctx.Status()) {
+	if assert.Equal(s.T(), injector.ForcefullyStopped, s.ctx.Status()) {
 		assert.Less(s.T(), s.ctx.IterationsCounter().CompletedIterations(), uint64(9999))
 		assert.Equal(s.T(), s.ctx.IterationsCounter().CompletedIterations(), s.ctx.IterationsCounter().PassedIterations())
 	}

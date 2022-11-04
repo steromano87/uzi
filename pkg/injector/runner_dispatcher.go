@@ -3,6 +3,8 @@ package injector
 import (
 	"context"
 	"errors"
+	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/configuration"
 	"github.com/steromano87/harkonnen/v1/pkg/pipeline"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 	"sync"
@@ -10,13 +12,15 @@ import (
 )
 
 type RunnerDispatcher struct {
-	ctx Context
+	ctx           context.Context
+	configuration *configuration.Configuration
+	logger        *zerolog.Logger
 
 	templatePipeline  pipeline.Pipeline
 	pipelineVariables *variables.Holder
 	runners           []runnerHolder
 
-	iterationsCounter *pipeline.IterationsCounter
+	iterationsCounter *IterationsCounter
 	scheduledRunners  int
 	startedRunners    int
 	runnersWaitGroup  sync.WaitGroup
@@ -24,17 +28,23 @@ type RunnerDispatcher struct {
 
 type runnerHolder struct {
 	ctx        *pipeline.Context
-	runner     *pipeline.Runner
+	runner     *RunnerOld
 	cancelFunc context.CancelFunc
 }
 
-func NewRunnerDispatcher(ctx Context) *RunnerDispatcher {
+func NewRunnerDispatcher(ctx context.Context, logger *zerolog.Logger, config *configuration.Configuration, varHolder *variables.Holder) *RunnerDispatcher {
 	dispatcher := new(RunnerDispatcher)
 	dispatcher.ctx = ctx
-	dispatcher.iterationsCounter = pipeline.NewIterationsCounter()
-	dispatcher.pipelineVariables = variables.NewHolder()
+	dispatcher.logger = logger
+	dispatcher.configuration = config
+	dispatcher.iterationsCounter = NewIterationsCounter()
+	dispatcher.pipelineVariables = varHolder
 	dispatcher.Reset()
 	return dispatcher
+}
+
+func (d *RunnerDispatcher) UpdateIterVars(vars map[string]any) {
+	d.pipelineVariables.UpdateIterVars(vars)
 }
 
 func (d *RunnerDispatcher) Prepare(referencePipeline pipeline.Pipeline, instances int, maxIterations uint64) error {
@@ -42,8 +52,8 @@ func (d *RunnerDispatcher) Prepare(referencePipeline pipeline.Pipeline, instance
 	d.iterationsCounter.SetMaxIterations(maxIterations)
 
 	for i := 0; i < instances; i++ {
-		pipContext, pipCancelFunc := pipeline.NewContext(d.ctx.Context, d.ctx.config, d.ctx.Logger(), d.ctx.MessageBridge, d.iterationsCounter)
-		currentRunner := pipeline.NewRunner(pipContext)
+		pipContext, pipCancelFunc := pipeline.NewContext(d.ctx, d.configuration, d.logger, d.ctx.MessageBridge, d.iterationsCounter)
+		currentRunner := NewRunner(pipContext)
 
 		d.runners = append(d.runners, runnerHolder{
 			ctx:        pipContext,
@@ -99,7 +109,7 @@ func (d *RunnerDispatcher) ForcedShutdown() {
 	}
 }
 
-func (d *RunnerDispatcher) IterationsCounter() *pipeline.IterationsCounter {
+func (d *RunnerDispatcher) IterationsCounter() *IterationsCounter {
 	return d.iterationsCounter
 }
 
@@ -111,28 +121,28 @@ func (d *RunnerDispatcher) Stats() RunnerStats {
 
 	for _, currentRunner := range d.runners {
 		switch currentRunner.ctx.Status() {
-		case pipeline.Ready:
+		case Ready:
 			stats.Ready++
 
-		case pipeline.Running:
+		case Running:
 			stats.Running++
 
-		case pipeline.Completed:
+		case Completed:
 			stats.Completed++
 
-		case pipeline.GracefullyShuttingDown:
+		case GracefullyShuttingDown:
 			stats.GracefullyShuttingDown++
 
-		case pipeline.Stopped:
+		case Stopped:
 			stats.Stopped++
 
-		case pipeline.ForcefullyShuttingDown:
+		case ForcefullyShuttingDown:
 			stats.ForcefullyShuttingDown++
 
-		case pipeline.ForcefullyStopped:
+		case ForcefullyStopped:
 			stats.ForcefullyStopped++
 
-		case pipeline.Error:
+		case Error:
 			stats.Error++
 		}
 	}
@@ -150,7 +160,7 @@ func (d *RunnerDispatcher) startPipeline(index int) error {
 	d.runners[index].runner.Start(&d.runnersWaitGroup, d.templatePipeline)
 
 	// Wait for the runner to be started before returning
-	for d.runners[index].ctx.Status() == pipeline.Ready {
+	for d.runners[index].ctx.Status() == Ready {
 		time.Sleep(time.Microsecond)
 	}
 
@@ -161,7 +171,7 @@ func (d *RunnerDispatcher) stopPipeline(index int) error {
 	run := d.runners[index]
 	run.ctx.SchedulePlannedShutdown()
 
-	for run.ctx.Status() == pipeline.Running {
+	for run.ctx.Status() == Running {
 		time.Sleep(time.Microsecond)
 	}
 
@@ -170,7 +180,7 @@ func (d *RunnerDispatcher) stopPipeline(index int) error {
 
 func (d *RunnerDispatcher) firstReadyRunnerIndex() (int, error) {
 	for index, run := range d.runners {
-		if run.ctx.Status() == pipeline.Ready {
+		if run.ctx.Status() == Ready {
 			return index, nil
 		}
 	}
@@ -180,7 +190,7 @@ func (d *RunnerDispatcher) firstReadyRunnerIndex() (int, error) {
 
 func (d *RunnerDispatcher) firstRunningRunnerIndex() (int, error) {
 	for index, run := range d.runners {
-		if run.ctx.Status() == pipeline.Running {
+		if run.ctx.Status() == Running {
 			return index, nil
 		}
 	}

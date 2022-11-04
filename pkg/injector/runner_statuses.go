@@ -1,4 +1,4 @@
-package pipeline
+package injector
 
 const (
 	Ready   = "READY"

@@ -1,0 +1,99 @@
+syntax = "proto3";
+package telemetry;
+option go_package = "github.com/steromano87/harkonnen/v1/pkg/telemetry";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+service Telemetry {
+  rpc GetSamples(SampleRequest) returns (stream Sample) {}
+  rpc GetLogs(LogRequest) returns (stream Log) {}
+  rpc GetIterationCounters(IterationCountersRequest) returns (IterationCounters) {}
+  rpc GetTransactions(TransactionRequest) returns (stream Transaction) {}
+  rpc GetHostMetrics(HostMetricsRequest) returns (stream HostMetrics) {}
+}
+
+//////////////////////////////////////////
+
+message SampleRequest {}
+
+message Sample {
+  google.protobuf.Timestamp timestamp = 1;
+  google.protobuf.Duration duration = 2;
+
+  string name = 3;
+  uint64 sent_bytes = 4;
+  uint64 received_bytes = 5;
+
+  oneof sample_data {
+    Rest rest = 100;
+  }
+
+  message Rest {
+    string url = 1;
+    string query_string = 2;
+    string method = 3;
+    bool is_redirect = 4;
+    string final_url = 5;
+  }
+}
+
+//////////////////////////////////////////
+
+message LogRequest {}
+
+message Log {
+  bytes entry = 1;
+}
+
+
+//////////////////////////////////////////
+
+message IterationCountersRequest {}
+
+message IterationCounters {
+  uint64 completed = 1;
+  uint64 in_progress = 2;
+  uint64 passed = 3;
+  uint64 failed = 4;
+}
+
+//////////////////////////////////////////
+
+message TransactionRequest {}
+
+message Transaction {
+  string name = 1;
+  google.protobuf.Timestamp start = 2;
+  google.protobuf.Timestamp end = 3;
+  google.protobuf.Duration duration = 4;
+  bool successful = 5;
+}
+
+//////////////////////////////////////////
+
+message HostMetricsRequest {}
+
+message HostMetrics {
+  google.protobuf.Timestamp timestamp = 1;
+  double cpu = 2;
+  Memory memory = 3;
+  Storage storage = 4;
+  Network network = 5;
+
+
+  message Memory {
+    uint64 total = 1;
+    uint64 used = 2;
+  }
+
+  message Storage {
+    uint64 total = 1;
+    uint64 used = 2;
+  }
+
+  message Network {
+    double up_speed = 1;
+    double down_speed = 2;
+  }
+}
