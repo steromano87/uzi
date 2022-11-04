@@ -15,17 +15,22 @@ import (
 type HostMetricsCollector struct {
 	metrics []*HostMetrics
 	mu      sync.Mutex
+
+	pollInterval    time.Duration
+	measureInterval time.Duration
 }
 
-func NewHostMetricsCollector() *HostMetricsCollector {
+func NewHostMetricsCollector(pollInterval time.Duration, measureInterval time.Duration) *HostMetricsCollector {
 	mc := new(HostMetricsCollector)
 	mc.metrics = make([]*HostMetrics, 0)
+	mc.pollInterval = pollInterval
+	mc.measureInterval = measureInterval
 
 	return mc
 }
 
-func (c *HostMetricsCollector) StartHostMetricsCollection(ctx context.Context, pollInterval time.Duration, measureInterval time.Duration) {
-	ticker := time.NewTicker(pollInterval)
+func (c *HostMetricsCollector) StartHostMetricsCollection(ctx context.Context) {
+	ticker := time.NewTicker(c.pollInterval)
 
 	go func() {
 		for {
@@ -35,7 +40,7 @@ func (c *HostMetricsCollector) StartHostMetricsCollection(ctx context.Context, p
 				return
 
 			case <-ticker.C:
-				err := c.gatherMetrics(ctx, measureInterval)
+				err := c.gatherMetrics(ctx)
 				if err != nil {
 					continue
 				}
@@ -44,8 +49,8 @@ func (c *HostMetricsCollector) StartHostMetricsCollection(ctx context.Context, p
 	}()
 }
 
-func (c *HostMetricsCollector) gatherMetrics(ctx context.Context, measureInterval time.Duration) error {
-	cpuPercent, err := cpu.PercentWithContext(ctx, measureInterval, false)
+func (c *HostMetricsCollector) gatherMetrics(ctx context.Context) error {
+	cpuPercent, err := cpu.PercentWithContext(ctx, c.measureInterval, false)
 	if err != nil {
 		return err
 	}
@@ -64,7 +69,7 @@ func (c *HostMetricsCollector) gatherMetrics(ctx context.Context, measureInterva
 	if err != nil {
 		return err
 	}
-	time.Sleep(measureInterval)
+	time.Sleep(c.measureInterval)
 	netUsageAfter, err := net.IOCountersWithContext(ctx, false)
 	if err != nil {
 		return err
@@ -82,8 +87,8 @@ func (c *HostMetricsCollector) gatherMetrics(ctx context.Context, measureInterva
 			Used:  diskUsage.Used,
 		},
 		Network: &HostMetrics_Network{
-			UpSpeed:   float64(netUsageAfter[0].BytesSent-netUsageBefore[0].BytesSent) / measureInterval.Seconds(),
-			DownSpeed: float64(netUsageAfter[0].BytesRecv-netUsageBefore[0].BytesRecv) / measureInterval.Seconds(),
+			UpSpeed:   float64(netUsageAfter[0].BytesSent-netUsageBefore[0].BytesSent) / c.measureInterval.Seconds(),
+			DownSpeed: float64(netUsageAfter[0].BytesRecv-netUsageBefore[0].BytesRecv) / c.measureInterval.Seconds(),
 		},
 	}
 

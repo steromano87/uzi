@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"context"
+	"github.com/steromano87/harkonnen/v1/pkg/configuration"
 )
 
 //go:generate sh -c "protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative *.proto"
@@ -16,13 +17,16 @@ type Server struct {
 	*IterationCountersCollector
 }
 
-func NewServer() *Server {
+func NewServer(config *configuration.Configuration) *Server {
 	server := new(Server)
 	server.LogCollector = NewLogCollector()
 	server.SampleCollector = NewSampleCollector()
-	server.HostMetricsCollector = NewHostMetricsCollector()
+	server.HostMetricsCollector = NewHostMetricsCollector(
+		config.Telemetry.HostMetrics.PollInterval,
+		config.Telemetry.HostMetrics.MeasureInterval,
+	)
 	server.TransactionCollector = NewTransactionCollector()
-	server.IterationCountersCollector = NewIterationCountersCollector(0)
+	server.IterationCountersCollector = NewIterationCountersCollector(config.Load.MaxIterations)
 
 	return server
 }
