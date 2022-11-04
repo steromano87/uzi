@@ -6,6 +6,18 @@ harkonnenVersion: "all"
 # Configuration #
 #################
 
+load:
+  script: "my_script.hcl"
+  maxIterations: 0
+  profiles:
+  - type: LinearRamp
+    spec:
+      runners: 5
+      initialDelay: 0s
+      rampUp: 10s
+      sustain: 5m
+      rampDown: 5s
+
 injectors:
   localhost:
     local: true
@@ -26,20 +38,19 @@ cockpit:
     type: FixedInterval
     updateInterval: 2s
 
-client:
-  rest:
-    timeout: 30s
-    baseUrl: ""
-    followRedirects: true
-    keepCookies: true
-    idleConnectionTimeout: 10s
-    tlsHandshakeTimeout: 10s
-    responseHeaderTimeout: 10s
-    maxIdleConnections: 100
-    maxConnectionsPerHost: 100
-    maxIdleConnectionsPerHost: 100
-    enableKeepAlive: true
-    enableCompression: true
+rest:
+  timeout: 30s
+  baseUrl: ""
+  followRedirects: true
+  keepCookies: true
+  idleConnectionTimeout: 10s
+  tlsHandshakeTimeout: 10s
+  responseHeaderTimeout: 10s
+  maxIdleConnections: 100
+  maxConnectionsPerHost: 100
+  maxIdleConnectionsPerHost: 100
+  enableKeepAlive: true
+  enableCompression: true
 
 telemetry:
   hostMetrics:
