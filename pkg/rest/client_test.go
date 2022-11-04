@@ -8,7 +8,6 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"github.com/steromano87/harkonnen/v1/pkg/message"
-	"github.com/steromano87/harkonnen/v1/pkg/pipeline"
 	"github.com/steromano87/harkonnen/v1/pkg/rest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -42,7 +41,7 @@ func (s *ClientTestSuite) SetupTest() {
 	config, _ := configuration.NewDefault()
 	config.Viper.Set("messaging.samples.bufferSize", 1)
 	_ = config.Update()
-	s.ctx, _ = pipeline.NewContext(context.TODO(), config, &s.logger, s.minionMessenger, injector.NewIterationsCounter())
+	s.ctx, _ = dsl.NewContext(context.TODO(), config, &s.logger, s.minionMessenger, injector.NewIterationsCounter())
 
 	s.client = rest.NewClient(s.ctx)
 

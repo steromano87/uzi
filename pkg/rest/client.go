@@ -3,8 +3,7 @@ package rest
 import (
 	"bytes"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
-	"github.com/steromano87/harkonnen/v1/pkg/message"
-	"github.com/steromano87/harkonnen/v1/pkg/message/sample"
+	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
@@ -18,11 +17,11 @@ import (
 const restClientVariablesKey = "restClient"
 
 type Client struct {
-	ctx         dsl.StepContext
+	ctx         dsl.Context
 	innerClient http.Client
 }
 
-func NewClient(ctx dsl.StepContext) *Client {
+func NewClient(ctx dsl.Context) *Client {
 	client := new(Client)
 	client.ctx = ctx
 	client.buildInnerClient()
@@ -91,22 +90,24 @@ func (c *Client) Execute(request Request) error {
 	finalURL := response.Request.URL
 
 	// Create request sample
-	requestSample := &message.Sample{
+	requestSample := &telemetry.Sample{
 		Timestamp:     timestamppb.New(startTime),
 		Duration:      durationpb.New(endTime.Sub(startTime)),
 		Name:          rawRequest.URL.String(),
 		SentBytes:     sentBytes,
 		ReceivedBytes: receivedBytes,
-		SampleData: &message.Sample_Rest{Rest: &sample.Rest{
-			Url:         pureUrl.String(),
-			QueryString: queryString.Encode(),
-			Method:      request.Method,
-			IsRedirect:  originalURL != finalURL,
-			FinalUrl:    finalURL.String(),
-		}},
+		SampleData: &telemetry.Sample_Rest_{
+			Rest: &telemetry.Sample_Rest{
+				Url:         pureUrl.String(),
+				QueryString: queryString.Encode(),
+				Method:      request.Method,
+				IsRedirect:  originalURL != finalURL,
+				FinalUrl:    finalURL.String(),
+			},
+		},
 	}
 
-	c.ctx.SampleSender().Collect(requestSample)
+	c.ctx.MetricsCollector().AddSample(requestSample)
 
 	return c.saveLastResponse(response)
 }

@@ -30,7 +30,7 @@ type Request struct {
 	Options     []Option
 }
 
-func (r *Request) Run(ctx dsl.StepContext) error {
+func (r *Request) Run(ctx dsl.Context) error {
 	restClient, ok := ctx.Variables().Locals()[restClientVariablesKey].(*Client)
 	if !ok {
 		restClient = NewClient(ctx)
