@@ -4,5 +4,6 @@ import "github.com/steromano87/harkonnen/v1/pkg/telemetry"
 
 type StepMetricsCollector interface {
 	AddLog(log *telemetry.Log)
+	AddSample(sample *telemetry.Sample)
 	AddTransaction(transaction *telemetry.Transaction)
 }

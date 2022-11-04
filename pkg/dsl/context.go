@@ -1,31 +1,30 @@
-package pipeline
+package dsl
 
 import (
 	"context"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/configuration"
-	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 )
 
 type Context struct {
 	context.Context
 
-	logger          *zerolog.Logger
-	config          *configuration.Configuration
-	sampleCollector *telemetry.SampleCollector
-	vars            *variables.Holder
+	logger           *zerolog.Logger
+	config           *configuration.Configuration
+	metricsCollector StepMetricsCollector
+	vars             *variables.Holder
 }
 
-func NewContext(ctx context.Context, config *configuration.Configuration, logger *zerolog.Logger, vars *variables.Holder) (*Context, context.CancelFunc) {
+func NewContext(ctx context.Context, config *configuration.Configuration, logger *zerolog.Logger, vars *variables.Holder, metricsCollector StepMetricsCollector) (Context, context.CancelFunc) {
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
 
-	return &Context{
-		Context:         cancelCtx,
-		logger:          logger,
-		config:          config,
-		sampleCollector: telemetry.NewSampleCollector(),
-		vars:            vars,
+	return Context{
+		Context:          cancelCtx,
+		logger:           logger,
+		config:           config,
+		metricsCollector: metricsCollector,
+		vars:             vars,
 	}, cancelFunc
 }
 
@@ -50,6 +49,6 @@ func (c *Context) Variables() *variables.Holder {
 	return c.vars
 }
 
-func (c *Context) SampleCollector() *telemetry.SampleCollector {
-	return c.sampleCollector
+func (c *Context) MetricsCollector() StepMetricsCollector {
+	return c.metricsCollector
 }

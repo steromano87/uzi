@@ -1,5 +1,5 @@
 package dsl
 
 type Step interface {
-	Run(ctx StepContext) error
+	Run(ctx Context) error
 }

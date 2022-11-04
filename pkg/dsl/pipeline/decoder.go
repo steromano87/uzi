@@ -5,7 +5,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 
-	_ "github.com/steromano87/harkonnen/v1/pkg/basesteps"
+	_ "github.com/steromano87/harkonnen/v1/pkg/dsl/basesteps"
 	_ "github.com/steromano87/harkonnen/v1/pkg/rest"
 )
 
@@ -30,9 +30,9 @@ func Decode(dslFileContent []byte, dslFilePath string) (Pipeline, error) {
 
 func decodeBody(ctx *hcl.EvalContext, body hcl.Body) (Pipeline, error) {
 	pipeline := Pipeline{
-		Setup:    Setup{},
-		Main:     Main{},
-		Teardown: Teardown{},
+		Setup:    StepContainer{},
+		Main:     StepContainer{},
+		Teardown: StepContainer{},
 	}
 
 	bodyContent, _ := body.Content(pipelineSchema)
@@ -45,7 +45,7 @@ func decodeBody(ctx *hcl.EvalContext, body hcl.Body) (Pipeline, error) {
 	for _, block := range bodyContent.Blocks {
 		switch block.Type {
 		case setupType:
-			setup := Setup{}
+			setup := StepContainer{}
 			err := setup.DecodeFromHCLBlock(ctx, block)
 			if err != nil {
 				return Pipeline{}, err
@@ -54,7 +54,7 @@ func decodeBody(ctx *hcl.EvalContext, body hcl.Body) (Pipeline, error) {
 			setupCount++
 
 		case mainType:
-			main := Main{}
+			main := StepContainer{}
 			err := main.DecodeFromHCLBlock(ctx, block)
 			if err != nil {
 				return Pipeline{}, err
@@ -63,7 +63,7 @@ func decodeBody(ctx *hcl.EvalContext, body hcl.Body) (Pipeline, error) {
 			mainCount++
 
 		case teardownType:
-			teardown := Teardown{}
+			teardown := StepContainer{}
 			err := teardown.DecodeFromHCLBlock(ctx, block)
 			if err != nil {
 				return Pipeline{}, err

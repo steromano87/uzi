@@ -10,7 +10,7 @@ type FixedWait struct {
 	amount      time.Duration
 }
 
-func (w *FixedWait) Run(ctx dsl.StepContext) error {
+func (w *FixedWait) Run(ctx dsl.Context) error {
 	ctx.Logger().Info().Dur("amount", w.amount).Msg("Waiting")
 	time.Sleep(w.amount)
 	return nil

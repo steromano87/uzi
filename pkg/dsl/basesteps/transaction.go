@@ -13,7 +13,7 @@ type Transaction struct {
 	end   time.Time
 }
 
-func (t *Transaction) Run(ctx dsl.StepContext) error {
+func (t *Transaction) Run(ctx dsl.Context) error {
 	t.contextLogger(ctx).Info().Msg("Transaction started")
 	t.start = time.Now()
 	defer func() {
@@ -34,7 +34,7 @@ func (t *Transaction) Duration() time.Duration {
 	return t.end.Sub(t.start)
 }
 
-func (t *Transaction) contextLogger(ctx dsl.StepContext) *zerolog.Logger {
+func (t *Transaction) contextLogger(ctx dsl.Context) *zerolog.Logger {
 	logger := ctx.Logger().With().Str("component", "transaction").Str("name", t.name).Logger()
 	return &logger
 }

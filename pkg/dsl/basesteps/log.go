@@ -12,7 +12,7 @@ type Log struct {
 	message string
 }
 
-func (log *Log) Run(ctx dsl.StepContext) error {
+func (log *Log) Run(ctx dsl.Context) error {
 	var partialLogger *zerolog.Event
 
 	switch log.level {
