@@ -24,7 +24,7 @@ type Injector struct {
 	childCtx        context.Context
 	childCancelFunc context.CancelFunc
 
-	dispatcher RunnerDispatcher
+	runnerPool RunnerPool
 
 	configuration *configuration.Configuration
 	logger        *zerolog.Logger
@@ -41,7 +41,6 @@ func New(parentCtx context.Context, logger *zerolog.Logger) (*Injector, error) {
 	inj.mainCtx = parentCtx
 	inj.childCtx, inj.childCancelFunc = context.WithCancel(parentCtx)
 	inj.configuration, _ = configuration.NewDefault()
-	inj.telemetryServer = telemetry.NewServer()
 
 	contextualizedLogger := logger.With().Str("component", "injector").Logger()
 	inj.logger = &contextualizedLogger
@@ -107,12 +106,9 @@ func (i *Injector) initializeWorkingFolder(compressedWorkingFolder []byte) error
 }
 
 func (i *Injector) startHostMetricsCollector() {
-	i.contextLogger().Info().Msg("Starting host metrics collector")
-	i.telemetryServer.StartHostMetricsCollection(
-		i.childCtx,
-		i.configuration.Telemetry.HostMetrics.PollInterval,
-		i.configuration.Telemetry.HostMetrics.MeasureInterval,
-	)
+	i.contextLogger().Info().Msg("Initializing host metrics collector")
+	i.telemetryServer = telemetry.NewServer(i.configuration)
+	i.telemetryServer.StartHostMetricsCollection(i.childCtx)
 	i.contextLogger().Info().Dur(
 		"pollInterval", i.configuration.Telemetry.HostMetrics.PollInterval,
 	).Dur(
@@ -152,10 +148,10 @@ func (i *Injector) Shutdown(_ context.Context, request *ShutdownRequest) (*Injec
 
 	previousStatus := i.status
 	if request.GetForced() {
-		i.dispatcher.ForcedShutdown()
+		i.runnerPool.ForcedShutdown()
 		i.status = InjectorStatus_FORCEFULLY_STOPPING
 	} else {
-		i.dispatcher.GracefulShutdown()
+		i.runnerPool.GracefulShutdown()
 		i.status = InjectorStatus_GRACEFULLY_STOPPING
 	}
 
@@ -182,12 +178,12 @@ func (i *Injector) WorkingFolder() string {
 
 func (i *Injector) handleGracefulShutdownRequest(msg *message.Envelope) {
 	i.contextLogger().Info().Str("msgID", msg.GetId()).Msg("Received graceful shutdown request")
-	i.dispatcher.GracefulShutdown()
+	i.runnerPool.GracefulShutdown()
 }
 
 func (i *Injector) handleForcedShutdownRequest(msg *message.Envelope) {
 	i.contextLogger().Warn().Str("msgID", msg.GetId()).Msg("Received forced shutdown request")
-	i.dispatcher.ForcedShutdown()
+	i.runnerPool.ForcedShutdown()
 }
 
 func (i *Injector) initWorkingFolder() error {

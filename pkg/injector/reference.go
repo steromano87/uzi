@@ -2,7 +2,7 @@ package injector
 
 import (
 	"fmt"
-	"github.com/steromano87/harkonnen/v1/pkg/message"
+	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 )
 
 type Reference struct {
@@ -15,7 +15,8 @@ type Reference struct {
 	Status           string
 	ScheduledRunners uint64
 	RunnerStats      RunnerStats
-	MessageBridge    message.Bridge
+	InjectorClient
+	telemetry.TelemetryClient
 }
 
 func (r Reference) String() string {

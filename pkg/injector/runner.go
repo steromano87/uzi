@@ -2,21 +2,20 @@ package injector
 
 import (
 	"context"
-	"errors"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/configuration"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
-	"github.com/steromano87/harkonnen/v1/pkg/pipeline"
+	"github.com/steromano87/harkonnen/v1/pkg/dsl/pipeline"
+	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
+	"sync"
 )
 
 type Runner struct {
-	ctx context.Context
-
-	pip               pipeline.Pipeline
-	pipCtx            *pipeline.Context
-	pipCancelFunc     context.CancelFunc
-	iterationsCounter *IterationsCounter
+	pip             pipeline.Pipeline
+	pipCtx          dsl.Context
+	pipCancelFunc   context.CancelFunc
+	telemetryServer *telemetry.Server
 
 	configuration *configuration.Configuration
 	logger        *zerolog.Logger
@@ -26,76 +25,81 @@ type Runner struct {
 
 	shutdownScheduled bool
 	completionChan    chan error
+	result            error
+	completionWG      sync.WaitGroup
 }
 
-func NewRunner(logger *zerolog.Logger) *Runner {
+func NewRunner(logger *zerolog.Logger, config *configuration.Configuration, varHolder *variables.Holder, telemetryServer *telemetry.Server, pip pipeline.Pipeline) *Runner {
 	runner := new(Runner)
 	runner.logger = logger
-	runner.status = RunnersStatus_AVAILABLE
+	runner.configuration = config
+	runner.variables = varHolder
+	runner.telemetryServer = telemetryServer
+	runner.pip = pip
+	runner.status = RunnersStatus_READY
 
 	return runner
 }
 
-func (r *Runner) Initialize(config *configuration.Configuration, pip pipeline.Pipeline, vars *variables.Holder, iterCounter *IterationsCounter) {
-	r.configuration = config
-	r.pip = pip
-	r.variables = vars
-	r.iterationsCounter = iterCounter
-	r.status = RunnersStatus_INITIALIZED
+func (r *Runner) Start(ctx context.Context) {
+	pipCtx, pipCancelFunc := dsl.NewContext(ctx, r.configuration, r.logger, r.variables, r.telemetryServer)
+	r.pipCancelFunc = pipCancelFunc
+
+	r.completionWG.Add(1)
+	go r.run(pipCtx)
 }
 
-func (r *Runner) Run(ctx context.Context) error {
-	if r.status != RunnersStatus_INITIALIZED {
-		return errors.New("a runner can be started only when in INITIALIZED status, current status: " + r.status.String())
-	}
-
-	r.ctx = ctx
-	r.pipCtx, r.pipCancelFunc = pipeline.NewContext(r.ctx, r.configuration, r.logger, r.variables)
-
-	go func() {
-		var err error
-		err = r.runSetup()
-		if err != nil {
-			r.logger.Error().Err(err).Msg("Encountered an unrecoverable error while running setup steps")
-			r.completionChan <- err
-		}
-
-		err = r.runMain()
-		if err != nil {
-			r.logger.Error().Err(err).Msg("Encountered an unrecoverable error while running main steps")
-			r.completionChan <- err
-		}
-
-		err = r.runTeardown()
-		if err != nil {
-			r.logger.Error().Err(err).Msg("Encountered an unrecoverable error while running teardown steps")
-			r.completionChan <- err
-		}
-
-		r.completionChan <- nil
-	}()
-
-	return nil
+func (r *Runner) Wait() {
+	r.completionWG.Wait()
 }
 
 func (r *Runner) Result() error {
-	select {
-	case <-r.ctx.Done():
-		return r.ctx.Err()
-
-	case result := <-r.completionChan:
-		return result
-	}
+	return r.result
 }
 
 func (r *Runner) ScheduleShutdown() {
 	r.shutdownScheduled = true
 }
 
-func (r *Runner) runSetup() error {
+func (r *Runner) run(ctx dsl.Context) {
+	defer r.completionWG.Done()
+	var err error
+
+	r.status = RunnersStatus_STARTING
+	err = r.runSetup(ctx)
+	if err != nil {
+		r.logger.Error().Err(err).Msg("Encountered an unrecoverable error while running setup steps")
+		r.status = RunnersStatus_ERROR
+		r.result = err
+		return
+	}
+
+	r.status = RunnersStatus_RUNNING
+	err = r.runMain(ctx)
+	if err != nil {
+		r.logger.Error().Err(err).Msg("Encountered an unrecoverable error while running main steps")
+		r.status = RunnersStatus_ERROR
+		r.result = err
+		return
+	}
+
+	r.status = RunnersStatus_STOPPING
+	err = r.runTeardown(ctx)
+	if err != nil {
+		r.logger.Error().Err(err).Msg("Encountered an unrecoverable error while running teardown steps")
+		r.status = RunnersStatus_ERROR
+		r.result = err
+		return
+	}
+
+	r.status = RunnersStatus_STOPPED
+	r.result = nil
+}
+
+func (r *Runner) runSetup(ctx dsl.Context) error {
 	for stepIndex, setupStep := range r.pip.Setup.Steps() {
 		r.logger.Debug().Int("stepIndex", stepIndex).Msg("Running setup step")
-		err := r.runStep(setupStep)
+		err := r.runStep(ctx, setupStep)
 		if err != nil {
 			return err
 		}
@@ -104,15 +108,15 @@ func (r *Runner) runSetup() error {
 	return nil
 }
 
-func (r *Runner) runMain() error {
-	for !r.shutdownScheduled && !r.iterationsCounter.MaxIterationsReached() {
-		r.iterationsCounter.AddInProgressIteration()
-		err := r.runMainLoop()
+func (r *Runner) runMain(ctx dsl.Context) error {
+	for !r.shutdownScheduled && !r.telemetryServer.MaxIterationsReached() {
+		r.telemetryServer.AddInProgressIteration()
+		err := r.runMainLoop(ctx)
 
 		if err == nil {
-			r.iterationsCounter.AddPassedIteration()
+			r.telemetryServer.AddPassedIteration()
 		} else {
-			r.iterationsCounter.AddFailedIteration()
+			r.telemetryServer.AddFailedIteration()
 		}
 	}
 
@@ -121,21 +125,19 @@ func (r *Runner) runMain() error {
 		r.logger.Info().Msg("Shutdown scheduled, exiting main loop")
 	}
 
-	if r.iterationsCounter.MaxIterationsReached() {
+	if r.telemetryServer.MaxIterationsReached() {
 		r.logger.Info().Uint64(
-			"maxIterations", r.iterationsCounter.maxIterations,
-		).Uint64(
-			"currentIteration", r.iterationsCounter.CompletedIterations(),
+			"currentIteration", r.telemetryServer.GetCounters().GetCompleted(),
 		).Msg("Maximum iteration reached, exiting main loop")
 	}
 
 	return nil
 }
 
-func (r *Runner) runMainLoop() error {
+func (r *Runner) runMainLoop(ctx dsl.Context) error {
 	for stepIndex, mainStep := range r.pip.Main.Steps() {
 		r.logger.Debug().Int("stepIndex", stepIndex).Msg("Running main loop step")
-		err := r.runStep(mainStep)
+		err := r.runStep(ctx, mainStep)
 		if err != nil {
 			return err
 		}
@@ -144,10 +146,10 @@ func (r *Runner) runMainLoop() error {
 	return nil
 }
 
-func (r *Runner) runTeardown() error {
+func (r *Runner) runTeardown(ctx dsl.Context) error {
 	for stepIndex, teardownStep := range r.pip.Teardown.Steps() {
 		r.logger.Debug().Int("stepIndex", stepIndex).Msg("Running teardown step")
-		err := r.runStep(teardownStep)
+		err := r.runStep(ctx, teardownStep)
 		if err != nil {
 			return err
 		}
@@ -156,18 +158,17 @@ func (r *Runner) runTeardown() error {
 	return nil
 }
 
-func (r *Runner) runStep(step dsl.Step) error {
+func (r *Runner) runStep(ctx dsl.Context, step dsl.Step) error {
 	stepResultChan := make(chan error)
 
 	go func() {
-		stepResultChan <- step.Run(r.pipCtx)
+		stepResultChan <- step.Run(ctx)
 	}()
 
 	select {
-	// TODO: verify if this check is really needed (context cancellation is already handled at runner level... maybe a step timeout can be implemented
-	case <-r.ctx.Done():
+	case <-ctx.Done():
 		r.logger.Warn().Msg("Aborting step due to context cancellation")
-		return r.ctx.Err()
+		return ctx.Err()
 
 	case err := <-stepResultChan:
 		if err != nil {
