@@ -6,7 +6,6 @@ import (
 	"context"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/configuration"
-	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/steromano87/harkonnen/v1/pkg/utils"
 	"github.com/steromano87/harkonnen/v1/pkg/version"
@@ -174,16 +173,6 @@ func (i *Injector) Status() InjectorStatus_Status {
 
 func (i *Injector) WorkingFolder() string {
 	return i.workingFolder
-}
-
-func (i *Injector) handleGracefulShutdownRequest(msg *message.Envelope) {
-	i.contextLogger().Info().Str("msgID", msg.GetId()).Msg("Received graceful shutdown request")
-	i.runnerPool.GracefulShutdown()
-}
-
-func (i *Injector) handleForcedShutdownRequest(msg *message.Envelope) {
-	i.contextLogger().Warn().Str("msgID", msg.GetId()).Msg("Received forced shutdown request")
-	i.runnerPool.ForcedShutdown()
 }
 
 func (i *Injector) initWorkingFolder() error {
