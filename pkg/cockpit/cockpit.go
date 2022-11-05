@@ -3,10 +3,10 @@ package cockpit
 import (
 	"context"
 	"errors"
+	"github.com/fullstorydev/grpchan/inprocgrpc"
 	"github.com/rs/zerolog"
-	harkonnenContext "github.com/steromano87/harkonnen/v1/pkg/context"
+	"github.com/steromano87/harkonnen/v1/pkg/configuration"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
-	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/scheduler"
 	"github.com/steromano87/harkonnen/v1/pkg/utils"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
@@ -14,11 +14,14 @@ import (
 )
 
 type Cockpit struct {
-	ctx                harkonnenContext.WithConfigurationLogger
+	ctx    context.Context
+	logger *zerolog.Logger
+	config *configuration.Configuration
+
 	injectorReferences map[string]*injector.Reference
 
 	localInjector           *injector.Injector
-	localInjectorCtx        injector.Context
+	localInjectorCtx        context.Context
 	localInjectorCancelFunc context.CancelFunc
 
 	scheduler   scheduler.Scheduler
@@ -27,9 +30,11 @@ type Cockpit struct {
 	variables variables.Holder
 }
 
-func New(ctx harkonnenContext.WithConfigurationLogger, loadProfile scheduler.LoadProfile) (*Cockpit, error) {
+func New(ctx context.Context, logger *zerolog.Logger, config *configuration.Configuration, loadProfile scheduler.LoadProfile) (*Cockpit, error) {
 	cockpit := new(Cockpit)
 	cockpit.ctx = ctx
+	cockpit.logger = logger
+	cockpit.config = config
 	cockpit.loadProfile = loadProfile
 	cockpit.injectorReferences = make(map[string]*injector.Reference)
 
@@ -72,7 +77,7 @@ func (c *Cockpit) Start() error {
 }
 
 func (c *Cockpit) parseInjectorReferences() error {
-	injectorsConfig := c.ctx.Config().Injectors
+	injectorsConfig := c.config.Injectors
 
 	for key, value := range injectorsConfig {
 		c.injectorReferences[key] = &injector.Reference{
@@ -88,14 +93,15 @@ func (c *Cockpit) parseInjectorReferences() error {
 }
 
 func (c *Cockpit) initScheduler() error {
-	schedulerType := c.ctx.Config().GetString("cockpit.scheduler.type")
+	schedulerType := c.config.GetString("cockpit.scheduler.type")
 
 	switch schedulerType {
 	case "FixedInterval":
 		c.scheduler = scheduler.NewFixedIntervalScheduler(
+			c.logger,
 			c.loadProfile,
 			c.injectorReferences,
-			c.ctx.Config().Cockpit.Scheduler.UpdateInterval)
+			c.config.Cockpit.Scheduler.UpdateInterval)
 
 	default:
 		return errors.New("unknown scheduler type: " + schedulerType)
@@ -146,17 +152,19 @@ func (c *Cockpit) connectToAllInjectors() error {
 
 func (c *Cockpit) startLocalInjector(reference *injector.Reference) error {
 	c.contextLogger().Info().Msg("Starting local injector...")
-	bossMessenger, minionMessenger := message.NewChannelBridgePair(c.ctx.Config().Messaging.MessageCapacity)
+	grpcChannel := inprocgrpc.Channel{}
+	c.localInjectorCtx, c.localInjectorCancelFunc = context.WithCancel(c.ctx)
 
-	c.localInjectorCtx, c.localInjectorCancelFunc = injector.NewContext(c.ctx, c.ctx.Logger(), minionMessenger)
-
-	localInjector, err := injector.New(c.localInjectorCtx)
+	localInjector, err := injector.New(c.localInjectorCtx, c.contextLogger())
 	if err != nil {
 		return err
-	}
 
+	}
 	c.localInjector = localInjector
-	reference.MessageBridge = bossMessenger
+	injector.RegisterInjectorServer(&grpcChannel, localInjector)
+
+	reference.InjectorClient = injector.NewInjectorClient(&grpcChannel)
+
 	c.contextLogger().Info().Msg("Local injector started")
 	return nil
 }
@@ -169,7 +177,20 @@ func (c *Cockpit) sayHelloToAllInjectors() error {
 	c.contextLogger().Info().Msg("Sending hello message to all available injectors...")
 	for injectorID, reference := range c.injectorReferences {
 		c.contextLogger().Info().Str("injectorID", injectorID).Msg("Sending hello message to injector")
-		reference.MessageBridge.Send(message.NewHelloEnvelope(version.Version))
+		response, err := reference.InjectorClient.Handshake(c.ctx, &injector.HandshakeRequest{CockpitVersion: version.Version})
+		if err != nil {
+			c.contextLogger().Error().Str(
+				injectorID, "injectorID",
+			).Err(err).Msg("Error when sending handshake message")
+			return err
+		}
+
+		// TODO: manage version check
+		c.contextLogger().Info().Str(
+			"injectorID", injectorID,
+		).Str(
+			"injectorVersion", response.GetInjectorVersion(),
+		).Msg("Received positive handshake")
 	}
 
 	return nil
@@ -177,13 +198,32 @@ func (c *Cockpit) sayHelloToAllInjectors() error {
 
 func (c *Cockpit) sendCompressedWorkingFolderTollInjectors() error {
 	c.contextLogger().Info().Msg("Sending compressed working folder to all available injectors...")
-	compressedFolder, err := utils.ZipFolder(c.ctx.Config().WorkingFolder)
+	compressedFolder, err := utils.ZipFolder(c.config.WorkingFolder)
 	if err != nil {
 		return err
 	}
 
-	for _, reference := range c.injectorReferences {
-		reference.MessageBridge.Send(message.NewWorkingFolderInitEnvelope(compressedFolder))
+	for injectorID, reference := range c.injectorReferences {
+		c.contextLogger().Info().Str("injectorID", injectorID).Msg("Sending compressed working folder to injector")
+		initializationRequest := injector.InitializationRequest{
+			WorkingFolder: &injector.WorkingFolder{
+				CompressedWorkingFolder: compressedFolder,
+				CompressionAlgorithm:    injector.CompressionAlgorithm_ZIP,
+			},
+		}
+
+		response, err := reference.InjectorClient.Initialize(c.ctx, &initializationRequest)
+		if err != nil {
+			c.contextLogger().Error().Err(err).Str("injectorID", injectorID).Msg("Error when sending compressed working folder")
+			return err
+		}
+		c.contextLogger().Info().Str(
+			"injectorID", injectorID,
+		).Str(
+			"previousStatus", response.GetPrevious().String(),
+		).Str(
+			"currentStatus", response.GetCurrent().String(),
+		).Msg("Working folder successfully sent, injector status updated")
 	}
 
 	return nil
@@ -210,6 +250,6 @@ func (c *Cockpit) localInjectorReference() *injector.Reference {
 }
 
 func (c *Cockpit) contextLogger() *zerolog.Logger {
-	logger := c.ctx.Logger().With().Str("component", "cockpit").Logger()
+	logger := c.logger.With().Str("component", "cockpit").Logger()
 	return &logger
 }
