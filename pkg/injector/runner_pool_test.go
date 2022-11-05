@@ -3,67 +3,45 @@ package injector_test
 import (
 	"context"
 	"github.com/Flaque/filet"
+	"github.com/fullstorydev/grpchan/inprocgrpc"
 	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/configuration"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl/pipeline"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
-	"github.com/steromano87/harkonnen/v1/pkg/message"
+	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"testing"
 	"time"
 )
 
-type SchedulerTestSuite struct {
+type RunnerPoolTestSuite struct {
 	suite.Suite
-	messenger  message.Bridge
-	ctx        injector.Context
-	cancelFunc context.CancelFunc
+	logger                *zerolog.Logger
+	configuration         *configuration.Configuration
+	ctx                   context.Context
+	cancelFunc            context.CancelFunc
+	injectorClient        injector.InjectorClient
+	injectorInProcChannel *inprocgrpc.Channel
+	telemetryServer       *telemetry.Server
 }
 
-func (s *SchedulerTestSuite) SetupTest() {
+func (s *RunnerPoolTestSuite) SetupTest() {
 	zerolog.TimeFieldFormat = time.RFC3339Nano
 	consoleWriter := zerolog.NewConsoleWriter()
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
+	s.logger = &logger
 
-	s.messenger, _ = message.NewChannelBridgePair(9999)
-	s.ctx, s.cancelFunc = injector.NewContext(context.TODO(), &logger, s.messenger)
+	s.configuration, _ = configuration.NewDefault()
+
+	s.ctx, s.cancelFunc = context.WithCancel(context.TODO())
+	s.injectorInProcChannel = &inprocgrpc.Channel{}
+	s.injectorClient = injector.NewInjectorClient(s.injectorInProcChannel)
+	s.telemetryServer = telemetry.NewServer(s.configuration)
 }
 
-func (s *SchedulerTestSuite) TestSchedulePreparation() {
-	tempScriptContent := `
-setup {
-	log {
-		message = "Setup executed"
-	}
-}
-
-main {
-	log {
-		message = "Main loop executed"
-	}
-}
-
-teardown {
-	log {
-		message = "Teardown executed"
-	}
-}
-`
-	tempScript := filet.TmpFile(s.T(), "", tempScriptContent)
-	defer filet.CleanUp(s.T())
-	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
-
-	dispatcher := injector.NewRunnerDispatcher(s.ctx)
-	err := dispatcher.Prepare(decodedPipeline, 10, 999)
-
-	if assert.NoError(s.T(), err) {
-		assert.Equal(s.T(), 10, dispatcher.Stats().Ready)
-		assert.Equal(s.T(), 0, dispatcher.Stats().Running)
-	}
-}
-
-func (s *SchedulerTestSuite) TestPipelineStartAndPlannedShutdown() {
+func (s *RunnerPoolTestSuite) TestSchedulePreparation() {
 	tempScriptContent := `
 setup {
 	log {
@@ -91,26 +69,69 @@ teardown {
 	defer filet.CleanUp(s.T())
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
 
-	dispatcher := injector.NewRunnerDispatcher(s.ctx)
-	_ = dispatcher.Prepare(decodedPipeline, 3, 999)
-
-	err := dispatcher.Dispatch(1)
+	runnerPool := injector.RunnerPool{
+		Configuration:    s.configuration,
+		Logger:           s.logger,
+		TemplatePipeline: decodedPipeline,
+		TelemetryServer:  s.telemetryServer,
+	}
+	err := runnerPool.SetDesiredRunners(s.ctx, 10)
 
 	if assert.NoError(s.T(), err) {
-		assert.Equal(s.T(), 1, dispatcher.Stats().Running)
+		assert.EqualValues(s.T(), 10, runnerPool.DispatchedRunners())
+	}
+}
+
+func (s *RunnerPoolTestSuite) TestPipelineStartAndPlannedShutdown() {
+	tempScriptContent := `
+setup {
+	log {
+		message = "Setup executed"
+	}
+}
+
+main {
+	fixed_wait {
+		amount = "1ms"
+	}
+
+	log {
+		message = "Main loop executed"
+	}
+}
+
+teardown {
+	log {
+		message = "Teardown executed"
+	}
+}
+`
+	tempScript := filet.TmpFile(s.T(), "", tempScriptContent)
+	defer filet.CleanUp(s.T())
+	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
+
+	runnerPool := injector.RunnerPool{
+		Configuration:    s.configuration,
+		Logger:           s.logger,
+		TemplatePipeline: decodedPipeline,
+		TelemetryServer:  s.telemetryServer,
+	}
+	err := runnerPool.SetDesiredRunners(s.ctx, 1)
+
+	if assert.NoError(s.T(), err) {
+		assert.EqualValues(s.T(), 1, runnerPool.DispatchedRunners())
 	}
 
 	time.Sleep(2 * time.Millisecond)
-	err = dispatcher.Dispatch(0)
+	err = runnerPool.SetDesiredRunners(s.ctx, 0)
 
 	if assert.NoError(s.T(), err) {
-		dispatcher.WaitForCompletion()
-		assert.Equal(s.T(), 0, dispatcher.Stats().Running)
-		assert.Equal(s.T(), 1, dispatcher.Stats().Completed)
+		runnerPool.WaitForCompletion()
+		assert.EqualValues(s.T(), 0, runnerPool.DispatchedRunners())
 	}
 }
 
-func (s *SchedulerTestSuite) TestGracefulShutdown() {
+func (s *RunnerPoolTestSuite) TestGracefulShutdown() {
 	tempScriptContent := `
 setup {
 	log {
@@ -138,23 +159,30 @@ teardown {
 	defer filet.CleanUp(s.T())
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
 
-	dispatcher := injector.NewRunnerDispatcher(s.ctx)
-	_ = dispatcher.Prepare(decodedPipeline, 3, 999)
-
-	err := dispatcher.Dispatch(3)
+	runnerPool := injector.RunnerPool{
+		Configuration:    s.configuration,
+		Logger:           s.logger,
+		TemplatePipeline: decodedPipeline,
+		TelemetryServer:  s.telemetryServer,
+	}
+	err := runnerPool.SetDesiredRunners(s.ctx, 3)
 
 	if assert.NoError(s.T(), err) {
-		assert.Equal(s.T(), 3, dispatcher.Stats().Running)
+		assert.EqualValues(s.T(), 3, runnerPool.DispatchedRunners())
 	}
 
 	time.Sleep(2 * time.Millisecond)
-	dispatcher.GracefulShutdown()
-	dispatcher.WaitForCompletion()
-	assert.Equal(s.T(), 0, dispatcher.Stats().Running)
-	assert.Equal(s.T(), 3, dispatcher.Stats().Stopped)
+	runnerPool.GracefulShutdown()
+	runnerPool.WaitForCompletion()
+	if assert.EqualValues(s.T(), 0, runnerPool.DispatchedRunners()) {
+		assert.EqualValues(s.T(), 5, s.telemetryServer.GetCounters().GetCompleted())
+		assert.EqualValues(s.T(), 5, s.telemetryServer.GetCounters().GetPassed())
+		assert.EqualValues(s.T(), 0, s.telemetryServer.GetCounters().GetFailed())
+		assert.EqualValues(s.T(), 0, s.telemetryServer.GetCounters().GetInProgress())
+	}
 }
 
-func (s *SchedulerTestSuite) TestPipelineStartWithFixedIterations() {
+func (s *RunnerPoolTestSuite) TestPipelineStartWithFixedIterations() {
 	tempScriptContent := `
 setup {
 	log {
@@ -181,23 +209,30 @@ teardown {
 	tempScript := filet.TmpFile(s.T(), "", tempScriptContent)
 	defer filet.CleanUp(s.T())
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
+	s.configuration.Load.MaxIterations = 5
+	s.telemetryServer = telemetry.NewServer(s.configuration)
 
-	dispatcher := injector.NewRunnerDispatcher(s.ctx)
-	_ = dispatcher.Prepare(decodedPipeline, 3, 5)
-	err := dispatcher.Dispatch(3)
+	runnerPool := injector.RunnerPool{
+		Configuration:    s.configuration,
+		Logger:           s.logger,
+		TemplatePipeline: decodedPipeline,
+		TelemetryServer:  s.telemetryServer,
+	}
+	err := runnerPool.SetDesiredRunners(s.ctx, 3)
 
 	if assert.NoError(s.T(), err) {
-		assert.Equal(s.T(), 3, dispatcher.Stats().Running)
+		assert.EqualValues(s.T(), 3, runnerPool.DispatchedRunners())
 	}
 
-	dispatcher.WaitForCompletion()
-	if assert.Equal(s.T(), 0, dispatcher.Stats().Running) {
-		assert.Equal(s.T(), 3, dispatcher.Stats().Completed)
-		assert.EqualValues(s.T(), 5, dispatcher.IterationsCounter().CompletedIterations())
-		assert.EqualValues(s.T(), 5, dispatcher.IterationsCounter().PassedIterations())
+	runnerPool.WaitForCompletion()
+	if assert.Equal(s.T(), 0, runnerPool.DispatchedRunners()) {
+		assert.EqualValues(s.T(), 5, s.telemetryServer.GetCounters().GetCompleted())
+		assert.EqualValues(s.T(), 5, s.telemetryServer.GetCounters().GetPassed())
+		assert.EqualValues(s.T(), 0, s.telemetryServer.GetCounters().GetFailed())
+		assert.EqualValues(s.T(), 0, s.telemetryServer.GetCounters().GetInProgress())
 	}
 }
 
-func TestSchedulerTestSuite(t *testing.T) {
-	suite.Run(t, new(SchedulerTestSuite))
+func TestRunnerPoolTestSuite(t *testing.T) {
+	suite.Run(t, new(RunnerPoolTestSuite))
 }
