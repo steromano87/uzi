@@ -75,6 +75,7 @@ teardown {
 		TemplatePipeline: decodedPipeline,
 		TelemetryServer:  s.telemetryServer,
 	}
+	runnerPool.Initialize()
 	err := runnerPool.SetDesiredRunners(s.ctx, 10)
 
 	if assert.NoError(s.T(), err) {
@@ -116,6 +117,7 @@ teardown {
 		TemplatePipeline: decodedPipeline,
 		TelemetryServer:  s.telemetryServer,
 	}
+	runnerPool.Initialize()
 	err := runnerPool.SetDesiredRunners(s.ctx, 1)
 
 	if assert.NoError(s.T(), err) {
@@ -165,6 +167,7 @@ teardown {
 		TemplatePipeline: decodedPipeline,
 		TelemetryServer:  s.telemetryServer,
 	}
+	runnerPool.Initialize()
 	err := runnerPool.SetDesiredRunners(s.ctx, 3)
 
 	if assert.NoError(s.T(), err) {
@@ -175,10 +178,7 @@ teardown {
 	runnerPool.GracefulShutdown()
 	runnerPool.WaitForCompletion()
 	if assert.EqualValues(s.T(), 0, runnerPool.DispatchedRunners()) {
-		assert.EqualValues(s.T(), 5, s.telemetryServer.GetCounters().GetCompleted())
-		assert.EqualValues(s.T(), 5, s.telemetryServer.GetCounters().GetPassed())
-		assert.EqualValues(s.T(), 0, s.telemetryServer.GetCounters().GetFailed())
-		assert.EqualValues(s.T(), 0, s.telemetryServer.GetCounters().GetInProgress())
+		assert.Equal(s.T(), s.telemetryServer.GetCounters().GetCompleted(), s.telemetryServer.GetCounters().GetPassed())
 	}
 }
 
@@ -218,6 +218,7 @@ teardown {
 		TemplatePipeline: decodedPipeline,
 		TelemetryServer:  s.telemetryServer,
 	}
+	runnerPool.Initialize()
 	err := runnerPool.SetDesiredRunners(s.ctx, 3)
 
 	if assert.NoError(s.T(), err) {
@@ -225,7 +226,7 @@ teardown {
 	}
 
 	runnerPool.WaitForCompletion()
-	if assert.Equal(s.T(), 0, runnerPool.DispatchedRunners()) {
+	if assert.EqualValues(s.T(), 0, runnerPool.DispatchedRunners()) {
 		assert.EqualValues(s.T(), 5, s.telemetryServer.GetCounters().GetCompleted())
 		assert.EqualValues(s.T(), 5, s.telemetryServer.GetCounters().GetPassed())
 		assert.EqualValues(s.T(), 0, s.telemetryServer.GetCounters().GetFailed())
