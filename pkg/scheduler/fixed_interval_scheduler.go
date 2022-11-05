@@ -1,10 +1,9 @@
 package scheduler
 
 import (
+	"context"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/context"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
-	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"math"
 	"sort"
 	"time"
@@ -18,13 +17,16 @@ type FixedIntervalScheduler struct {
 	updateTicker   *time.Ticker
 	start          time.Time
 	loadProfile    LoadProfile
+
+	logger *zerolog.Logger
 }
 
-func NewFixedIntervalScheduler(loadProfile LoadProfile, injectors map[string]*injector.Reference, updateInterval time.Duration) *FixedIntervalScheduler {
+func NewFixedIntervalScheduler(logger *zerolog.Logger, loadProfile LoadProfile, injectors map[string]*injector.Reference, updateInterval time.Duration) *FixedIntervalScheduler {
 	scheduler := new(FixedIntervalScheduler)
 	scheduler.loadProfile = loadProfile
 	scheduler.totalWeights = 0
 	scheduler.injectors = injectors
+	scheduler.logger = logger
 	for _, inj := range scheduler.injectors {
 		scheduler.totalWeights += inj.Weight
 	}
@@ -33,17 +35,17 @@ func NewFixedIntervalScheduler(loadProfile LoadProfile, injectors map[string]*in
 	return scheduler
 }
 
-func (f *FixedIntervalScheduler) Start(ctx context.WithLogger) {
+func (f *FixedIntervalScheduler) Start(ctx context.Context) {
 	f.start = time.Now()
 	f.updateTicker = time.NewTicker(f.updateInterval)
-	f.contextLogger(ctx).Info().Msg("Scheduler started")
+	f.contextLogger().Info().Msg("Scheduler started")
 
 	for {
 		select {
 		case t := <-f.updateTicker.C:
 			elapsed := t.Sub(f.start)
 			scheduledRunners := f.At(elapsed)
-			f.contextLogger(ctx).Debug().Interface("quotas", scheduledRunners).Dur("elapsed", elapsed).Msg("Updated scheduled runner quotas")
+			f.contextLogger().Debug().Interface("quotas", scheduledRunners).Dur("elapsed", elapsed).Msg("Updated scheduled runner quotas")
 
 			// Loop through the calculated quotas and send the update message
 			// only if the scheduled quota differs from the last one
@@ -51,19 +53,20 @@ func (f *FixedIntervalScheduler) Start(ctx context.WithLogger) {
 				lastScheduledQuota := f.injectors[injectorID].ScheduledRunners
 
 				if quota != lastScheduledQuota {
-					f.contextLogger(ctx).Info().Str("injectorID", injectorID).Uint64("quota", quota).Uint64("lastScheduledQuota", lastScheduledQuota).Msg("Current quota differs from last scheduled quota, sending quota update message")
+					f.contextLogger().Info().Str(
+						"injectorID", injectorID,
+					).Uint64("quota", quota).Uint64(
+						"lastScheduledQuota", lastScheduledQuota,
+					).Msg("Current quota differs from last scheduled quota, sending quota update message")
 
-					payload := message.Envelope_RunnersQuotaUpdate{
-						RunnersQuotaUpdate: &message.RunnersQuotaUpdate{RunnersQuota: quota},
-					}
-					msg := message.NewEnvelope(&payload)
-					f.injectors[injectorID].MessageBridge.Send(msg)
+					// FIXME: correctly handle the error and the return message
+					_, _ = f.injectors[injectorID].InjectorClient.SetRunnersQuota(ctx, &injector.RunnersQuota{Quota: quota})
 					f.injectors[injectorID].ScheduledRunners = quota
 				}
 			}
 
 		case <-ctx.Done():
-			f.contextLogger(ctx).Info().Msg("Scheduler stopped")
+			f.contextLogger().Info().Msg("Scheduler stopped")
 			return
 		}
 	}
@@ -92,7 +95,7 @@ func (f *FixedIntervalScheduler) At(elapsed time.Duration) map[string]uint64 {
 	return quotas
 }
 
-func (f *FixedIntervalScheduler) contextLogger(ctx context.WithLogger) *zerolog.Logger {
-	logger := ctx.Logger().With().Str("component", "scheduler").Logger()
+func (f *FixedIntervalScheduler) contextLogger() *zerolog.Logger {
+	logger := f.logger.With().Str("component", "scheduler").Logger()
 	return &logger
 }
