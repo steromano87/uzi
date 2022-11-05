@@ -5,9 +5,11 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
-	"github.com/steromano87/harkonnen/v1/pkg/message"
+	"google.golang.org/grpc"
+	"net"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 )
 
@@ -30,17 +32,31 @@ func runInjector(cmd *cobra.Command, args []string) {
 	consoleWriter := zerolog.NewConsoleWriter()
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
-	logger.Info().Msg("Starting remote injector")
 
-	// FIXME: correctly implement the websocket messenger
-	_, messenger := message.NewChannelBridgePair(100)
+	tcpListener, err := net.Listen("tcp", ":9000")
+	cobra.CheckErr(err)
 
-	messagingCtx, _ := injector.NewContext(mainCtx, &logger, messenger)
-	inj, _ := injector.New(messagingCtx)
-	logger.Info().Msg("Remote injector started, press Ctrl+C to stop it")
+	inj, _ := injector.New(mainCtx, &logger)
 
-	<-mainCtx.Done()
-	logger.Info().Msg("Starting graceful shutdown")
-	inj.Stop()
-	logger.Info().Msg("Gracefully shutdown completed")
+	grpcServerOpts := make([]grpc.ServerOption, 0)
+	grpcServer := grpc.NewServer(grpcServerOpts...)
+	injector.RegisterInjectorServer(grpcServer, inj)
+
+	mainWg := sync.WaitGroup{}
+	mainWg.Add(1)
+	logger.Info().Msg("Remote injector starting, press Ctrl+C to stop it")
+	go func() {
+		<-mainCtx.Done()
+		logger.Info().Msg("Starting graceful shutdown")
+		cancelFunc()
+		grpcServer.GracefulStop()
+		inj.Stop()
+		mainWg.Done()
+	}()
+
+	err = grpcServer.Serve(tcpListener)
+	cobra.CheckErr(err)
+
+	mainWg.Wait()
+	logger.Info().Msg("Injector stopped")
 }

@@ -4,9 +4,7 @@ import (
 	"context"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
-	"github.com/steromano87/harkonnen/v1/pkg/cockpit"
 	"github.com/steromano87/harkonnen/v1/pkg/configuration"
-	"github.com/steromano87/harkonnen/v1/pkg/scheduler"
 	"github.com/steromano87/harkonnen/v1/pkg/workingfolder"
 	"os"
 	"os/signal"
@@ -26,7 +24,7 @@ var runCmd = &cobra.Command{
 }
 
 func runRun(cmd *cobra.Command, args []string) {
-	mainCtx, cancelFunc := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	_, cancelFunc := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancelFunc()
 
 	config, err := configuration.New(filepath.Join(workingFolder, workingfolder.ConfigurationFile))
@@ -45,8 +43,7 @@ func runRun(cmd *cobra.Command, args []string) {
 	}
 	zerolog.SetGlobalLevel(logLevel)
 
-	cockpitCtx, _ := cockpit.NewContext(mainCtx, &logger, config)
-	ckp, err := cockpit.New(cockpitCtx, scheduler.CompositeLoadProfile{})
+	/*ckp, err := cockpit.New(mainCtx, scheduler.CompositeLoadProfile{})
 	if err != nil {
 		logger.Fatal().Err(err).Msg("Unable to create cockpit, exiting...")
 	}
@@ -57,5 +54,5 @@ func runRun(cmd *cobra.Command, args []string) {
 	}
 
 	<-mainCtx.Done()
-	logger.Info().Msg("Graceful shutdown completed")
+	logger.Info().Msg("Graceful shutdown completed")*/
 }
