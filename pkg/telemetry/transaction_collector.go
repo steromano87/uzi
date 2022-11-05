@@ -25,7 +25,7 @@ func (c *TransactionCollector) GetTransactions() []*Transaction {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	var output []*Transaction
+	output := make([]*Transaction, len(c.transactions))
 	copy(output, c.transactions)
 	c.transactions = make([]*Transaction, 0)
 

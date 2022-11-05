@@ -6,9 +6,9 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/configuration"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
-	"github.com/steromano87/harkonnen/v1/pkg/injector"
-	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/rest"
+	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
+	"github.com/steromano87/harkonnen/v1/pkg/variables"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"io"
@@ -21,10 +21,9 @@ import (
 
 type ClientTestSuite struct {
 	suite.Suite
-	ctx             dsl.StepContext
+	ctx             dsl.Context
 	logger          zerolog.Logger
-	bossMessenger   message.Bridge
-	minionMessenger message.Bridge
+	telemetryServer *telemetry.Server
 
 	client     *rest.Client
 	testServer *httptest.Server
@@ -36,12 +35,13 @@ func (s *ClientTestSuite) SetupTest() {
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	s.logger = zerolog.New(consoleWriter).With().Timestamp().Logger()
 
-	s.bossMessenger, s.minionMessenger = message.NewChannelBridgePair(100)
-
+	// TODO: replace this and all other entries with the default config
 	config, _ := configuration.NewDefault()
 	config.Viper.Set("messaging.samples.bufferSize", 1)
 	_ = config.Update()
-	s.ctx, _ = dsl.NewContext(context.TODO(), config, &s.logger, s.minionMessenger, injector.NewIterationsCounter())
+
+	s.telemetryServer = telemetry.NewServer(config)
+	s.ctx, _ = dsl.NewContext(context.TODO(), config, &s.logger, variables.NewHolder(), s.telemetryServer)
 
 	s.client = rest.NewClient(s.ctx)
 
@@ -92,18 +92,15 @@ func (s *ClientTestSuite) TestGetRequest() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		msg := <-s.bossMessenger.Receive()
+		samples := s.telemetryServer.SampleCollector.GetSamples()
 
-		if assert.IsType(s.T(), &message.Envelope_Samples{}, msg.GetPayload()) {
-			samples := msg.GetSamples()
-			assert.Len(s.T(), samples.GetSample(), 1)
+		if assert.Len(s.T(), samples, 1) {
+			sample := samples[0]
 
-			sample := samples.GetSample()[0]
+			assert.Greater(s.T(), sample.GetSentBytes(), uint64(0))
+			assert.Greater(s.T(), sample.GetReceivedBytes(), uint64(0))
 
-			assert.Greater(s.T(), sample.SentBytes, uint64(0))
-			assert.Greater(s.T(), sample.ReceivedBytes, uint64(0))
-
-			if assert.IsType(s.T(), &message.Sample_Rest{}, sample.GetSampleData()) {
+			if assert.IsType(s.T(), &telemetry.Sample_Rest_{}, sample.GetSampleData()) {
 				restData := sample.GetRest()
 
 				assert.Equal(s.T(), s.testServer.URL, restData.GetUrl())
@@ -135,18 +132,15 @@ func (s *ClientTestSuite) TestGetRequestWithQueryString() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		msg := <-s.bossMessenger.Receive()
+		samples := s.telemetryServer.SampleCollector.GetSamples()
 
-		if assert.IsType(s.T(), &message.Envelope_Samples{}, msg.GetPayload()) {
-			samples := msg.GetSamples()
-			assert.Len(s.T(), samples.GetSample(), 1)
+		if assert.Len(s.T(), samples, 1) {
+			sample := samples[0]
 
-			sample := samples.GetSample()[0]
+			assert.Greater(s.T(), sample.GetSentBytes(), uint64(0))
+			assert.Greater(s.T(), sample.GetReceivedBytes(), uint64(0))
 
-			assert.Greater(s.T(), sample.SentBytes, uint64(0))
-			assert.Greater(s.T(), sample.ReceivedBytes, uint64(0))
-
-			if assert.IsType(s.T(), &message.Sample_Rest{}, sample.GetSampleData()) {
+			if assert.IsType(s.T(), &telemetry.Sample_Rest_{}, sample.GetSampleData()) {
 				restData := sample.GetRest()
 
 				assert.Equal(s.T(), s.testServer.URL, restData.GetUrl())
@@ -173,18 +167,15 @@ func (s *ClientTestSuite) TestPostNoBody() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		msg := <-s.bossMessenger.Receive()
+		samples := s.telemetryServer.SampleCollector.GetSamples()
 
-		if assert.IsType(s.T(), &message.Envelope_Samples{}, msg.GetPayload()) {
-			samples := msg.GetSamples()
-			assert.Len(s.T(), samples.GetSample(), 1)
+		if assert.Len(s.T(), samples, 1) {
+			sample := samples[0]
 
-			sample := samples.GetSample()[0]
+			assert.Greater(s.T(), sample.GetSentBytes(), uint64(0))
+			assert.Greater(s.T(), sample.GetReceivedBytes(), uint64(0))
 
-			assert.Greater(s.T(), sample.SentBytes, uint64(0))
-			assert.Greater(s.T(), sample.ReceivedBytes, uint64(0))
-
-			if assert.IsType(s.T(), &message.Sample_Rest{}, sample.GetSampleData()) {
+			if assert.IsType(s.T(), &telemetry.Sample_Rest_{}, sample.GetSampleData()) {
 				restData := sample.GetRest()
 
 				assert.Equal(s.T(), s.testServer.URL, restData.GetUrl())
@@ -211,18 +202,15 @@ func (s *ClientTestSuite) TestPutNoBody() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		msg := <-s.bossMessenger.Receive()
+		samples := s.telemetryServer.SampleCollector.GetSamples()
 
-		if assert.IsType(s.T(), &message.Envelope_Samples{}, msg.GetPayload()) {
-			samples := msg.GetSamples()
-			assert.Len(s.T(), samples.GetSample(), 1)
+		if assert.Len(s.T(), samples, 1) {
+			sample := samples[0]
 
-			sample := samples.GetSample()[0]
+			assert.Greater(s.T(), sample.GetSentBytes(), uint64(0))
+			assert.Greater(s.T(), sample.GetReceivedBytes(), uint64(0))
 
-			assert.Greater(s.T(), sample.SentBytes, uint64(0))
-			assert.Greater(s.T(), sample.ReceivedBytes, uint64(0))
-
-			if assert.IsType(s.T(), &message.Sample_Rest{}, sample.GetSampleData()) {
+			if assert.IsType(s.T(), &telemetry.Sample_Rest_{}, sample.GetSampleData()) {
 				restData := sample.GetRest()
 
 				assert.Equal(s.T(), s.testServer.URL, restData.GetUrl())
@@ -249,18 +237,15 @@ func (s *ClientTestSuite) TestPatchNoBody() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		msg := <-s.bossMessenger.Receive()
+		samples := s.telemetryServer.SampleCollector.GetSamples()
 
-		if assert.IsType(s.T(), &message.Envelope_Samples{}, msg.GetPayload()) {
-			samples := msg.GetSamples()
-			assert.Len(s.T(), samples.GetSample(), 1)
+		if assert.Len(s.T(), samples, 1) {
+			sample := samples[0]
 
-			sample := samples.GetSample()[0]
+			assert.Greater(s.T(), sample.GetSentBytes(), uint64(0))
+			assert.Greater(s.T(), sample.GetReceivedBytes(), uint64(0))
 
-			assert.Greater(s.T(), sample.SentBytes, uint64(0))
-			assert.Greater(s.T(), sample.ReceivedBytes, uint64(0))
-
-			if assert.IsType(s.T(), &message.Sample_Rest{}, sample.GetSampleData()) {
+			if assert.IsType(s.T(), &telemetry.Sample_Rest_{}, sample.GetSampleData()) {
 				restData := sample.GetRest()
 
 				assert.Equal(s.T(), s.testServer.URL, restData.GetUrl())
@@ -287,18 +272,15 @@ func (s *ClientTestSuite) TestDeleteNoBody() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		msg := <-s.bossMessenger.Receive()
+		samples := s.telemetryServer.SampleCollector.GetSamples()
 
-		if assert.IsType(s.T(), &message.Envelope_Samples{}, msg.GetPayload()) {
-			samples := msg.GetSamples()
-			assert.Len(s.T(), samples.GetSample(), 1)
+		if assert.Len(s.T(), samples, 1) {
+			sample := samples[0]
 
-			sample := samples.GetSample()[0]
+			assert.Greater(s.T(), sample.GetSentBytes(), uint64(0))
+			assert.Greater(s.T(), sample.GetReceivedBytes(), uint64(0))
 
-			assert.Greater(s.T(), sample.SentBytes, uint64(0))
-			assert.Greater(s.T(), sample.ReceivedBytes, uint64(0))
-
-			if assert.IsType(s.T(), &message.Sample_Rest{}, sample.GetSampleData()) {
+			if assert.IsType(s.T(), &telemetry.Sample_Rest_{}, sample.GetSampleData()) {
 				restData := sample.GetRest()
 
 				assert.Equal(s.T(), s.testServer.URL, restData.GetUrl())
@@ -325,18 +307,15 @@ func (s *ClientTestSuite) TestHeadNoBody() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		msg := <-s.bossMessenger.Receive()
+		samples := s.telemetryServer.SampleCollector.GetSamples()
 
-		if assert.IsType(s.T(), &message.Envelope_Samples{}, msg.GetPayload()) {
-			samples := msg.GetSamples()
-			assert.Len(s.T(), samples.GetSample(), 1)
+		if assert.Len(s.T(), samples, 1) {
+			sample := samples[0]
 
-			sample := samples.GetSample()[0]
+			assert.Greater(s.T(), sample.GetSentBytes(), uint64(0))
+			assert.Greater(s.T(), sample.GetReceivedBytes(), uint64(0))
 
-			assert.Greater(s.T(), sample.SentBytes, uint64(0))
-			assert.Greater(s.T(), sample.ReceivedBytes, uint64(0))
-
-			if assert.IsType(s.T(), &message.Sample_Rest{}, sample.GetSampleData()) {
+			if assert.IsType(s.T(), &telemetry.Sample_Rest_{}, sample.GetSampleData()) {
 				restData := sample.GetRest()
 
 				assert.Equal(s.T(), s.testServer.URL, restData.GetUrl())
@@ -360,18 +339,15 @@ func (s *ClientTestSuite) TestOptionsNoBody() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		msg := <-s.bossMessenger.Receive()
+		samples := s.telemetryServer.SampleCollector.GetSamples()
 
-		if assert.IsType(s.T(), &message.Envelope_Samples{}, msg.GetPayload()) {
-			samples := msg.GetSamples()
-			assert.Len(s.T(), samples.GetSample(), 1)
+		if assert.Len(s.T(), samples, 1) {
+			sample := samples[0]
 
-			sample := samples.GetSample()[0]
+			assert.Greater(s.T(), sample.GetSentBytes(), uint64(0))
+			assert.Greater(s.T(), sample.GetReceivedBytes(), uint64(0))
 
-			assert.Greater(s.T(), sample.SentBytes, uint64(0))
-			assert.Greater(s.T(), sample.ReceivedBytes, uint64(0))
-
-			if assert.IsType(s.T(), &message.Sample_Rest{}, sample.GetSampleData()) {
+			if assert.IsType(s.T(), &telemetry.Sample_Rest_{}, sample.GetSampleData()) {
 				restData := sample.GetRest()
 
 				assert.Equal(s.T(), s.testServer.URL, restData.GetUrl())
@@ -402,18 +378,15 @@ func (s *ClientTestSuite) TestPostFormRequest() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		msg := <-s.bossMessenger.Receive()
+		samples := s.telemetryServer.SampleCollector.GetSamples()
 
-		if assert.IsType(s.T(), &message.Envelope_Samples{}, msg.GetPayload()) {
-			samples := msg.GetSamples()
-			assert.Len(s.T(), samples.GetSample(), 1)
+		if assert.Len(s.T(), samples, 1) {
+			sample := samples[0]
 
-			sample := samples.GetSample()[0]
+			assert.Greater(s.T(), sample.GetSentBytes(), uint64(0))
+			assert.Greater(s.T(), sample.GetReceivedBytes(), uint64(0))
 
-			assert.Greater(s.T(), sample.SentBytes, uint64(0))
-			assert.Greater(s.T(), sample.ReceivedBytes, uint64(0))
-
-			if assert.IsType(s.T(), &message.Sample_Rest{}, sample.GetSampleData()) {
+			if assert.IsType(s.T(), &telemetry.Sample_Rest_{}, sample.GetSampleData()) {
 				restData := sample.GetRest()
 
 				assert.Equal(s.T(), s.testServer.URL, restData.GetUrl())
@@ -478,18 +451,15 @@ func (s *ClientTestSuite) TestRequestWithRedirect_WithoutRedirectSetting() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		msg := <-s.bossMessenger.Receive()
+		samples := s.telemetryServer.SampleCollector.GetSamples()
 
-		if assert.IsType(s.T(), &message.Envelope_Samples{}, msg.GetPayload()) {
-			samples := msg.GetSamples()
-			assert.Len(s.T(), samples.GetSample(), 1)
+		if assert.Len(s.T(), samples, 1) {
+			sample := samples[0]
 
-			sample := samples.GetSample()[0]
+			assert.Greater(s.T(), sample.GetSentBytes(), uint64(0))
+			assert.Greater(s.T(), sample.GetReceivedBytes(), uint64(0))
 
-			assert.Greater(s.T(), sample.SentBytes, uint64(0))
-			assert.Greater(s.T(), sample.ReceivedBytes, uint64(0))
-
-			if assert.IsType(s.T(), &message.Sample_Rest{}, sample.GetSampleData()) {
+			if assert.IsType(s.T(), &telemetry.Sample_Rest_{}, sample.GetSampleData()) {
 				restData := sample.GetRest()
 
 				assert.Equal(s.T(), s.testServer.URL+"/redirect", restData.GetUrl())
@@ -520,18 +490,15 @@ func (s *ClientTestSuite) TestRequestWithRedirect_WithRedirectSetting() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		msg := <-s.bossMessenger.Receive()
+		samples := s.telemetryServer.SampleCollector.GetSamples()
 
-		if assert.IsType(s.T(), &message.Envelope_Samples{}, msg.GetPayload()) {
-			samples := msg.GetSamples()
-			assert.Len(s.T(), samples.GetSample(), 1)
+		if assert.Len(s.T(), samples, 1) {
+			sample := samples[0]
 
-			sample := samples.GetSample()[0]
+			assert.Greater(s.T(), sample.GetSentBytes(), uint64(0))
+			assert.Greater(s.T(), sample.GetReceivedBytes(), uint64(0))
 
-			assert.Greater(s.T(), sample.SentBytes, uint64(0))
-			assert.Greater(s.T(), sample.ReceivedBytes, uint64(0))
-
-			if assert.IsType(s.T(), &message.Sample_Rest{}, sample.GetSampleData()) {
+			if assert.IsType(s.T(), &telemetry.Sample_Rest_{}, sample.GetSampleData()) {
 				restData := sample.GetRest()
 
 				assert.Equal(s.T(), s.testServer.URL+"/redirect", restData.GetUrl())

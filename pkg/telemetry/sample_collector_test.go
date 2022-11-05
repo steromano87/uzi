@@ -1,101 +1,37 @@
 package telemetry_test
 
 import (
-	"github.com/steromano87/harkonnen/v1/pkg/message"
+	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"testing"
 )
 
-type SampleSenderTestSuite struct {
+type SampleCollectorTestSuite struct {
 	suite.Suite
-	bossMessenger   message.Bridge
-	minionMessenger message.Bridge
 }
 
-func (s *SampleSenderTestSuite) SetupTest() {
-	s.bossMessenger, s.minionMessenger = message.NewChannelBridgePair(100)
+func (s *SampleCollectorTestSuite) TestNewSampleSender() {
+	sampleCollector := telemetry.NewSampleCollector()
+
+	assert.IsType(s.T(), &telemetry.SampleCollector{}, sampleCollector)
 }
 
-func (s *SampleSenderTestSuite) TestNewSampleSender() {
-	sender := NewSampleSender(s.minionMessenger, 10)
+func (s *SampleCollectorTestSuite) TestSampleAdditionAndFlush() {
+	originalSample := &telemetry.Sample{}
 
-	assert.IsType(s.T(), &SampleSender{}, sender)
-}
+	sampleCollector := telemetry.NewSampleCollector()
+	sampleCollector.AddSample(originalSample)
+	sampleCollector.AddSample(originalSample)
 
-func (s *SampleSenderTestSuite) TestCollectBelowBufferLimit() {
-	sample := &message.Sample{}
+	samples := sampleCollector.GetSamples()
 
-	sender := NewSampleSender(s.minionMessenger, 10)
-	sender.Collect(sample)
-	sender.Collect(sample)
-
-	// Check that no message was actually sent
-	var noValue bool
-
-	select {
-	case <-s.bossMessenger.Receive():
-		noValue = false
-
-	default:
-		noValue = true
-	}
-
-	assert.True(s.T(), noValue)
-}
-
-func (s *SampleSenderTestSuite) TestSampleSendingWithManualFlush() {
-	sample := &message.Sample{}
-
-	sender := NewSampleSender(s.minionMessenger, 10)
-	sender.Collect(sample)
-	sender.Collect(sample)
-
-	sender.Flush()
-
-	var msg *message.Envelope
-
-	select {
-	case msg = <-s.bossMessenger.Receive():
-
-	default:
-		assert.Fail(s.T(), "no msg was sent")
-	}
-
-	if assert.IsType(s.T(), &message.Envelope{}, msg) {
-		payload := msg.GetSamples()
-		if assert.NotNil(s.T(), payload) {
-			assert.IsType(s.T(), []*message.Sample{}, payload.GetSample())
-			assert.Len(s.T(), payload.GetSample(), 2)
-		}
+	if assert.Len(s.T(), samples, 2) {
+		assert.Equal(s.T(), originalSample, samples[0])
+		assert.Equal(s.T(), originalSample, samples[1])
 	}
 }
 
-func (s *SampleSenderTestSuite) TestSampleSendingWithAutomaticFlush() {
-	sample := &message.Sample{}
-
-	sender := NewSampleSender(s.minionMessenger, 2)
-	sender.Collect(sample)
-	sender.Collect(sample)
-
-	var msg *message.Envelope
-
-	select {
-	case msg = <-s.bossMessenger.Receive():
-
-	default:
-		assert.Fail(s.T(), "no msg was sent")
-	}
-
-	if assert.IsType(s.T(), &message.Envelope{}, msg) {
-		payload := msg.GetSamples()
-		if assert.NotNil(s.T(), payload) {
-			assert.IsType(s.T(), []*message.Sample{}, payload.GetSample())
-			assert.Len(s.T(), payload.GetSample(), 2)
-		}
-	}
-}
-
-func TestSampleSenderSuite(t *testing.T) {
-	suite.Run(t, new(SampleSenderTestSuite))
+func TestSampleCollectorSuite(t *testing.T) {
+	suite.Run(t, new(SampleCollectorTestSuite))
 }

@@ -103,7 +103,7 @@ func (c *HostMetricsCollector) GetHostMetrics() []*HostMetrics {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	var output []*HostMetrics
+	output := make([]*HostMetrics, len(c.metrics))
 	copy(output, c.metrics)
 	c.metrics = make([]*HostMetrics, 0)
 	return output

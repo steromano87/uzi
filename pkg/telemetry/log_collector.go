@@ -37,7 +37,7 @@ func (l *LogCollector) GetLogs() []*Log {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	var outputLogs []*Log
+	outputLogs := make([]*Log, len(l.logs))
 	copy(outputLogs, l.logs)
 	l.logs = make([]*Log, 0)
 

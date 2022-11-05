@@ -26,7 +26,7 @@ func (s *SampleCollector) GetSamples() []*Sample {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	var outputSamples []*Sample
+	outputSamples := make([]*Sample, len(s.samples))
 	copy(outputSamples, s.samples)
 	s.samples = make([]*Sample, 0)
 	return outputSamples

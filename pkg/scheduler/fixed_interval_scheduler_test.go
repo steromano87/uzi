@@ -2,11 +2,9 @@ package scheduler_test
 
 import (
 	"context"
+	"github.com/fullstorydev/grpchan/inprocgrpc"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/cockpit"
-	"github.com/steromano87/harkonnen/v1/pkg/configuration"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
-	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/scheduler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -16,9 +14,9 @@ import (
 
 type SchedulerTestSuite struct {
 	suite.Suite
-	profile         scheduler.LoadProfile
-	bossMessenger   message.Bridge
-	minionMessenger message.Bridge
+	profile     scheduler.LoadProfile
+	grpcChannel *inprocgrpc.Channel
+	logger      *zerolog.Logger
 }
 
 func (s *SchedulerTestSuite) SetupTest() {
@@ -29,19 +27,23 @@ func (s *SchedulerTestSuite) SetupTest() {
 		Sustain:      2 * time.Second,
 		RampDown:     0,
 	}
-
-	s.bossMessenger, s.minionMessenger = message.NewChannelBridgePair(100)
+	s.grpcChannel = &inprocgrpc.Channel{}
+	zerolog.TimeFieldFormat = time.RFC3339Nano
+	consoleWriter := zerolog.NewConsoleWriter()
+	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
+	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
+	s.logger = &logger
 }
 
 func (s *SchedulerTestSuite) TestSingleInjectorQuota() {
 	injectorReferences := map[string]*injector.Reference{
 		"first": {
-			Weight:        1,
-			MessageBridge: s.bossMessenger,
+			Weight:         1,
+			InjectorClient: injector.NewInjectorClient(s.grpcChannel),
 		},
 	}
 
-	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 5*time.Second)
+	sched := scheduler.NewFixedIntervalScheduler(s.logger, s.profile, injectorReferences, 5*time.Second)
 	quotas := sched.At(1 * time.Second)
 
 	assert.EqualValues(s.T(), 10, quotas["first"])
@@ -50,15 +52,15 @@ func (s *SchedulerTestSuite) TestSingleInjectorQuota() {
 func (s *SchedulerTestSuite) TestTwoInjectorsWithSameWeight() {
 	injectorReferences := map[string]*injector.Reference{
 		"first": {
-			Weight:        1,
-			MessageBridge: s.bossMessenger,
+			Weight:         1,
+			InjectorClient: injector.NewInjectorClient(s.grpcChannel),
 		},
 		"second": {
-			Weight:        1,
-			MessageBridge: s.bossMessenger,
+			Weight:         1,
+			InjectorClient: injector.NewInjectorClient(s.grpcChannel),
 		},
 	}
-	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 5*time.Second)
+	sched := scheduler.NewFixedIntervalScheduler(s.logger, s.profile, injectorReferences, 5*time.Second)
 	quotas := sched.At(1 * time.Second)
 
 	assert.EqualValues(s.T(), 5, quotas["first"], "first weight is wrong")
@@ -68,16 +70,16 @@ func (s *SchedulerTestSuite) TestTwoInjectorsWithSameWeight() {
 func (s *SchedulerTestSuite) TestTwoInjectorsWithDifferentWeight() {
 	injectorReferences := map[string]*injector.Reference{
 		"first": {
-			Weight:        8,
-			MessageBridge: s.bossMessenger,
+			Weight:         8,
+			InjectorClient: injector.NewInjectorClient(s.grpcChannel),
 		},
 		"second": {
-			Weight:        2,
-			MessageBridge: s.bossMessenger,
+			Weight:         2,
+			InjectorClient: injector.NewInjectorClient(s.grpcChannel),
 		},
 	}
 
-	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 5*time.Second)
+	sched := scheduler.NewFixedIntervalScheduler(s.logger, s.profile, injectorReferences, 5*time.Second)
 	quotas := sched.At(1 * time.Second)
 
 	assert.EqualValues(s.T(), 8, quotas["first"], "first weight is wrong")
@@ -87,20 +89,20 @@ func (s *SchedulerTestSuite) TestTwoInjectorsWithDifferentWeight() {
 func (s *SchedulerTestSuite) TestThreeInjectorsWithDifferentWeight() {
 	injectorReferences := map[string]*injector.Reference{
 		"first": {
-			Weight:        8,
-			MessageBridge: s.bossMessenger,
+			Weight:         8,
+			InjectorClient: injector.NewInjectorClient(s.grpcChannel),
 		},
 		"second": {
-			Weight:        2,
-			MessageBridge: s.bossMessenger,
+			Weight:         2,
+			InjectorClient: injector.NewInjectorClient(s.grpcChannel),
 		},
 		"third": {
-			Weight:        2,
-			MessageBridge: s.bossMessenger,
+			Weight:         2,
+			InjectorClient: injector.NewInjectorClient(s.grpcChannel),
 		},
 	}
 
-	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 5*time.Second)
+	sched := scheduler.NewFixedIntervalScheduler(s.logger, s.profile, injectorReferences, 5*time.Second)
 	quotas := sched.At(1 * time.Second)
 
 	assert.EqualValues(s.T(), 6, quotas["first"], "first weight is wrong")
@@ -111,20 +113,14 @@ func (s *SchedulerTestSuite) TestThreeInjectorsWithDifferentWeight() {
 func (s *SchedulerTestSuite) TestRemoteReferenceUpdate() {
 	injectorReferences := map[string]*injector.Reference{
 		"first": {
-			Weight:        1,
-			MessageBridge: s.bossMessenger,
+			Weight:         1,
+			InjectorClient: injector.NewInjectorClient(s.grpcChannel),
 		},
 	}
 
-	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 100*time.Millisecond)
+	sched := scheduler.NewFixedIntervalScheduler(s.logger, s.profile, injectorReferences, 100*time.Millisecond)
 
-	zerolog.TimeFieldFormat = time.RFC3339Nano
-	consoleWriter := zerolog.NewConsoleWriter()
-	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
-	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
-	config, _ := configuration.NewDefault()
-
-	ctx, cancelFunc := cockpit.NewContext(context.TODO(), &logger, config)
+	ctx, cancelFunc := context.WithCancel(context.TODO())
 	go sched.Start(ctx)
 	time.Sleep(150 * time.Millisecond)
 	cancelFunc()

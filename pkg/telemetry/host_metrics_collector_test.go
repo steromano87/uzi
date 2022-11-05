@@ -2,7 +2,7 @@ package telemetry_test
 
 import (
 	"context"
-	"github.com/steromano87/harkonnen/v1/pkg/message"
+	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"testing"
@@ -11,47 +11,35 @@ import (
 
 type HostMetricsCollectorTestSuite struct {
 	suite.Suite
-	bossMessenger   message.Bridge
-	minionMessenger message.Bridge
-}
-
-func (s *HostMetricsCollectorTestSuite) SetupTest() {
-	s.bossMessenger, s.minionMessenger = message.NewChannelBridgePair(100)
 }
 
 func (s *HostMetricsCollectorTestSuite) TestNewHostMetricsCollector() {
-	collector := NewHostMetricsSender(s.minionMessenger)
-	assert.IsType(s.T(), &HostMetricsSender{}, collector)
+	collector := telemetry.NewHostMetricsCollector(1*time.Second, 200*time.Millisecond)
+	assert.IsType(s.T(), &telemetry.HostMetricsCollector{}, collector)
 }
 
 func (s *HostMetricsCollectorTestSuite) TestMetricsCollection() {
-	collector := NewHostMetricsSender(s.minionMessenger)
-	ctx, cancelFunc := context.WithCancel(context.TODO())
-
 	pollingInterval := 250 * time.Millisecond
 	measuringInterval := 50 * time.Millisecond
-	collector.Start(ctx, pollingInterval, measuringInterval)
+	collector := telemetry.NewHostMetricsCollector(pollingInterval, measuringInterval)
+	ctx, cancelFunc := context.WithCancel(context.TODO())
+
+	collector.StartHostMetricsCollection(ctx)
 
 	time.Sleep(2 * pollingInterval)
 	cancelFunc()
 
-	select {
-	case msg := <-s.bossMessenger.Receive():
-		if assert.IsType(s.T(), &message.Envelope_HostMetrics{}, msg.GetPayload()) {
-			payload := msg.GetHostMetrics()
-			if assert.NotNil(s.T(), payload) {
-				if assert.IsType(s.T(), &message.HostMetrics{}, payload) {
-					assert.GreaterOrEqual(s.T(), payload.GetCpu(), 0.0)
-					assert.Greater(s.T(), payload.GetMemory().GetTotal(), uint64(0))
-					assert.LessOrEqual(s.T(), payload.GetMemory().GetUsed(), payload.GetMemory().GetTotal())
-					assert.Greater(s.T(), payload.GetStorage().GetTotal(), uint64(0))
-					assert.LessOrEqual(s.T(), payload.GetStorage().GetUsed(), payload.GetStorage().GetTotal())
-				}
-			}
-		}
+	metrics := collector.GetHostMetrics()
+	if assert.NotEmpty(s.T(), metrics) {
+		metric := metrics[0]
 
-	default:
-		assert.Fail(s.T(), "no metrics message was sent")
+		if assert.IsType(s.T(), &telemetry.HostMetrics{}, metric) {
+			assert.GreaterOrEqual(s.T(), metric.GetCpu(), 0.0)
+			assert.Greater(s.T(), metric.GetMemory().GetTotal(), uint64(0))
+			assert.LessOrEqual(s.T(), metric.GetMemory().GetUsed(), metric.GetMemory().GetTotal())
+			assert.Greater(s.T(), metric.GetStorage().GetTotal(), uint64(0))
+			assert.LessOrEqual(s.T(), metric.GetStorage().GetUsed(), metric.GetStorage().GetTotal())
+		}
 	}
 }
 
