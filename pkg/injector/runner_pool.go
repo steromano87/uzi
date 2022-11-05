@@ -2,6 +2,7 @@ package injector
 
 import (
 	"context"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/configuration"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl/pipeline"
@@ -36,8 +37,9 @@ func (d *RunnerPool) UpdateIterVars(vars map[string]any) {
 func (d *RunnerPool) SetDesiredRunners(ctx context.Context, desiredRunners uint64) error {
 	// Case 1: new runners must be dispatched
 	for desiredRunners > d.DispatchedRunners() {
+		runnerLogger := d.Logger.With().Str("runnerID", uuid.NewString()).Logger()
 		runner := NewRunner(
-			d.Logger,
+			&runnerLogger,
 			d.Configuration,
 			d.VariablesHolder,
 			d.TelemetryServer,
