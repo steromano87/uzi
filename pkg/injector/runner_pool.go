@@ -2,6 +2,7 @@ package injector
 
 import (
 	"context"
+	"github.com/emirpasic/gods/sets/linkedhashset"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/configuration"
@@ -19,87 +20,144 @@ type RunnerPool struct {
 	VariablesHolder  *variables.Holder
 	TelemetryServer  *telemetry.Server
 
-	runners          []runnerHolder
+	dispatchedRunners   *linkedhashset.Set
+	dispatchedRunnersMu sync.RWMutex
+
 	scheduledRunners int
 	startedRunners   int
 	runnersWaitGroup sync.WaitGroup
 }
 
 type runnerHolder struct {
-	runner     *Runner
-	cancelFunc context.CancelFunc
+	id                string
+	runner            *Runner
+	cancelFunc        context.CancelFunc
+	scheduledShutdown bool
 }
 
-func (d *RunnerPool) UpdateIterVars(vars map[string]any) {
-	d.VariablesHolder.UpdateIterVars(vars)
+func (rp *RunnerPool) UpdateIterVars(vars map[string]any) {
+	rp.VariablesHolder.UpdateIterVars(vars)
 }
 
-func (d *RunnerPool) SetDesiredRunners(ctx context.Context, desiredRunners uint64) error {
-	// Case 1: new runners must be dispatched
-	for desiredRunners > d.DispatchedRunners() {
-		runnerLogger := d.Logger.With().Str("runnerID", uuid.NewString()).Logger()
+func (rp *RunnerPool) SetDesiredRunners(ctx context.Context, desiredRunners uint64) error {
+	// Case 1: new dispatchedRunners must be dispatched
+	for desiredRunners > rp.DispatchedRunners() {
+		rp.Logger.Debug().Uint64(
+			"dispatchedRunners", rp.DispatchedRunners(),
+		).Uint64(
+			"desiredRunners", desiredRunners,
+		).Msg("Desired runners are less than dispatched runners, adding a new one")
+
+		runnerID := uuid.NewString()
+		runnerLogger := rp.Logger.With().Str("runnerID", runnerID).Logger()
 		runner := NewRunner(
 			&runnerLogger,
-			d.Configuration,
-			d.VariablesHolder,
-			d.TelemetryServer,
-			d.TemplatePipeline,
+			rp.Configuration,
+			rp.VariablesHolder,
+			rp.TelemetryServer,
+			rp.TemplatePipeline,
 		)
 
 		runnerCtx, runnerCancelFunc := context.WithCancel(ctx)
-		d.runnersWaitGroup.Add(1)
+		rp.runnersWaitGroup.Add(1)
 		runner.Start(runnerCtx)
+		rp.Logger.Info().Str("runnerID", runnerID).Msg("New runner started")
 
-		// Asynchronously wait for the runner to complete
+		// Holder must be used as pointer, because otherwise GoDS Set would complain about an un-hashable type...
+		holder := &runnerHolder{
+			id:                runnerID,
+			runner:            runner,
+			cancelFunc:        runnerCancelFunc,
+			scheduledShutdown: false,
+		}
+		rp.addToActiveRunners(holder)
+
+		// Asynchronously wait for the runner to complete and automatically remove it from active dispatchedRunners
 		go func() {
 			runner.Wait()
-			d.runnersWaitGroup.Done()
+			rp.removeFromActiveRunners(holder)
+			rp.Logger.Info().Str("runnerID", holder.id).Msg("Runner stopped")
+			rp.runnersWaitGroup.Done()
 		}()
-
-		d.runners = append(d.runners, runnerHolder{
-			runner:     runner,
-			cancelFunc: runnerCancelFunc,
-		})
 	}
 
-	// Case 2: some runners should be gracefully stopped
-	for desiredRunners < d.DispatchedRunners() {
-		// Pop the first element from the list, see https://stackoverflow.com/a/52546579
-		indexToStop := 0
-		runnerHolderToStop := d.runners[indexToStop]
-		d.runners = append(d.runners[:indexToStop], d.runners[indexToStop+1:]...)
+	// Case 2: some dispatchedRunners should be gracefully stopped
+	for desiredRunners < rp.DispatchedRunners() {
+		rp.Logger.Debug().Uint64(
+			"dispatchedRunners", rp.DispatchedRunners(),
+		).Uint64(
+			"desiredRunners", desiredRunners,
+		).Msg("Desired runners are more than dispatched runners, stopping one")
 
-		runnerHolderToStop.runner.ScheduleShutdown()
+		runnerToDelete := rp.getNextStoppableRunner()
+		rp.Logger.Info().Str("runnerID", runnerToDelete.id).Msg("Scheduling shutdown for runner")
+
+		runnerToDelete.runner.ScheduleShutdown()
+		runnerToDelete.scheduledShutdown = true
 	}
 
 	return nil
 }
 
-func (d *RunnerPool) DispatchedRunners() uint64 {
-	return uint64(len(d.runners))
+func (rp *RunnerPool) addToActiveRunners(holder *runnerHolder) {
+	rp.dispatchedRunnersMu.Lock()
+	defer rp.dispatchedRunnersMu.Unlock()
+
+	rp.dispatchedRunners.Add(holder)
 }
 
-func (d *RunnerPool) WaitForCompletion() {
-	d.runnersWaitGroup.Wait()
+func (rp *RunnerPool) removeFromActiveRunners(holder *runnerHolder) {
+	rp.dispatchedRunnersMu.Lock()
+	defer rp.dispatchedRunnersMu.Unlock()
+
+	rp.dispatchedRunners.Remove(holder)
 }
 
-func (d *RunnerPool) GracefulShutdown() {
-	for _, holder := range d.runners {
-		holder.runner.ScheduleShutdown()
-	}
+func (rp *RunnerPool) getNextStoppableRunner() *runnerHolder {
+	rp.dispatchedRunnersMu.RLock()
+	defer rp.dispatchedRunnersMu.RUnlock()
+
+	return rp.dispatchedRunners.Values()[0].(*runnerHolder)
 }
 
-func (d *RunnerPool) ForcedShutdown() {
-	for _, holder := range d.runners {
-		holder.cancelFunc()
-	}
+func (rp *RunnerPool) DispatchedRunners() uint64 {
+	rp.dispatchedRunnersMu.RLock()
+	defer rp.dispatchedRunnersMu.RUnlock()
+
+	var counter uint64
+
+	rp.dispatchedRunners.Each(func(_ int, holder any) {
+		if !holder.(*runnerHolder).scheduledShutdown {
+			counter++
+		}
+	})
+
+	return counter
 }
 
-func (d *RunnerPool) Status() *RunnersStatus {
+func (rp *RunnerPool) WaitForCompletion() {
+	rp.runnersWaitGroup.Wait()
+}
+
+func (rp *RunnerPool) GracefulShutdown() {
+	rp.Logger.Info().Msg("Requested global graceful shutdown")
+	rp.dispatchedRunners.Each(func(_ int, holder any) {
+		holder.(*runnerHolder).runner.ScheduleShutdown()
+	})
+}
+
+func (rp *RunnerPool) ForcedShutdown() {
+	rp.Logger.Warn().Msg("Requested global forced shutdown, stopping all runners...")
+	rp.dispatchedRunners.Each(func(_ int, holder any) {
+		holder.(*runnerHolder).cancelFunc()
+	})
+}
+
+func (rp *RunnerPool) Status() *RunnersStatus {
 	status := &RunnersStatus{}
 
-	for _, holder := range d.runners {
-		switch holder.runner.status {
+	rp.dispatchedRunners.Each(func(_ int, holder any) {
+		switch holder.(*runnerHolder).runner.status {
 		case RunnersStatus_READY:
 			status.Ready++
 
@@ -118,11 +176,11 @@ func (d *RunnerPool) Status() *RunnersStatus {
 		case RunnersStatus_ERROR:
 			status.Error++
 		}
-	}
+	})
 
 	return status
 }
 
-func (d *RunnerPool) Initialize() {
-	d.runners = make([]runnerHolder, 0)
+func (rp *RunnerPool) Initialize() {
+	rp.dispatchedRunners = linkedhashset.New()
 }
