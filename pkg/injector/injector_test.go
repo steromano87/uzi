@@ -3,9 +3,9 @@ package injector_test
 import (
 	"context"
 	"github.com/Flaque/filet"
+	"github.com/fullstorydev/grpchan/inprocgrpc"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
-	"github.com/steromano87/harkonnen/v1/pkg/message"
 	"github.com/steromano87/harkonnen/v1/pkg/utils"
 	"github.com/steromano87/harkonnen/v1/pkg/version"
 	"github.com/steromano87/harkonnen/v1/pkg/workingfolder"
@@ -19,10 +19,11 @@ import (
 
 type InjectorTestSuite struct {
 	suite.Suite
-	bossMessenger   message.Bridge
-	minionMessenger message.Bridge
-	ctx             injector.Context
-	cancelFunc      context.CancelFunc
+	logger                *zerolog.Logger
+	ctx                   context.Context
+	cancelFunc            context.CancelFunc
+	injectorClient        injector.InjectorClient
+	injectorInProcChannel *inprocgrpc.Channel
 }
 
 func (s *InjectorTestSuite) SetupTest() {
@@ -30,9 +31,11 @@ func (s *InjectorTestSuite) SetupTest() {
 	consoleWriter := zerolog.NewConsoleWriter()
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
+	s.logger = &logger
 
-	s.bossMessenger, s.minionMessenger = message.NewChannelBridgePair(100)
-	s.ctx, s.cancelFunc = injector.NewContext(context.TODO(), &logger, s.minionMessenger)
+	s.ctx, s.cancelFunc = context.WithCancel(context.TODO())
+	s.injectorInProcChannel = &inprocgrpc.Channel{}
+	s.injectorClient = injector.NewInjectorClient(s.injectorInProcChannel)
 }
 
 func (s *InjectorTestSuite) TearDownTest() {
@@ -40,7 +43,7 @@ func (s *InjectorTestSuite) TearDownTest() {
 }
 
 func (s *InjectorTestSuite) TestNewInjector() {
-	inj, err := injector.New(s.ctx)
+	inj, err := injector.New(s.ctx, s.logger)
 	defer inj.Stop()
 
 	if assert.NoError(s.T(), err) {
@@ -50,66 +53,50 @@ func (s *InjectorTestSuite) TestNewInjector() {
 }
 
 func (s *InjectorTestSuite) TestStartNewInjector() {
-	inj, err := injector.New(s.ctx)
+	inj, err := injector.New(s.ctx, s.logger)
 	if assert.NoError(s.T(), err) {
-		assert.Equal(s.T(), injector.StatusDisconnected, inj.Status())
+		assert.Equal(s.T(), injector.InjectorStatus_READY, inj.Status())
 	}
 }
 
-func (s *InjectorTestSuite) TestHelloMessageHandlingWithCorrectVersion() {
-	inj, _ := injector.New(s.ctx)
-	s.bossMessenger.Send(message.NewHelloEnvelope(version.Version))
+func (s *InjectorTestSuite) TestHandshakeMessageHandlingWithCorrectVersion() {
+	inj, _ := injector.New(s.ctx, s.logger)
+	injector.RegisterInjectorServer(s.injectorInProcChannel, inj)
 
-	responseMessage, ok := <-s.bossMessenger.Receive()
-	if assert.True(s.T(), ok) {
-		assert.IsType(s.T(), &message.Envelope_Acknowledge{}, responseMessage.GetPayload())
-		assert.True(s.T(), responseMessage.GetAcknowledge().GetOk())
-		assert.Equal(s.T(), injector.StatusConnected, inj.Status())
-		assert.Equal(s.T(), injector.StatusConnected, responseMessage.GetAcknowledge().GetStatus())
+	responseMessage, err := s.injectorClient.Handshake(s.ctx, &injector.HandshakeRequest{CockpitVersion: version.Version})
+
+	if assert.NoError(s.T(), err) {
+		assert.Equal(s.T(), version.Version, responseMessage.GetInjectorVersion())
 	}
 }
 
-func (s *InjectorTestSuite) TestHelloMessageHandlingWithMismatchingVersion() {
-	inj, _ := injector.New(s.ctx)
-	s.bossMessenger.Send(message.NewHelloEnvelope("0.0.0"))
+func (s *InjectorTestSuite) TestHandshakeMessageHandlingWithMismatchingVersion() {
+	s.T().Skip("To be still implemented")
+	inj, _ := injector.New(s.ctx, s.logger)
+	injector.RegisterInjectorServer(s.injectorInProcChannel, inj)
 
-	responseMessage, ok := <-s.bossMessenger.Receive()
-	if assert.True(s.T(), ok) {
-		assert.IsType(s.T(), &message.Envelope_Acknowledge{}, responseMessage.GetPayload())
-		assert.False(s.T(), responseMessage.GetAcknowledge().GetOk())
-		assert.Equal(s.T(), injector.StatusDisconnected, inj.Status())
-		assert.Empty(s.T(), responseMessage.GetAcknowledge().GetStatus())
-		assert.Contains(s.T(), responseMessage.GetAcknowledge().GetDetails(), "mismatch")
+	responseMessage, err := s.injectorClient.Handshake(s.ctx, &injector.HandshakeRequest{CockpitVersion: "0.0.0"})
+
+	if assert.NoError(s.T(), err) {
+		assert.Equal(s.T(), version.Version, responseMessage.GetInjectorVersion())
 	}
 }
 
-func (s *InjectorTestSuite) TestHelloMessageHandlingWithInvalidVersion() {
-	inj, _ := injector.New(s.ctx)
-	s.bossMessenger.Send(message.NewHelloEnvelope("invalid"))
+func (s *InjectorTestSuite) TestHandshakeMessageHandlingWithInvalidVersion() {
+	s.T().Skip("To be still implemented")
+	inj, _ := injector.New(s.ctx, s.logger)
+	injector.RegisterInjectorServer(s.injectorInProcChannel, inj)
 
-	responseMessage, ok := <-s.bossMessenger.Receive()
-	if assert.True(s.T(), ok) {
-		assert.IsType(s.T(), &message.Envelope_Acknowledge{}, responseMessage.GetPayload())
-		assert.False(s.T(), responseMessage.GetAcknowledge().GetOk())
-		assert.Equal(s.T(), injector.StatusDisconnected, inj.Status())
-		assert.Empty(s.T(), responseMessage.GetAcknowledge().GetStatus())
-		assert.Contains(s.T(), responseMessage.GetAcknowledge().GetDetails(), "invalid")
+	responseMessage, err := s.injectorClient.Handshake(s.ctx, &injector.HandshakeRequest{CockpitVersion: "invalid"})
+
+	if assert.NoError(s.T(), err) {
+		assert.Equal(s.T(), version.Version, responseMessage.GetInjectorVersion())
 	}
 }
 
-func (s *InjectorTestSuite) TestPingMessageHandling() {
-	_, _ = injector.New(s.ctx)
-	s.bossMessenger.SendPing()
-
-	responseMessage, ok := <-s.bossMessenger.Receive()
-	if assert.True(s.T(), ok) {
-		assert.IsType(s.T(), &message.Envelope_Pong{}, responseMessage.GetPayload())
-		assert.NotNil(s.T(), responseMessage.GetAnswersTo())
-	}
-}
-
-func (s *InjectorTestSuite) TestWorkingFolderInitMessageHandlingWithValidConfiguration() {
-	inj, _ := injector.New(s.ctx)
+func (s *InjectorTestSuite) TestInitializationMessageHandlingWithValidConfiguration() {
+	inj, _ := injector.New(s.ctx, s.logger)
+	injector.RegisterInjectorServer(s.injectorInProcChannel, inj)
 
 	tempWorkingDir := filet.TmpDir(s.T(), "")
 	filet.File(s.T(), filepath.Join(tempWorkingDir, workingfolder.ConfigurationFile), "")
@@ -118,27 +105,27 @@ func (s *InjectorTestSuite) TestWorkingFolderInitMessageHandlingWithValidConfigu
 
 	compressedWorkDir, err := utils.ZipFolder(tempWorkingDir)
 	require.NoError(s.T(), err)
-	workDirMessage := message.NewWorkingFolderInitEnvelope(compressedWorkDir)
 
-	s.bossMessenger.Send(workDirMessage)
+	initializationRequest := &injector.InitializationRequest{
+		WorkingFolder: &injector.WorkingFolder{
+			CompressedWorkingFolder: compressedWorkDir,
+			CompressionAlgorithm:    injector.CompressionAlgorithm_ZIP,
+		},
+	}
 
-	responseMessage, ok := <-s.bossMessenger.Receive()
-	if assert.True(s.T(), ok) {
-		if assert.IsType(s.T(), &message.Envelope_Acknowledge{}, responseMessage.GetPayload()) {
-			assert.Equal(s.T(), workDirMessage.GetId(), responseMessage.GetAnswersTo())
-			assert.True(s.T(), responseMessage.GetAcknowledge().GetOk())
-		}
-
+	responseMessage, err := s.injectorClient.Initialize(s.ctx, initializationRequest)
+	if assert.NoError(s.T(), err) {
 		if assert.DirExists(s.T(), inj.WorkingFolder()) {
 			assert.FileExists(s.T(), filepath.Join(inj.WorkingFolder(), workingfolder.ConfigurationFile))
 		}
 
-		assert.Equal(s.T(), injector.StatusInitialized, inj.Status())
+		assert.Equal(s.T(), injector.InjectorStatus_INITIALIZED, responseMessage.GetCurrent())
 	}
 }
 
-func (s *InjectorTestSuite) TestWorkingFolderInitMessageHandlingWithInvalidConfiguration() {
-	inj, _ := injector.New(s.ctx)
+func (s *InjectorTestSuite) TestInitializationMessageHandlingWithInvalidConfiguration() {
+	inj, _ := injector.New(s.ctx, s.logger)
+	injector.RegisterInjectorServer(s.injectorInProcChannel, inj)
 
 	tempWorkingDir := filet.TmpDir(s.T(), "")
 	filet.File(s.T(), filepath.Join(tempWorkingDir, workingfolder.ConfigurationFile), "fake")
@@ -147,23 +134,24 @@ func (s *InjectorTestSuite) TestWorkingFolderInitMessageHandlingWithInvalidConfi
 
 	compressedWorkDir, err := utils.ZipFolder(tempWorkingDir)
 	require.NoError(s.T(), err)
-	workDirMessage := message.NewWorkingFolderInitEnvelope(compressedWorkDir)
 
-	s.bossMessenger.Send(workDirMessage)
+	initializationRequest := &injector.InitializationRequest{
+		WorkingFolder: &injector.WorkingFolder{
+			CompressedWorkingFolder: compressedWorkDir,
+			CompressionAlgorithm:    injector.CompressionAlgorithm_ZIP,
+		},
+	}
 
-	responseMessage, ok := <-s.bossMessenger.Receive()
-	if assert.True(s.T(), ok) {
-		if assert.IsType(s.T(), &message.Envelope_Acknowledge{}, responseMessage.GetPayload()) {
-			assert.Equal(s.T(), workDirMessage.GetId(), responseMessage.GetAnswersTo())
-			assert.False(s.T(), responseMessage.GetAcknowledge().GetOk())
-		}
+	responseMessage, err := s.injectorClient.Initialize(s.ctx, initializationRequest)
 
-		assert.NotEqual(s.T(), injector.StatusInitialized, inj.Status())
+	if assert.Error(s.T(), err) {
+		assert.Nil(s.T(), responseMessage)
 	}
 }
 
-func (s *InjectorTestSuite) TestWorkingFolderInitMessageHandlingWithMissingConfiguration() {
-	inj, _ := injector.New(s.ctx)
+func (s *InjectorTestSuite) TestInitializationMessageHandlingWithMissingConfiguration() {
+	inj, _ := injector.New(s.ctx, s.logger)
+	injector.RegisterInjectorServer(s.injectorInProcChannel, inj)
 
 	tempWorkingDir := filet.TmpDir(s.T(), "")
 	filet.File(s.T(), filepath.Join(tempWorkingDir, "config.yaml"), "")
@@ -172,18 +160,17 @@ func (s *InjectorTestSuite) TestWorkingFolderInitMessageHandlingWithMissingConfi
 
 	compressedWorkDir, err := utils.ZipFolder(tempWorkingDir)
 	require.NoError(s.T(), err)
-	workDirMessage := message.NewWorkingFolderInitEnvelope(compressedWorkDir)
 
-	s.bossMessenger.Send(workDirMessage)
+	initializationRequest := &injector.InitializationRequest{
+		WorkingFolder: &injector.WorkingFolder{
+			CompressedWorkingFolder: compressedWorkDir,
+			CompressionAlgorithm:    injector.CompressionAlgorithm_ZIP,
+		},
+	}
 
-	responseMessage, ok := <-s.bossMessenger.Receive()
-	if assert.True(s.T(), ok) {
-		if assert.IsType(s.T(), &message.Envelope_Acknowledge{}, responseMessage.GetPayload()) {
-			assert.Equal(s.T(), workDirMessage.GetId(), responseMessage.GetAnswersTo())
-			assert.False(s.T(), responseMessage.GetAcknowledge().GetOk())
-		}
-
-		assert.NotEqual(s.T(), injector.StatusInitialized, inj.Status())
+	responseMessage, err := s.injectorClient.Initialize(s.ctx, initializationRequest)
+	if assert.Error(s.T(), err) {
+		assert.Nil(s.T(), responseMessage)
 	}
 }
 

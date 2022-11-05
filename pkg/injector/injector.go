@@ -90,14 +90,14 @@ func (i *Injector) initializeWorkingFolder(compressedWorkingFolder []byte) error
 	i.contextLogger().Debug().Msg("Unzipping working folder...")
 	err := utils.UnzipFolder(compressedWorkingFolder, i.workingFolder)
 	if err != nil {
-		return nil
+		return err
 	}
 	i.contextLogger().Info().Msg("Working folder successfully unzipped")
 
 	i.contextLogger().Debug().Msg("Reading configuration from working folder...")
 	err = i.configuration.Read(filepath.Join(i.workingFolder, workingfolder.ConfigurationFile))
 	if err != nil {
-		return nil
+		return err
 	}
 	i.contextLogger().Info().Msg("Configuration successfully parsed")
 
