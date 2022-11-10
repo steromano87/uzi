@@ -23,13 +23,6 @@ injectors:
     local: true
     weight: 1
 
-messaging:
-  messageCapacity: 2048
-  logging:
-    bufferSize: 50
-  samples:
-    bufferSize: 10
-
 logging:
   level: info
 

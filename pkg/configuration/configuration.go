@@ -22,7 +22,6 @@ type Configuration struct {
 	HarkonnenVersion string
 	Load             Load
 	Injectors        map[string]Injector
-	Messaging        Messaging
 	Logging          Logging
 	Cockpit          Cockpit
 	Client           ClientConfiguration
