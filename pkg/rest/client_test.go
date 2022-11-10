@@ -35,10 +35,7 @@ func (s *ClientTestSuite) SetupTest() {
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	s.logger = zerolog.New(consoleWriter).With().Timestamp().Logger()
 
-	// TODO: replace this and all other entries with the default config
 	config, _ := configuration.NewDefault()
-	config.Viper.Set("messaging.samples.bufferSize", 1)
-	_ = config.Update()
 
 	s.telemetryServer = telemetry.NewServer(config)
 	s.ctx, _ = dsl.NewContext(context.TODO(), config, &s.logger, variables.NewHolder(), s.telemetryServer)
@@ -419,9 +416,8 @@ func (s *ClientTestSuite) TestRequestMalformedUrl() {
 
 func (s *ClientTestSuite) TestRequestInvalidPartialUrl() {
 	baseUrl, _ := url.Parse(s.testServer.URL)
-	s.ctx.Config().Viper.Set("client.rest.baseUrl", baseUrl.String())
-	s.ctx.Config().Viper.Set("client.rest.followRedirects", false)
-	_ = s.ctx.Config().Update()
+	s.ctx.Config().Client.Rest.BaseUrl = baseUrl.String()
+	s.ctx.Config().Client.Rest.FollowRedirects = false
 
 	invalidPartialUrl := "test"
 
