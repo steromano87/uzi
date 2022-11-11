@@ -21,7 +21,7 @@ type Runner struct {
 	logger        *zerolog.Logger
 	variables     *variables.Holder
 
-	status RunnersStatus_Status
+	status RunnerStatus
 
 	shutdownScheduled bool
 	completionChan    chan error
@@ -36,7 +36,7 @@ func NewRunner(logger *zerolog.Logger, config *configuration.Configuration, varH
 	runner.variables = varHolder
 	runner.telemetryServer = telemetryServer
 	runner.pip = pip
-	runner.status = RunnersStatus_READY
+	runner.status = RunnerStatus_READY
 
 	return runner
 }
@@ -65,34 +65,34 @@ func (r *Runner) run(ctx dsl.Context) {
 	defer r.completionWG.Done()
 	var err error
 
-	r.status = RunnersStatus_STARTING
+	r.status = RunnerStatus_STARTING
 	err = r.runSetup(ctx)
 	if err != nil {
 		r.logger.Error().Err(err).Msg("Encountered an unrecoverable error while running setup steps")
-		r.status = RunnersStatus_ERROR
+		r.status = RunnerStatus_ERROR
 		r.result = err
 		return
 	}
 
-	r.status = RunnersStatus_RUNNING
+	r.status = RunnerStatus_RUNNING
 	err = r.runMain(ctx)
 	if err != nil {
 		r.logger.Error().Err(err).Msg("Encountered an unrecoverable error while running main steps")
-		r.status = RunnersStatus_ERROR
+		r.status = RunnerStatus_ERROR
 		r.result = err
 		return
 	}
 
-	r.status = RunnersStatus_STOPPING
+	r.status = RunnerStatus_STOPPING
 	err = r.runTeardown(ctx)
 	if err != nil {
 		r.logger.Error().Err(err).Msg("Encountered an unrecoverable error while running teardown steps")
-		r.status = RunnersStatus_ERROR
+		r.status = RunnerStatus_ERROR
 		r.result = err
 		return
 	}
 
-	r.status = RunnersStatus_STOPPED
+	r.status = RunnerStatus_STOPPED
 	r.result = nil
 }
 

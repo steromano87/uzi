@@ -10,7 +10,6 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/scheduler"
 	"github.com/steromano87/harkonnen/v1/pkg/utils"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
-	"github.com/steromano87/harkonnen/v1/pkg/version"
 )
 
 type Cockpit struct {
@@ -61,7 +60,7 @@ func (c *Cockpit) Start() error {
 		return err
 	}
 
-	err = c.sayHelloToAllInjectors()
+	err = c.checkInitialInjectorsStatus()
 	if err != nil {
 		return err
 	}
@@ -173,11 +172,12 @@ func (c *Cockpit) connectToRemoteInjector(reference *injector.Reference) error {
 	panic("to be implemented")
 }
 
-func (c *Cockpit) sayHelloToAllInjectors() error {
-	c.contextLogger().Info().Msg("Sending hello message to all available injectors...")
+func (c *Cockpit) checkInitialInjectorsStatus() error {
+	c.contextLogger().Info().Msg("Checking status of all available injectors...")
+
 	for injectorID, reference := range c.injectorReferences {
 		c.contextLogger().Info().Str("injectorID", injectorID).Msg("Sending hello message to injector")
-		response, err := reference.InjectorClient.Handshake(c.ctx, &injector.HandshakeRequest{CockpitVersion: version.Version})
+		response, err := reference.InjectorClient.GetStatus(c.ctx, &injector.StatusRequest{})
 		if err != nil {
 			c.contextLogger().Error().Str(
 				injectorID, "injectorID",
@@ -189,7 +189,7 @@ func (c *Cockpit) sayHelloToAllInjectors() error {
 		c.contextLogger().Info().Str(
 			"injectorID", injectorID,
 		).Str(
-			"injectorVersion", response.GetInjectorVersion(),
+			"injectorVersion", response.GetVersion(),
 		).Msg("Received positive handshake")
 	}
 
@@ -212,18 +212,14 @@ func (c *Cockpit) sendCompressedWorkingFolderTollInjectors() error {
 			},
 		}
 
-		response, err := reference.InjectorClient.Initialize(c.ctx, &initializationRequest)
+		_, err := reference.InjectorClient.Initialize(c.ctx, &initializationRequest)
 		if err != nil {
 			c.contextLogger().Error().Err(err).Str("injectorID", injectorID).Msg("Error when sending compressed working folder")
 			return err
 		}
 		c.contextLogger().Info().Str(
 			"injectorID", injectorID,
-		).Str(
-			"previousStatus", response.GetPrevious().String(),
-		).Str(
-			"currentStatus", response.GetCurrent().String(),
-		).Msg("Working folder successfully sent, injector status updated")
+		).Msg("Working folder successfully sent")
 	}
 
 	return nil

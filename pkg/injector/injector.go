@@ -12,9 +12,15 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/workingfolder"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"io"
 	"os"
 	"path/filepath"
+	"time"
 )
+
+const HeartbeatTimeout = 10 * time.Second
 
 type Injector struct {
 	UnimplementedInjectorServer
@@ -25,14 +31,13 @@ type Injector struct {
 
 	runnerPool RunnerPool
 
-	configuration *configuration.Configuration
-	logger        *zerolog.Logger
-
+	configuration   *configuration.Configuration
+	logger          *zerolog.Logger
 	telemetryServer *telemetry.Server
+	workingFolder   string
+	status          InjectorStatus
 
-	status InjectorStatus_Status
-
-	workingFolder string
+	heartbeatTimeoutTimer *time.Timer
 }
 
 func New(parentCtx context.Context, logger *zerolog.Logger) (*Injector, error) {
@@ -48,24 +53,91 @@ func New(parentCtx context.Context, logger *zerolog.Logger) (*Injector, error) {
 	if err != nil {
 		return nil, err
 	}
-	inj.status = InjectorStatus_READY
+	inj.status = InjectorStatus_AVAILABLE
 
 	return inj, nil
 }
 
-func (i *Injector) Handshake(_ context.Context, request *HandshakeRequest) (*HandshakeResponse, error) {
-	i.contextLogger().Info().Str("cockpitVersion", request.GetCockpitVersion()).Msg("Received handshake message")
-	return &HandshakeResponse{
-		InjectorVersion: version.Version,
-	}, nil
+func (i *Injector) GetStatus(_ context.Context, _ *StatusRequest) (*Status, error) {
+	response := Status{
+		Version:        version.Version,
+		Status:         i.status,
+		RunnerCounters: i.runnerPool.GetCounters(),
+	}
+
+	return &response, nil
 }
 
-func (i *Injector) Heartbeat(Injector_HeartbeatServer) error {
-	return status.Errorf(codes.Unimplemented, "method Heartbeat not implemented")
+func (i *Injector) Acquire(stream Injector_AcquireServer) error {
+	i.contextLogger().Info().Msg("Received acquire request")
+	i.status = InjectorStatus_ACQUIRED
+	i.heartbeatTimeoutTimer = time.NewTimer(HeartbeatTimeout)
+
+	for {
+		errorChan := make(chan error)
+		go func() {
+			_, err := stream.Recv()
+
+			if err == io.EOF {
+				i.contextLogger().Error().Err(err).Msg("Lock channel closed by cockpit")
+				errorChan <- err
+				return
+			}
+
+			if err != nil {
+				i.contextLogger().Error().Err(err).Msg("Error when receiving heartbeat from cockpit")
+				errorChan <- err
+				return
+			}
+
+			// Drain the timer, according to documentation
+			if !i.heartbeatTimeoutTimer.Stop() {
+				<-i.heartbeatTimeoutTimer.C
+			}
+
+			response := &HeartbeatResponse{
+				Timestamp: timestamppb.Now(),
+			}
+
+			if err := stream.Send(response); err != nil {
+				i.contextLogger().Error().Err(err).Msg("Error sending heartbeat response")
+				errorChan <- err
+				return
+			}
+			i.heartbeatTimeoutTimer.Reset(HeartbeatTimeout)
+		}()
+
+		select {
+		case <-i.heartbeatTimeoutTimer.C:
+			i.contextLogger().Error().Msg("Timeout exceeded for heartbeat message, stopping all active runners")
+			i.childCancelFunc()
+			i.status = InjectorStatus_AVAILABLE
+			return status.Error(codes.Aborted, "Heartbeat timeout exceeded")
+
+		case err := <-errorChan:
+			if err != nil {
+				i.contextLogger().Error().Err(err).Msg("Stopping all active runners")
+				i.childCancelFunc()
+				i.status = InjectorStatus_AVAILABLE
+				return status.Errorf(codes.Aborted, "Error received: %x", err)
+			}
+		}
+	}
 }
 
-func (i *Injector) Initialize(_ context.Context, request *InitializationRequest) (*InjectorStatus, error) {
+func (i *Injector) Initialize(ctx context.Context, request *InitializationRequest) (*emptypb.Empty, error) {
 	i.contextLogger().Info().Msg("Received initialization request")
+
+	if i.status != InjectorStatus_ACQUIRED {
+		errorDescription := "Invalid status for initialization"
+		i.contextLogger().Error().Str("status", i.status.String()).Msg(errorDescription)
+		return nil, status.Errorf(
+			codes.FailedPrecondition,
+			"Invalid status for initialization, current: %s, requested: %s",
+			i.status.String(),
+			InjectorStatus_ACQUIRED.String(),
+		)
+	}
 
 	compressedWorkingFolder := request.GetWorkingFolder().GetCompressedWorkingFolder()
 	err := i.initializeWorkingFolder(compressedWorkingFolder)
@@ -77,13 +149,9 @@ func (i *Injector) Initialize(_ context.Context, request *InitializationRequest)
 
 	// Initialize all components
 	i.startHostMetricsCollector()
-	previousStatus := i.status
 	i.status = InjectorStatus_INITIALIZED
 
-	return &InjectorStatus{
-		Current:  i.status,
-		Previous: &previousStatus,
-	}, nil
+	return nil, nil
 }
 
 func (i *Injector) initializeWorkingFolder(compressedWorkingFolder []byte) error {
@@ -115,59 +183,51 @@ func (i *Injector) startHostMetricsCollector() {
 	).Msg("Host metrics collector started")
 }
 
-func (i *Injector) SetRunnersQuota(_ context.Context, quota *RunnersQuota) (*InjectorStatus, error) {
+func (i *Injector) SetRunnersQuota(_ context.Context, quota *RunnersQuota) (*emptypb.Empty, error) {
 	newRunnerQuota := quota.GetQuota()
 
 	i.contextLogger().Info().Uint64("newQuota", newRunnerQuota).Msg("Received runners quota update request")
 
-	// Set status according to quota variation
-	previousStatus := i.status
-	if i.status == InjectorStatus_INITIALIZED && newRunnerQuota > 0 {
-		i.status = InjectorStatus_RUNNING
+	if i.status != InjectorStatus_INITIALIZED && i.status != InjectorStatus_ACTIVE {
+		return nil, status.Errorf(codes.FailedPrecondition, "Runners cannot be updated due to invalid status")
 	}
 
-	return &InjectorStatus{
-		Current:  i.status,
-		Previous: &previousStatus,
-	}, nil
+	// Set status according to quota variation
+	if i.status == InjectorStatus_INITIALIZED && newRunnerQuota > 0 {
+		i.status = InjectorStatus_ACTIVE
+	}
+
+	err := i.runnerPool.SetDesiredRunners(i.childCtx, newRunnerQuota)
+
+	if err != nil {
+		return nil, status.Errorf(codes.Unknown, "Encountered error when updating runners quota: %x", err)
+	}
+
+	return nil, nil
 }
 
-func (i *Injector) GetRunnersStatus(ctx context.Context, request *RunnersStatusRequest) (*RunnersStatus, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (i *Injector) GetInjectorStatus(ctx context.Context, request *InjectorStatusRequest) (*InjectorStatus, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (i *Injector) Shutdown(_ context.Context, request *ShutdownRequest) (*InjectorStatus, error) {
+func (i *Injector) Shutdown(_ context.Context, request *ShutdownRequest) (*emptypb.Empty, error) {
 	i.contextLogger().Info().Bool("forcedShutdown", request.GetForced()).Msg("Received shutdown request")
 
-	previousStatus := i.status
 	if request.GetForced() {
 		i.runnerPool.ForcedShutdown()
-		i.status = InjectorStatus_FORCEFULLY_STOPPING
 	} else {
 		i.runnerPool.GracefulShutdown()
-		i.status = InjectorStatus_GRACEFULLY_STOPPING
 	}
 
-	return &InjectorStatus{
-		Current:  i.status,
-		Previous: &previousStatus,
-	}, nil
+	i.status = InjectorStatus_ACQUIRED
+
+	return nil, nil
 }
 
 func (i *Injector) Stop() {
 	i.cleanWorkingFolder()
 	i.childCancelFunc()
-	i.status = InjectorStatus_STOPPED
+	i.status = InjectorStatus_ACQUIRED
 	i.contextLogger().Info().Msg("Injector stopped")
 }
 
-func (i *Injector) Status() InjectorStatus_Status {
+func (i *Injector) Status() InjectorStatus {
 	return i.status
 }
 

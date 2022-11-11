@@ -153,32 +153,32 @@ func (rp *RunnerPool) ForcedShutdown() {
 	})
 }
 
-func (rp *RunnerPool) Status() *RunnersStatus {
-	status := &RunnersStatus{}
+func (rp *RunnerPool) GetCounters() *RunnerCounters {
+	counters := &RunnerCounters{}
 
 	rp.dispatchedRunners.Each(func(_ int, holder any) {
 		switch holder.(*runnerHolder).runner.status {
-		case RunnersStatus_READY:
-			status.Ready++
+		case RunnerStatus_READY:
+			counters.Ready++
 
-		case RunnersStatus_STARTING:
-			status.Starting++
+		case RunnerStatus_STARTING:
+			counters.Starting++
 
-		case RunnersStatus_RUNNING:
-			status.Running++
+		case RunnerStatus_RUNNING:
+			counters.Running++
 
-		case RunnersStatus_STOPPING:
-			status.Stopping++
+		case RunnerStatus_STOPPING:
+			counters.Stopping++
 
-		case RunnersStatus_STOPPED:
-			status.Stopped++
+		case RunnerStatus_STOPPED:
+			counters.Stopped++
 
-		case RunnersStatus_ERROR:
-			status.Error++
+		case RunnerStatus_ERROR:
+			counters.Error++
 		}
 	})
 
-	return status
+	return counters
 }
 
 func (rp *RunnerPool) Initialize() {

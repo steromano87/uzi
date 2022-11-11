@@ -4,27 +4,33 @@ option go_package = "github.com/steromano87/harkonnen/v1/pkg/injector";
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
 
 service Injector {
-  rpc Handshake(HandshakeRequest) returns (HandshakeResponse) {}
-  rpc Heartbeat(stream HeartbeatRequest) returns (stream HeartbeatResponse) {}
-  rpc Initialize(InitializationRequest) returns (InjectorStatus) {}
-  rpc SetRunnersQuota(RunnersQuota) returns (InjectorStatus) {}
-
-  rpc GetRunnersStatus(RunnersStatusRequest) returns (RunnersStatus) {}
-  rpc GetInjectorStatus(InjectorStatusRequest) returns (InjectorStatus) {}
-
-  rpc Shutdown(ShutdownRequest) returns (InjectorStatus) {}
+  rpc GetStatus(StatusRequest) returns (Status) {}
+  rpc Acquire(stream HeartbeatRequest) returns (stream HeartbeatResponse) {}
+  rpc Initialize(InitializationRequest) returns (google.protobuf.Empty) {}
+  rpc SetRunnersQuota(RunnersQuota) returns (google.protobuf.Empty) {}
+  rpc Shutdown(ShutdownRequest) returns (google.protobuf.Empty) {}
 }
 
 //////////////////////////////////////////
 
-message HandshakeRequest {
-  string cockpit_version = 1;
+message StatusRequest {}
+
+message Status {
+  string version = 1;
+  InjectorStatus status = 2;
+  RunnerCounters runner_counters = 3;
 }
 
-message HandshakeResponse {
-  string injector_version = 1;
+message RunnerCounters {
+  uint64 ready = 1;
+  uint64 starting = 2;
+  uint64 running = 3;
+  uint64 stopping = 4;
+  uint64 stopped = 5;
+  uint64 error = 6;
 }
 
 //////////////////////////////////////////
@@ -56,52 +62,28 @@ message RunnersQuota {
 
 //////////////////////////////////////////
 
-message RunnersStatusRequest {}
-
-message RunnersStatus {
-  uint64 ready = 1;
-  uint64 starting = 2;
-  uint64 running = 3;
-  uint64 stopping = 4;
-  uint64 stopped = 5;
-  uint64 error = 6;
-
-  enum Status {
-    READY = 0;
-    STARTING = 1;
-    RUNNING = 2;
-    STOPPING = 3;
-    STOPPED = 4;
-    ERROR = 5;
-  }
-}
-
-//////////////////////////////////////////
-
-message InjectorStatusRequest {}
-
-message InjectorStatus {
-  Status current = 1;
-  optional Status previous = 2;
-
-  enum Status {
-    READY = 0;
-    INITIALIZED = 1;
-    RUNNING = 2;
-    GRACEFULLY_STOPPING = 3;
-    FORCEFULLY_STOPPING = 4;
-    STOPPED = 5;
-  }
-}
-
-//////////////////////////////////////////
-
 message ShutdownRequest {
   bool forced = 1;
   google.protobuf.Duration timeout = 2;
 }
 
 //////////////////////////////////////////
+
+enum InjectorStatus {
+  AVAILABLE = 0;
+  ACQUIRED = 1;
+  INITIALIZED = 2;
+  ACTIVE = 3;
+}
+
+enum RunnerStatus {
+  READY = 0;
+  STARTING = 1;
+  RUNNING = 2;
+  STOPPING = 3;
+  STOPPED = 4;
+  ERROR = 5;
+}
 
 enum CompressionAlgorithm {
   ZIP = 0;

@@ -55,42 +55,18 @@ func (s *InjectorTestSuite) TestNewInjector() {
 func (s *InjectorTestSuite) TestStartNewInjector() {
 	inj, err := injector.New(s.ctx, s.logger)
 	if assert.NoError(s.T(), err) {
-		assert.Equal(s.T(), injector.InjectorStatus_READY, inj.Status())
+		assert.Equal(s.T(), injector.InjectorStatus_AVAILABLE, inj.Status())
 	}
 }
 
-func (s *InjectorTestSuite) TestHandshakeMessageHandlingWithCorrectVersion() {
+func (s *InjectorTestSuite) TestGetStatusRequest() {
 	inj, _ := injector.New(s.ctx, s.logger)
 	injector.RegisterInjectorServer(s.injectorInProcChannel, inj)
 
-	responseMessage, err := s.injectorClient.Handshake(s.ctx, &injector.HandshakeRequest{CockpitVersion: version.Version})
+	responseMessage, err := s.injectorClient.GetStatus(s.ctx, &injector.StatusRequest{})
 
 	if assert.NoError(s.T(), err) {
-		assert.Equal(s.T(), version.Version, responseMessage.GetInjectorVersion())
-	}
-}
-
-func (s *InjectorTestSuite) TestHandshakeMessageHandlingWithMismatchingVersion() {
-	s.T().Skip("To be still implemented")
-	inj, _ := injector.New(s.ctx, s.logger)
-	injector.RegisterInjectorServer(s.injectorInProcChannel, inj)
-
-	responseMessage, err := s.injectorClient.Handshake(s.ctx, &injector.HandshakeRequest{CockpitVersion: "0.0.0"})
-
-	if assert.NoError(s.T(), err) {
-		assert.Equal(s.T(), version.Version, responseMessage.GetInjectorVersion())
-	}
-}
-
-func (s *InjectorTestSuite) TestHandshakeMessageHandlingWithInvalidVersion() {
-	s.T().Skip("To be still implemented")
-	inj, _ := injector.New(s.ctx, s.logger)
-	injector.RegisterInjectorServer(s.injectorInProcChannel, inj)
-
-	responseMessage, err := s.injectorClient.Handshake(s.ctx, &injector.HandshakeRequest{CockpitVersion: "invalid"})
-
-	if assert.NoError(s.T(), err) {
-		assert.Equal(s.T(), version.Version, responseMessage.GetInjectorVersion())
+		assert.Equal(s.T(), version.Version, responseMessage.GetVersion())
 	}
 }
 
@@ -113,13 +89,15 @@ func (s *InjectorTestSuite) TestInitializationMessageHandlingWithValidConfigurat
 		},
 	}
 
-	responseMessage, err := s.injectorClient.Initialize(s.ctx, initializationRequest)
+	initializationResponse, err := s.injectorClient.Initialize(s.ctx, initializationRequest)
 	if assert.NoError(s.T(), err) {
+		assert.Nil(s.T(), initializationResponse)
+
 		if assert.DirExists(s.T(), inj.WorkingFolder()) {
 			assert.FileExists(s.T(), filepath.Join(inj.WorkingFolder(), workingfolder.ConfigurationFile))
 		}
 
-		assert.Equal(s.T(), injector.InjectorStatus_INITIALIZED, responseMessage.GetCurrent())
+		assert.Equal(s.T(), injector.InjectorStatus_INITIALIZED, inj.Status())
 	}
 }
 
