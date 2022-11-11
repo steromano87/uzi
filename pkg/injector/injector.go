@@ -45,6 +45,7 @@ func New(parentCtx context.Context, logger *zerolog.Logger) (*Injector, error) {
 	inj.mainCtx = parentCtx
 	inj.childCtx, inj.childCancelFunc = context.WithCancel(parentCtx)
 	inj.configuration, _ = configuration.NewDefault()
+	inj.runnerPool.Initialize()
 
 	contextualizedLogger := logger.With().Str("component", "injector").Logger()
 	inj.logger = &contextualizedLogger
@@ -66,6 +67,10 @@ func (i *Injector) GetStatus(_ context.Context, _ *StatusRequest) (*Status, erro
 	}
 
 	return &response, nil
+}
+
+func (i *Injector) SetStatus(status InjectorStatus) {
+	i.status = status
 }
 
 func (i *Injector) Acquire(stream Injector_AcquireServer) error {
@@ -151,7 +156,7 @@ func (i *Injector) Initialize(ctx context.Context, request *InitializationReques
 	i.startHostMetricsCollector()
 	i.status = InjectorStatus_INITIALIZED
 
-	return nil, nil
+	return &emptypb.Empty{}, nil
 }
 
 func (i *Injector) initializeWorkingFolder(compressedWorkingFolder []byte) error {
@@ -203,7 +208,7 @@ func (i *Injector) SetRunnersQuota(_ context.Context, quota *RunnersQuota) (*emp
 		return nil, status.Errorf(codes.Unknown, "Encountered error when updating runners quota: %x", err)
 	}
 
-	return nil, nil
+	return &emptypb.Empty{}, nil
 }
 
 func (i *Injector) Shutdown(_ context.Context, request *ShutdownRequest) (*emptypb.Empty, error) {
@@ -217,7 +222,7 @@ func (i *Injector) Shutdown(_ context.Context, request *ShutdownRequest) (*empty
 
 	i.status = InjectorStatus_ACQUIRED
 
-	return nil, nil
+	return &emptypb.Empty{}, nil
 }
 
 func (i *Injector) Stop() {

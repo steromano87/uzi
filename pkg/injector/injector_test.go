@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"path/filepath"
 	"testing"
 	"time"
@@ -70,7 +71,7 @@ func (s *InjectorTestSuite) TestGetStatusRequest() {
 	}
 }
 
-func (s *InjectorTestSuite) TestInitializationMessageHandlingWithValidConfiguration() {
+func (s *InjectorTestSuite) TestInitializationRequestWithValidConfiguration() {
 	inj, _ := injector.New(s.ctx, s.logger)
 	injector.RegisterInjectorServer(s.injectorInProcChannel, inj)
 
@@ -82,6 +83,9 @@ func (s *InjectorTestSuite) TestInitializationMessageHandlingWithValidConfigurat
 	compressedWorkDir, err := utils.ZipFolder(tempWorkingDir)
 	require.NoError(s.T(), err)
 
+	// Manually forcing status to run the test
+	inj.SetStatus(injector.InjectorStatus_ACQUIRED)
+
 	initializationRequest := &injector.InitializationRequest{
 		WorkingFolder: &injector.WorkingFolder{
 			CompressedWorkingFolder: compressedWorkDir,
@@ -91,7 +95,7 @@ func (s *InjectorTestSuite) TestInitializationMessageHandlingWithValidConfigurat
 
 	initializationResponse, err := s.injectorClient.Initialize(s.ctx, initializationRequest)
 	if assert.NoError(s.T(), err) {
-		assert.Nil(s.T(), initializationResponse)
+		assert.IsType(s.T(), &emptypb.Empty{}, initializationResponse)
 
 		if assert.DirExists(s.T(), inj.WorkingFolder()) {
 			assert.FileExists(s.T(), filepath.Join(inj.WorkingFolder(), workingfolder.ConfigurationFile))
@@ -101,7 +105,7 @@ func (s *InjectorTestSuite) TestInitializationMessageHandlingWithValidConfigurat
 	}
 }
 
-func (s *InjectorTestSuite) TestInitializationMessageHandlingWithInvalidConfiguration() {
+func (s *InjectorTestSuite) TestInitializationRequestWithInvalidConfiguration() {
 	inj, _ := injector.New(s.ctx, s.logger)
 	injector.RegisterInjectorServer(s.injectorInProcChannel, inj)
 
@@ -113,6 +117,9 @@ func (s *InjectorTestSuite) TestInitializationMessageHandlingWithInvalidConfigur
 	compressedWorkDir, err := utils.ZipFolder(tempWorkingDir)
 	require.NoError(s.T(), err)
 
+	// Manually forcing status to run the test
+	inj.SetStatus(injector.InjectorStatus_ACQUIRED)
+
 	initializationRequest := &injector.InitializationRequest{
 		WorkingFolder: &injector.WorkingFolder{
 			CompressedWorkingFolder: compressedWorkDir,
@@ -123,11 +130,12 @@ func (s *InjectorTestSuite) TestInitializationMessageHandlingWithInvalidConfigur
 	responseMessage, err := s.injectorClient.Initialize(s.ctx, initializationRequest)
 
 	if assert.Error(s.T(), err) {
+		assert.NotContains(s.T(), err.Error(), "Invalid status for initialization")
 		assert.Nil(s.T(), responseMessage)
 	}
 }
 
-func (s *InjectorTestSuite) TestInitializationMessageHandlingWithMissingConfiguration() {
+func (s *InjectorTestSuite) TestInitializationRequestWithMissingConfiguration() {
 	inj, _ := injector.New(s.ctx, s.logger)
 	injector.RegisterInjectorServer(s.injectorInProcChannel, inj)
 
@@ -139,6 +147,9 @@ func (s *InjectorTestSuite) TestInitializationMessageHandlingWithMissingConfigur
 	compressedWorkDir, err := utils.ZipFolder(tempWorkingDir)
 	require.NoError(s.T(), err)
 
+	// Manually forcing status to run the test
+	inj.SetStatus(injector.InjectorStatus_ACQUIRED)
+
 	initializationRequest := &injector.InitializationRequest{
 		WorkingFolder: &injector.WorkingFolder{
 			CompressedWorkingFolder: compressedWorkDir,
@@ -148,6 +159,7 @@ func (s *InjectorTestSuite) TestInitializationMessageHandlingWithMissingConfigur
 
 	responseMessage, err := s.injectorClient.Initialize(s.ctx, initializationRequest)
 	if assert.Error(s.T(), err) {
+		assert.NotContains(s.T(), err.Error(), "Invalid status for initialization")
 		assert.Nil(s.T(), responseMessage)
 	}
 }
