@@ -73,7 +73,7 @@ func (i *Injector) SetStatus(status InjectorStatus) {
 	i.status = status
 }
 
-func (i *Injector) Acquire(stream Injector_AcquireServer) error {
+func (i *Injector) Acquire(stream Injector_LockServer) error {
 	i.contextLogger().Info().Msg("Received acquire request")
 	i.status = InjectorStatus_ACQUIRED
 	i.heartbeatTimeoutTimer = time.NewTimer(HeartbeatTimeout)
