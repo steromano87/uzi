@@ -2,7 +2,6 @@ package dsl
 
 import (
 	"context"
-	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/configuration"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 )
@@ -10,18 +9,16 @@ import (
 type Context struct {
 	context.Context
 
-	logger           *zerolog.Logger
 	config           *configuration.Configuration
 	metricsCollector StepMetricsCollector
 	vars             *variables.Holder
 }
 
-func NewContext(ctx context.Context, config *configuration.Configuration, logger *zerolog.Logger, vars *variables.Holder, metricsCollector StepMetricsCollector) (Context, context.CancelFunc) {
+func NewContext(ctx context.Context, config *configuration.Configuration, vars *variables.Holder, metricsCollector StepMetricsCollector) (Context, context.CancelFunc) {
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
 
 	return Context{
 		Context:          cancelCtx,
-		logger:           logger,
 		config:           config,
 		metricsCollector: metricsCollector,
 		vars:             vars,
@@ -35,10 +32,6 @@ func (c *Context) UpdateConfig(config *configuration.Configuration) {
 func (c *Context) UpdateVariables(newVars variables.Holder) {
 	c.vars.SetGlobals(newVars.Globals())
 	c.vars.UpdateIterVars(newVars.IterVars())
-}
-
-func (c *Context) Logger() *zerolog.Logger {
-	return c.logger
 }
 
 func (c *Context) Config() *configuration.Configuration {

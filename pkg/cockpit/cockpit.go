@@ -29,10 +29,10 @@ type Cockpit struct {
 	variables variables.Holder
 }
 
-func New(ctx context.Context, logger *zerolog.Logger, config *configuration.Configuration, loadProfile scheduler.LoadProfile) (*Cockpit, error) {
+func New(ctx context.Context, config *configuration.Configuration, loadProfile scheduler.LoadProfile) (*Cockpit, error) {
 	cockpit := new(Cockpit)
 	cockpit.ctx = ctx
-	cockpit.logger = logger
+	cockpit.logger = zerolog.Ctx(ctx)
 	cockpit.config = config
 	cockpit.loadProfile = loadProfile
 	cockpit.injectorReferences = make(map[string]*injector.Reference)
@@ -97,7 +97,6 @@ func (c *Cockpit) initScheduler() error {
 	switch schedulerType {
 	case "FixedInterval":
 		c.scheduler = scheduler.NewFixedIntervalScheduler(
-			c.logger,
 			c.loadProfile,
 			c.injectorReferences,
 			c.config.Cockpit.Scheduler.UpdateInterval)
@@ -154,7 +153,7 @@ func (c *Cockpit) startLocalInjector(reference *injector.Reference) error {
 	grpcChannel := inprocgrpc.Channel{}
 	c.localInjectorCtx, c.localInjectorCancelFunc = context.WithCancel(c.ctx)
 
-	localInjector, err := injector.New(c.localInjectorCtx, c.contextLogger())
+	localInjector, err := injector.New(c.localInjectorCtx)
 	if err != nil {
 		return err
 

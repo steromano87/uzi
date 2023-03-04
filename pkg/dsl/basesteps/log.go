@@ -14,22 +14,23 @@ type Log struct {
 
 func (log *Log) Run(ctx dsl.Context) error {
 	var partialLogger *zerolog.Event
+	loggerFromCtx := zerolog.Ctx(ctx).With().Str("step", "Log").Logger()
 
 	switch log.level {
 	case "error":
-		partialLogger = ctx.Logger().Error()
+		partialLogger = loggerFromCtx.Error()
 
 	case "warning":
-		partialLogger = ctx.Logger().Warn()
+		partialLogger = loggerFromCtx.Warn()
 
 	case "info":
-		partialLogger = ctx.Logger().Info()
+		partialLogger = loggerFromCtx.Info()
 
 	case "debug":
-		partialLogger = ctx.Logger().Debug()
+		partialLogger = loggerFromCtx.Debug()
 
 	case "trace":
-		partialLogger = ctx.Logger().Trace()
+		partialLogger = loggerFromCtx.Trace()
 
 	default:
 		return errors.New(fmt.Sprintf("%s is not a valid log level", log.level))

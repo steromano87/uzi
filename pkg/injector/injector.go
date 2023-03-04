@@ -40,14 +40,14 @@ type Injector struct {
 	heartbeatTimeoutTimer *time.Timer
 }
 
-func New(parentCtx context.Context, logger *zerolog.Logger) (*Injector, error) {
+func New(parentCtx context.Context) (*Injector, error) {
 	inj := new(Injector)
 	inj.mainCtx = parentCtx
 	inj.childCtx, inj.childCancelFunc = context.WithCancel(parentCtx)
 	inj.configuration, _ = configuration.NewDefault()
 	inj.runnerPool.Initialize()
 
-	contextualizedLogger := logger.With().Str("component", "injector").Logger()
+	contextualizedLogger := zerolog.Ctx(parentCtx).With().Str("component", "injector").Logger()
 	inj.logger = &contextualizedLogger
 
 	err := inj.initWorkingFolder()
@@ -59,8 +59,8 @@ func New(parentCtx context.Context, logger *zerolog.Logger) (*Injector, error) {
 	return inj, nil
 }
 
-func (i *Injector) GetStatus(_ context.Context, _ *StatusRequest) (*Status, error) {
-	response := Status{
+func (i *Injector) GetStatus(_ context.Context, _ *StatusRequest) (*StatusResponse, error) {
+	response := StatusResponse{
 		Version:        version.Version,
 		Status:         i.status,
 		RunnerCounters: i.runnerPool.GetCounters(),

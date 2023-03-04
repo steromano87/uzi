@@ -42,7 +42,7 @@ func NewRunner(logger *zerolog.Logger, config *configuration.Configuration, varH
 }
 
 func (r *Runner) Start(ctx context.Context) {
-	pipCtx, pipCancelFunc := dsl.NewContext(ctx, r.configuration, r.logger, r.variables, r.telemetryServer)
+	pipCtx, pipCancelFunc := dsl.NewContext(ctx, r.configuration, r.variables, r.telemetryServer)
 	r.pipCancelFunc = pipCancelFunc
 
 	r.completionWG.Add(1)

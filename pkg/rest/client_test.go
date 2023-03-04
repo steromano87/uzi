@@ -38,7 +38,7 @@ func (s *ClientTestSuite) SetupTest() {
 	config, _ := configuration.NewDefault()
 
 	s.telemetryServer = telemetry.NewServer(config)
-	s.ctx, _ = dsl.NewContext(context.TODO(), config, &s.logger, variables.NewHolder(), s.telemetryServer)
+	s.ctx, _ = dsl.NewContext(s.logger.WithContext(context.TODO()), config, variables.NewHolder(), s.telemetryServer)
 
 	s.client = rest.NewClient(s.ctx)
 

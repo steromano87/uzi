@@ -17,16 +17,13 @@ type FixedIntervalScheduler struct {
 	updateTicker   *time.Ticker
 	start          time.Time
 	loadProfile    LoadProfile
-
-	logger *zerolog.Logger
 }
 
-func NewFixedIntervalScheduler(logger *zerolog.Logger, loadProfile LoadProfile, injectors map[string]*injector.Reference, updateInterval time.Duration) *FixedIntervalScheduler {
+func NewFixedIntervalScheduler(loadProfile LoadProfile, injectors map[string]*injector.Reference, updateInterval time.Duration) *FixedIntervalScheduler {
 	scheduler := new(FixedIntervalScheduler)
 	scheduler.loadProfile = loadProfile
 	scheduler.totalWeights = 0
 	scheduler.injectors = injectors
-	scheduler.logger = logger
 	for _, inj := range scheduler.injectors {
 		scheduler.totalWeights += inj.Weight
 	}
@@ -36,16 +33,18 @@ func NewFixedIntervalScheduler(logger *zerolog.Logger, loadProfile LoadProfile, 
 }
 
 func (f *FixedIntervalScheduler) Start(ctx context.Context) {
+	logger := zerolog.Ctx(ctx).With().Str("component", "Scheduler").Logger()
+
 	f.start = time.Now()
 	f.updateTicker = time.NewTicker(f.updateInterval)
-	f.contextLogger().Info().Msg("Scheduler started")
+	logger.Info().Msg("Scheduler started")
 
 	for {
 		select {
 		case t := <-f.updateTicker.C:
 			elapsed := t.Sub(f.start)
 			scheduledRunners := f.At(elapsed)
-			f.contextLogger().Debug().Interface("quotas", scheduledRunners).Dur("elapsed", elapsed).Msg("Updated scheduled runner quotas")
+			logger.Debug().Interface("quotas", scheduledRunners).Dur("elapsed", elapsed).Msg("Updated scheduled runner quotas")
 
 			// Loop through the calculated quotas and send the update message
 			// only if the scheduled quota differs from the last one
@@ -53,7 +52,7 @@ func (f *FixedIntervalScheduler) Start(ctx context.Context) {
 				lastScheduledQuota := f.injectors[injectorID].ScheduledRunners
 
 				if quota != lastScheduledQuota {
-					f.contextLogger().Info().Str(
+					logger.Info().Str(
 						"injectorID", injectorID,
 					).Uint64("quota", quota).Uint64(
 						"lastScheduledQuota", lastScheduledQuota,
@@ -66,7 +65,8 @@ func (f *FixedIntervalScheduler) Start(ctx context.Context) {
 			}
 
 		case <-ctx.Done():
-			f.contextLogger().Info().Msg("Scheduler stopped")
+			f.updateTicker.Stop()
+			logger.Info().Msg("Scheduler stopped")
 			return
 		}
 	}
@@ -93,9 +93,4 @@ func (f *FixedIntervalScheduler) At(elapsed time.Duration) map[string]uint64 {
 	}
 
 	return quotas
-}
-
-func (f *FixedIntervalScheduler) contextLogger() *zerolog.Logger {
-	logger := f.logger.With().Str("component", "scheduler").Logger()
-	return &logger
 }

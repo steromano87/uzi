@@ -7,7 +7,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
 
 service Injector {
-  rpc GetStatus(StatusRequest) returns (Status) {}
+  rpc GetStatus(StatusRequest) returns (StatusResponse) {}
   rpc Lock(stream HeartbeatRequest) returns (stream HeartbeatResponse) {}
   rpc Initialize(InitializationRequest) returns (google.protobuf.Empty) {}
   rpc SetRunnersQuota(RunnersQuota) returns (google.protobuf.Empty) {}
@@ -18,7 +18,7 @@ service Injector {
 
 message StatusRequest {}
 
-message Status {
+message StatusResponse {
   string version = 1;
   InjectorStatus status = 2;
   RunnerCounters runner_counters = 3;

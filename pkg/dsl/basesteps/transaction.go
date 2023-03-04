@@ -35,6 +35,6 @@ func (t *Transaction) Duration() time.Duration {
 }
 
 func (t *Transaction) contextLogger(ctx dsl.Context) *zerolog.Logger {
-	logger := ctx.Logger().With().Str("component", "transaction").Str("name", t.name).Logger()
+	logger := zerolog.Ctx(ctx).With().Str("step", "Transaction").Str("name", t.name).Logger()
 	return &logger
 }

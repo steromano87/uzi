@@ -43,7 +43,7 @@ func (s *SchedulerTestSuite) TestSingleInjectorQuota() {
 		},
 	}
 
-	sched := scheduler.NewFixedIntervalScheduler(s.logger, s.profile, injectorReferences, 5*time.Second)
+	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 5*time.Second)
 	quotas := sched.At(1 * time.Second)
 
 	assert.EqualValues(s.T(), 10, quotas["first"])
@@ -60,7 +60,7 @@ func (s *SchedulerTestSuite) TestTwoInjectorsWithSameWeight() {
 			InjectorClient: injector.NewInjectorClient(s.grpcChannel),
 		},
 	}
-	sched := scheduler.NewFixedIntervalScheduler(s.logger, s.profile, injectorReferences, 5*time.Second)
+	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 5*time.Second)
 	quotas := sched.At(1 * time.Second)
 
 	assert.EqualValues(s.T(), 5, quotas["first"], "first weight is wrong")
@@ -79,7 +79,7 @@ func (s *SchedulerTestSuite) TestTwoInjectorsWithDifferentWeight() {
 		},
 	}
 
-	sched := scheduler.NewFixedIntervalScheduler(s.logger, s.profile, injectorReferences, 5*time.Second)
+	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 5*time.Second)
 	quotas := sched.At(1 * time.Second)
 
 	assert.EqualValues(s.T(), 8, quotas["first"], "first weight is wrong")
@@ -102,7 +102,7 @@ func (s *SchedulerTestSuite) TestThreeInjectorsWithDifferentWeight() {
 		},
 	}
 
-	sched := scheduler.NewFixedIntervalScheduler(s.logger, s.profile, injectorReferences, 5*time.Second)
+	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 5*time.Second)
 	quotas := sched.At(1 * time.Second)
 
 	assert.EqualValues(s.T(), 6, quotas["first"], "first weight is wrong")
@@ -118,7 +118,7 @@ func (s *SchedulerTestSuite) TestRemoteReferenceUpdate() {
 		},
 	}
 
-	sched := scheduler.NewFixedIntervalScheduler(s.logger, s.profile, injectorReferences, 100*time.Millisecond)
+	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 100*time.Millisecond)
 
 	ctx, cancelFunc := context.WithCancel(context.TODO())
 	go sched.Start(ctx)
