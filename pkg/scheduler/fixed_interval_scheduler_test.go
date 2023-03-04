@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/fullstorydev/grpchan/inprocgrpc"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"github.com/steromano87/harkonnen/v1/pkg/scheduler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -36,31 +35,18 @@ func (s *SchedulerTestSuite) SetupTest() {
 }
 
 func (s *SchedulerTestSuite) TestSingleInjectorQuota() {
-	injectorReferences := map[string]*injector.Reference{
-		"first": {
-			Weight:         1,
-			InjectorClient: injector.NewInjectorClient(s.grpcChannel),
-		},
-	}
-
-	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 5*time.Second)
+	sched := scheduler.NewFixedIntervalScheduler(s.profile, 5*time.Second)
+	sched.RegisterInjector("first", 1)
 	quotas := sched.At(1 * time.Second)
 
 	assert.EqualValues(s.T(), 10, quotas["first"])
 }
 
 func (s *SchedulerTestSuite) TestTwoInjectorsWithSameWeight() {
-	injectorReferences := map[string]*injector.Reference{
-		"first": {
-			Weight:         1,
-			InjectorClient: injector.NewInjectorClient(s.grpcChannel),
-		},
-		"second": {
-			Weight:         1,
-			InjectorClient: injector.NewInjectorClient(s.grpcChannel),
-		},
-	}
-	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 5*time.Second)
+	sched := scheduler.NewFixedIntervalScheduler(s.profile, 5*time.Second)
+	sched.RegisterInjector("first", 1)
+	sched.RegisterInjector("second", 1)
+
 	quotas := sched.At(1 * time.Second)
 
 	assert.EqualValues(s.T(), 5, quotas["first"], "first weight is wrong")
@@ -68,18 +54,10 @@ func (s *SchedulerTestSuite) TestTwoInjectorsWithSameWeight() {
 }
 
 func (s *SchedulerTestSuite) TestTwoInjectorsWithDifferentWeight() {
-	injectorReferences := map[string]*injector.Reference{
-		"first": {
-			Weight:         8,
-			InjectorClient: injector.NewInjectorClient(s.grpcChannel),
-		},
-		"second": {
-			Weight:         2,
-			InjectorClient: injector.NewInjectorClient(s.grpcChannel),
-		},
-	}
+	sched := scheduler.NewFixedIntervalScheduler(s.profile, 5*time.Second)
+	sched.RegisterInjector("first", 8)
+	sched.RegisterInjector("second", 2)
 
-	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 5*time.Second)
 	quotas := sched.At(1 * time.Second)
 
 	assert.EqualValues(s.T(), 8, quotas["first"], "first weight is wrong")
@@ -87,22 +65,11 @@ func (s *SchedulerTestSuite) TestTwoInjectorsWithDifferentWeight() {
 }
 
 func (s *SchedulerTestSuite) TestThreeInjectorsWithDifferentWeight() {
-	injectorReferences := map[string]*injector.Reference{
-		"first": {
-			Weight:         8,
-			InjectorClient: injector.NewInjectorClient(s.grpcChannel),
-		},
-		"second": {
-			Weight:         2,
-			InjectorClient: injector.NewInjectorClient(s.grpcChannel),
-		},
-		"third": {
-			Weight:         2,
-			InjectorClient: injector.NewInjectorClient(s.grpcChannel),
-		},
-	}
+	sched := scheduler.NewFixedIntervalScheduler(s.profile, 5*time.Second)
+	sched.RegisterInjector("first", 8)
+	sched.RegisterInjector("second", 2)
+	sched.RegisterInjector("third", 2)
 
-	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 5*time.Second)
 	quotas := sched.At(1 * time.Second)
 
 	assert.EqualValues(s.T(), 6, quotas["first"], "first weight is wrong")
@@ -111,21 +78,16 @@ func (s *SchedulerTestSuite) TestThreeInjectorsWithDifferentWeight() {
 }
 
 func (s *SchedulerTestSuite) TestRemoteReferenceUpdate() {
-	injectorReferences := map[string]*injector.Reference{
-		"first": {
-			Weight:         1,
-			InjectorClient: injector.NewInjectorClient(s.grpcChannel),
-		},
-	}
-
-	sched := scheduler.NewFixedIntervalScheduler(s.profile, injectorReferences, 100*time.Millisecond)
+	sched := scheduler.NewFixedIntervalScheduler(s.profile, 100*time.Millisecond)
+	sched.RegisterInjector("first", 1)
 
 	ctx, cancelFunc := context.WithCancel(context.TODO())
-	go sched.Start(ctx)
+	outputChan := sched.Run(ctx)
 	time.Sleep(150 * time.Millisecond)
 	cancelFunc()
 
-	assert.EqualValues(s.T(), 10, injectorReferences["first"].ScheduledRunners)
+	schedule := <-outputChan
+	assert.EqualValues(s.T(), map[string]uint64{"first": 10}, schedule)
 }
 
 func TestSchedulerTestSuite(t *testing.T) {

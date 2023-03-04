@@ -14,7 +14,7 @@ func TestInjectorDefaultConfiguration(t *testing.T) {
 
 		defaultInjector, ok := config.Injectors["localhost"]
 		if assert.True(t, ok) {
-			assert.Equal(t, 1, defaultInjector.Weight)
+			assert.EqualValues(t, 1, defaultInjector.Weight)
 			assert.True(t, defaultInjector.Local)
 		}
 	}

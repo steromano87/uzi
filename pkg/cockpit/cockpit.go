@@ -70,7 +70,7 @@ func (c *Cockpit) Start() error {
 		return err
 	}
 
-	c.scheduler.Start(c.ctx)
+	c.scheduler.Run(c.ctx)
 
 	return nil
 }
@@ -98,11 +98,14 @@ func (c *Cockpit) initScheduler() error {
 	case "FixedInterval":
 		c.scheduler = scheduler.NewFixedIntervalScheduler(
 			c.loadProfile,
-			c.injectorReferences,
 			c.config.Cockpit.Scheduler.UpdateInterval)
 
 	default:
 		return errors.New("unknown scheduler type: " + schedulerType)
+	}
+
+	for name, reference := range c.injectorReferences {
+		c.scheduler.RegisterInjector(name, reference.Weight)
 	}
 
 	c.contextLogger().Info().Str("schedulerType", schedulerType).Msg("Scheduler initialized")

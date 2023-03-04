@@ -10,7 +10,7 @@ type Reference struct {
 	Address     string
 	Local       bool
 	Optional    bool
-	Weight      int
+	Weight      uint
 
 	Status           string
 	ScheduledRunners uint64

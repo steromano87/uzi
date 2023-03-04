@@ -5,5 +5,5 @@ type Injector struct {
 	Address     string
 	Local       bool
 	Optional    bool
-	Weight      int
+	Weight      uint
 }
