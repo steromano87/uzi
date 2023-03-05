@@ -44,7 +44,7 @@ func (s *InjectorTestSuite) TearDownTest() {
 }
 
 func (s *InjectorTestSuite) TestNewInjector() {
-	inj, err := injector.New(s.ctx)
+	inj, err := injector.NewInjector(s.ctx)
 	defer inj.Stop()
 
 	if assert.NoError(s.T(), err) {
@@ -54,14 +54,14 @@ func (s *InjectorTestSuite) TestNewInjector() {
 }
 
 func (s *InjectorTestSuite) TestStartNewInjector() {
-	inj, err := injector.New(s.ctx)
+	inj, err := injector.NewInjector(s.ctx)
 	if assert.NoError(s.T(), err) {
 		assert.Equal(s.T(), injector.InjectorStatus_AVAILABLE, inj.Status())
 	}
 }
 
 func (s *InjectorTestSuite) TestGetStatusRequest() {
-	inj, _ := injector.New(s.ctx)
+	inj, _ := injector.NewInjector(s.ctx)
 	injector.RegisterInjectorServer(s.injectorInProcChannel, inj)
 
 	responseMessage, err := s.injectorClient.GetStatus(s.ctx, &injector.StatusRequest{})
@@ -72,7 +72,7 @@ func (s *InjectorTestSuite) TestGetStatusRequest() {
 }
 
 func (s *InjectorTestSuite) TestInitializationRequestWithValidConfiguration() {
-	inj, _ := injector.New(s.ctx)
+	inj, _ := injector.NewInjector(s.ctx)
 	injector.RegisterInjectorServer(s.injectorInProcChannel, inj)
 
 	tempWorkingDir := filet.TmpDir(s.T(), "")
@@ -106,7 +106,7 @@ func (s *InjectorTestSuite) TestInitializationRequestWithValidConfiguration() {
 }
 
 func (s *InjectorTestSuite) TestInitializationRequestWithInvalidConfiguration() {
-	inj, _ := injector.New(s.ctx)
+	inj, _ := injector.NewInjector(s.ctx)
 	injector.RegisterInjectorServer(s.injectorInProcChannel, inj)
 
 	tempWorkingDir := filet.TmpDir(s.T(), "")
@@ -136,7 +136,7 @@ func (s *InjectorTestSuite) TestInitializationRequestWithInvalidConfiguration() 
 }
 
 func (s *InjectorTestSuite) TestInitializationRequestWithMissingConfiguration() {
-	inj, _ := injector.New(s.ctx)
+	inj, _ := injector.NewInjector(s.ctx)
 	injector.RegisterInjectorServer(s.injectorInProcChannel, inj)
 
 	tempWorkingDir := filet.TmpDir(s.T(), "")

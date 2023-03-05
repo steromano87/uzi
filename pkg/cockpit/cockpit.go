@@ -156,7 +156,7 @@ func (c *Cockpit) startLocalInjector(reference *injector.Reference) error {
 	grpcChannel := inprocgrpc.Channel{}
 	c.localInjectorCtx, c.localInjectorCancelFunc = context.WithCancel(c.ctx)
 
-	localInjector, err := injector.New(c.localInjectorCtx)
+	localInjector, err := injector.NewInjector(c.localInjectorCtx)
 	if err != nil {
 		return err
 

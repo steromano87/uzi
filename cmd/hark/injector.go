@@ -36,7 +36,7 @@ func runInjector(cmd *cobra.Command, args []string) {
 	tcpListener, err := net.Listen("tcp", ":9000")
 	cobra.CheckErr(err)
 
-	inj, _ := injector.New(logger.WithContext(mainCtx))
+	inj, _ := injector.NewInjector(logger.WithContext(mainCtx))
 
 	grpcServerOpts := make([]grpc.ServerOption, 0)
 	grpcServer := grpc.NewServer(grpcServerOpts...)

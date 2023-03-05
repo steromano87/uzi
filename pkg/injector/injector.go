@@ -40,7 +40,7 @@ type Injector struct {
 	heartbeatTimeoutTimer *time.Timer
 }
 
-func New(parentCtx context.Context) (*Injector, error) {
+func NewInjector(parentCtx context.Context) (*Injector, error) {
 	inj := new(Injector)
 	inj.mainCtx = parentCtx
 	inj.childCtx, inj.childCancelFunc = context.WithCancel(parentCtx)
@@ -73,7 +73,7 @@ func (i *Injector) SetStatus(status InjectorStatus) {
 	i.status = status
 }
 
-func (i *Injector) Acquire(stream Injector_LockServer) error {
+func (i *Injector) Lock(stream Injector_LockServer) error {
 	i.contextLogger().Info().Msg("Received acquire request")
 	i.status = InjectorStatus_ACQUIRED
 	i.heartbeatTimeoutTimer = time.NewTimer(HeartbeatTimeout)
