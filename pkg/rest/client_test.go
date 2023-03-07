@@ -35,7 +35,7 @@ func (s *ClientTestSuite) SetupTest() {
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	s.logger = zerolog.New(consoleWriter).With().Timestamp().Logger()
 
-	config, _ := configuration.NewDefault()
+	config := configuration.MustNewDefault()
 
 	s.telemetryServer = telemetry.NewServer(config)
 	s.ctx, _ = dsl.NewContext(s.logger.WithContext(context.TODO()), config, variables.NewHolder(), s.telemetryServer)

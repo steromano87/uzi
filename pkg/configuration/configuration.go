@@ -33,10 +33,7 @@ type ClientConfiguration struct {
 }
 
 func New(configFile string) (*Configuration, error) {
-	config, err := NewDefault()
-	if err != nil {
-		return nil, err
-	}
+	config := MustNewDefault()
 
 	// Read configuration file
 	fileReader, err := os.Open(configFile)
@@ -57,7 +54,7 @@ func New(configFile string) (*Configuration, error) {
 	return config, err
 }
 
-func NewDefault() (*Configuration, error) {
+func MustNewDefault() *Configuration {
 	config := new(Configuration)
 
 	// Viper setup
@@ -65,7 +62,7 @@ func NewDefault() (*Configuration, error) {
 	config.SetConfigType(Format)
 	err := config.ReadConfig(bytes.NewBufferString(workingfolder.DefaultProjectConfigurationContent))
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
 	config.SetConfigName(Name)
@@ -74,7 +71,7 @@ func NewDefault() (*Configuration, error) {
 	config.AutomaticEnv()
 	err = config.Update()
 
-	return config, err
+	return config
 }
 
 func (c *Configuration) Read(configFile string) error {

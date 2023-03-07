@@ -7,15 +7,13 @@ import (
 )
 
 func TestInjectorDefaultConfiguration(t *testing.T) {
-	config, err := configuration.NewDefault()
+	config := configuration.MustNewDefault()
 
-	if assert.NoError(t, err) {
-		assert.IsType(t, map[string]configuration.Injector{}, config.Injectors)
+	assert.IsType(t, map[string]configuration.Injector{}, config.Injectors)
 
-		defaultInjector, ok := config.Injectors["localhost"]
-		if assert.True(t, ok) {
-			assert.EqualValues(t, 1, defaultInjector.Weight)
-			assert.True(t, defaultInjector.Local)
-		}
+	defaultInjector, ok := config.Injectors["localhost"]
+	if assert.True(t, ok) {
+		assert.EqualValues(t, 1, defaultInjector.Weight)
+		assert.True(t, defaultInjector.Local)
 	}
 }

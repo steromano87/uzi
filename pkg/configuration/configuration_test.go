@@ -8,12 +8,12 @@ import (
 )
 
 func TestNewDefaultConfiguration(t *testing.T) {
-	config, err := configuration.NewDefault()
+	assert.NotPanics(t, func() {
+		config := configuration.MustNewDefault()
 
-	if assert.NoError(t, err) {
 		assert.IsType(t, &configuration.Configuration{}, config)
 		assert.Equal(t, "all", config.HarkonnenVersion)
-	}
+	})
 }
 
 func TestNewConfigurationFromFile(t *testing.T) {
