@@ -21,9 +21,11 @@ type BeatingHeart struct {
 	incomingBeatChan chan struct{}
 	outgoingBeatChan chan struct{}
 
-	beatMonitorsWG sync.WaitGroup
+	beatMonitorsWG        sync.WaitGroup
+	beatMonitorCtx        context.Context
+	beatMonitorCancelFunc context.CancelFunc
 
-	childCancelCauseFunc context.CancelCauseFunc
+	externalCtxCancelFunc context.CancelCauseFunc
 }
 
 func NewBeatingHeart(beatInterval, beatTimeout time.Duration) (*BeatingHeart, error) {
@@ -42,16 +44,22 @@ func NewBeatingHeart(beatInterval, beatTimeout time.Duration) (*BeatingHeart, er
 
 func (bh *BeatingHeart) Start(ctx context.Context) context.Context {
 	bh.logger = zerolog.Ctx(ctx)
-	childCtx, childCancelCauseFunc := context.WithCancelCause(ctx)
-	bh.childCancelCauseFunc = childCancelCauseFunc
+	bh.beatMonitorCtx, bh.beatMonitorCancelFunc = context.WithCancel(ctx)
+
+	outgoingBeatCtx, outgoingBeatCancelCauseFunc := context.WithCancelCause(bh.beatMonitorCtx)
+	bh.externalCtxCancelFunc = outgoingBeatCancelCauseFunc
 
 	bh.beatTicker = time.NewTicker(bh.beatInterval)
 	bh.beatTimeoutTimer = time.NewTimer(bh.beatTimeout)
 
-	go bh.incomingBeatMonitorLoop(ctx)
-	go bh.outgoingBeatSendLoop(childCtx)
+	go bh.incomingBeatMonitorLoop(bh.beatMonitorCtx)
+	go bh.outgoingBeatSendLoop(outgoingBeatCtx)
 
-	return childCtx
+	return outgoingBeatCtx
+}
+
+func (bh *BeatingHeart) Stop() {
+	bh.beatMonitorCancelFunc()
 }
 
 func (bh *BeatingHeart) Wait() {
@@ -86,13 +94,13 @@ func (bh *BeatingHeart) incomingBeatMonitorLoop(ctx context.Context) {
 			if !bh.beatTimeoutTimer.Stop() {
 				<-bh.beatTimeoutTimer.C
 			}
-			bh.childCancelCauseFunc(context.Cause(ctx))
+			bh.externalCtxCancelFunc(context.Cause(ctx))
 
 			return
 
 		case <-bh.beatTimeoutTimer.C:
 			bh.contextualizedLogger().Error().Msg("Incoming heartbeat timeout, canceling child context")
-			bh.childCancelCauseFunc(errors.New("incoming heartbeat timeout"))
+			bh.externalCtxCancelFunc(errors.New("incoming heartbeat timeout"))
 			return
 		}
 	}
