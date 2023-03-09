@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rs/zerolog"
+	"reflect"
 	"sync"
 	"time"
 )
@@ -105,8 +106,8 @@ func (bh *BeatingHeart) outgoingBeatSendLoop(ctx context.Context) {
 		select {
 		case <-bh.beatTicker.C:
 			bh.contextualizedLogger().Debug().Msg("Sending heartbeat")
-			// Use async function to avoid blocking main goroutine if the channel is not read
-			go func() { bh.outgoingBeatChan <- struct{}{} }()
+			// Non-blocking channel send, do not use a goroutine or it may leak
+			reflect.ValueOf(bh.outgoingBeatChan).TrySend(reflect.ValueOf(struct{}{}))
 
 		case <-ctx.Done():
 			bh.contextualizedLogger().Info().Err(context.Cause(ctx)).Msg(
