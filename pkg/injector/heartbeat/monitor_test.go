@@ -1,9 +1,9 @@
-package injector_test
+package heartbeat_test
 
 import (
 	"context"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/injector"
+	"github.com/steromano87/harkonnen/v1/pkg/injector/heartbeat"
 	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
@@ -11,19 +11,19 @@ import (
 )
 
 func TestNewBeatingHeart(t *testing.T) {
-	bh, err := injector.NewBeatingHeart(5*time.Second, 10*time.Second)
+	bh, err := heartbeat.NewMonitor(5*time.Second, 10*time.Second)
 	if assert.NoError(t, err) {
-		assert.IsType(t, &injector.BeatingHeart{}, bh)
+		assert.IsType(t, &heartbeat.Monitor{}, bh)
 	}
 }
 
 func TestNewBeatingHeartWithInvalidInput(t *testing.T) {
-	_, err := injector.NewBeatingHeart(10*time.Second, 5*time.Second)
+	_, err := heartbeat.NewMonitor(10*time.Second, 5*time.Second)
 	assert.Error(t, err)
 }
 
 func TestNewBeatingHeartWithInvalidInput2(t *testing.T) {
-	_, err := injector.NewBeatingHeart(5*time.Second, 5*time.Second)
+	_, err := heartbeat.NewMonitor(5*time.Second, 5*time.Second)
 	assert.Error(t, err)
 }
 
@@ -36,7 +36,7 @@ func TestRunningHeartWithoutBeatTimeout(t *testing.T) {
 	tempCtx, cancelFunc := context.WithCancel(context.TODO())
 	ctx := logger.WithContext(tempCtx)
 
-	bh, _ := injector.NewBeatingHeart(10*time.Millisecond, 20*time.Millisecond)
+	bh, _ := heartbeat.NewMonitor(10*time.Millisecond, 20*time.Millisecond)
 	childCtx := bh.Start(ctx)
 	childContextCanceled := false
 
@@ -81,7 +81,7 @@ func TestRunningHeartWithBeatTimeout(t *testing.T) {
 	tempCtx, cancelFunc := context.WithCancel(context.TODO())
 	ctx := logger.WithContext(tempCtx)
 
-	bh, _ := injector.NewBeatingHeart(10*time.Millisecond, 20*time.Millisecond)
+	bh, _ := heartbeat.NewMonitor(10*time.Millisecond, 20*time.Millisecond)
 	childCtx := bh.Start(ctx)
 	childContextCanceled := false
 
@@ -122,7 +122,7 @@ func TestExternalStop(t *testing.T) {
 
 	ctx := logger.WithContext(context.TODO())
 
-	bh, _ := injector.NewBeatingHeart(10*time.Millisecond, 20*time.Millisecond)
+	bh, _ := heartbeat.NewMonitor(10*time.Millisecond, 20*time.Millisecond)
 	childCtx := bh.Start(ctx)
 	childContextCanceled := false
 

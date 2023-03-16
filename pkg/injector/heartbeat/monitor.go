@@ -1,4 +1,4 @@
-package injector
+package heartbeat
 
 import (
 	"context"
@@ -10,8 +10,15 @@ import (
 	"time"
 )
 
-type BeatingHeart struct {
+const (
+	ServerRole  = "server"
+	ClientRole  = "client"
+	GenericRole = "generic"
+)
+
+type Monitor struct {
 	logger *zerolog.Logger
+	role   string
 
 	beatInterval     time.Duration
 	beatTimeout      time.Duration
@@ -28,21 +35,42 @@ type BeatingHeart struct {
 	externalCtxCancelFunc context.CancelCauseFunc
 }
 
-func NewBeatingHeart(beatInterval, beatTimeout time.Duration) (*BeatingHeart, error) {
+func NewServerMonitor(beatInterval, beatTimeout time.Duration) (*Monitor, error) {
+	monitor, err := NewMonitor(beatInterval, beatTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	monitor.role = ServerRole
+	return monitor, nil
+}
+
+func NewClientMonitor(beatInterval, beatTimeout time.Duration) (*Monitor, error) {
+	monitor, err := NewMonitor(beatInterval, beatTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	monitor.role = ClientRole
+	return monitor, nil
+}
+
+func NewMonitor(beatInterval, beatTimeout time.Duration) (*Monitor, error) {
 	if beatTimeout <= beatInterval {
 		return nil, errors.New(fmt.Sprintf("beat timeout (%s) cannot be smaller than beat interval (%s)", beatTimeout, beatInterval))
 	}
 
-	beatingHeart := new(BeatingHeart)
-	beatingHeart.beatInterval = beatInterval
-	beatingHeart.beatTimeout = beatTimeout
-	beatingHeart.incomingBeatChan = make(chan struct{})
-	beatingHeart.outgoingBeatChan = make(chan struct{})
+	monitor := new(Monitor)
+	monitor.beatInterval = beatInterval
+	monitor.beatTimeout = beatTimeout
+	monitor.incomingBeatChan = make(chan struct{})
+	monitor.outgoingBeatChan = make(chan struct{})
+	monitor.role = GenericRole
 
-	return beatingHeart, nil
+	return monitor, nil
 }
 
-func (bh *BeatingHeart) Start(ctx context.Context) context.Context {
+func (bh *Monitor) Start(ctx context.Context) context.Context {
 	bh.logger = zerolog.Ctx(ctx)
 	bh.beatMonitorCtx, bh.beatMonitorCancelFunc = context.WithCancel(ctx)
 
@@ -55,33 +83,38 @@ func (bh *BeatingHeart) Start(ctx context.Context) context.Context {
 	go bh.incomingBeatMonitorLoop(bh.beatMonitorCtx)
 	go bh.outgoingBeatSendLoop(outgoingBeatCtx)
 
+	bh.contextualizedLogger().Info().Dur(
+		"heartbeatInterval", bh.beatInterval,
+	).Dur(
+		"heartbeatTimeout", bh.beatTimeout,
+	).Msg("Started heartbeat monitor")
 	return outgoingBeatCtx
 }
 
-func (bh *BeatingHeart) Stop() {
+func (bh *Monitor) Stop() {
 	bh.beatMonitorCancelFunc()
 }
 
-func (bh *BeatingHeart) Wait() {
+func (bh *Monitor) Wait() {
 	bh.beatMonitorsWG.Wait()
 }
 
-func (bh *BeatingHeart) IncomingBeat() {
+func (bh *Monitor) IncomingBeat() {
 	bh.incomingBeatChan <- struct{}{}
 }
 
-func (bh *BeatingHeart) OutgoingBeat() <-chan struct{} {
+func (bh *Monitor) OutgoingBeat() <-chan struct{} {
 	return bh.outgoingBeatChan
 }
 
-func (bh *BeatingHeart) incomingBeatMonitorLoop(ctx context.Context) {
+func (bh *Monitor) incomingBeatMonitorLoop(ctx context.Context) {
 	bh.beatMonitorsWG.Add(1)
 	defer bh.beatMonitorsWG.Done()
 
 	for {
 		select {
 		case <-bh.incomingBeatChan:
-			bh.contextualizedLogger().Debug().Msg("Received incoming heartbeat")
+			bh.contextualizedLogger().Trace().Msg("Received heartbeat")
 			if !bh.beatTimeoutTimer.Stop() {
 				<-bh.beatTimeoutTimer.C
 			}
@@ -106,15 +139,15 @@ func (bh *BeatingHeart) incomingBeatMonitorLoop(ctx context.Context) {
 	}
 }
 
-func (bh *BeatingHeart) outgoingBeatSendLoop(ctx context.Context) {
+func (bh *Monitor) outgoingBeatSendLoop(ctx context.Context) {
 	bh.beatMonitorsWG.Add(1)
 	defer bh.beatMonitorsWG.Done()
 
 	for {
 		select {
 		case <-bh.beatTicker.C:
-			bh.contextualizedLogger().Debug().Msg("Sending heartbeat")
-			// Non-blocking channel send, do not use a goroutine or it may leak
+			bh.contextualizedLogger().Trace().Msg("Sending heartbeat")
+			// Non-blocking channel send, do not use a goroutine, or it may leak
 			reflect.ValueOf(bh.outgoingBeatChan).TrySend(reflect.ValueOf(struct{}{}))
 
 		case <-ctx.Done():
@@ -125,7 +158,7 @@ func (bh *BeatingHeart) outgoingBeatSendLoop(ctx context.Context) {
 	}
 }
 
-func (bh *BeatingHeart) contextualizedLogger() *zerolog.Logger {
-	logger := bh.logger.With().Str("component", "Beating Heart").Logger()
+func (bh *Monitor) contextualizedLogger() *zerolog.Logger {
+	logger := bh.logger.With().Str("component", "Heartbeat Monitor").Str("role", bh.role).Logger()
 	return &logger
 }
