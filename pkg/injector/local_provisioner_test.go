@@ -20,3 +20,10 @@ func TestLocalProvisionerSetup(t *testing.T) {
 		}
 	}
 }
+
+func TestLocalProvisionerCreationFromRegistry(t *testing.T) {
+	provisioner, err := injector.CreateProvisioner("local", map[string]any{})
+	if assert.NoError(t, err) {
+		assert.IsType(t, &injector.LocalProvisioner{}, provisioner)
+	}
+}
