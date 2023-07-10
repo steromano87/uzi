@@ -120,3 +120,12 @@ func (s *Server) Initialize(ctx context.Context, request *InitializationRequest)
 		return nil, context.Cause(ctx)
 	}
 }
+
+func (s *Server) GetSyntheticUserCounters(_ context.Context, _ *SyntheticUserCountersRequest) (*SyntheticUserCounters, error) {
+	// If the spawner is not started, do not panic but send a zero response (that is true, indeed...)
+	if s.spawner == nil {
+		return &SyntheticUserCounters{}, nil
+	}
+
+	return s.spawner.Counters(), nil
+}
