@@ -10,24 +10,24 @@ import (
 	"time"
 )
 
-func TestNewBeatingHeart(t *testing.T) {
+func TestNewHeartbeatMonitor(t *testing.T) {
 	bh, err := heartbeat.NewMonitor(5*time.Second, 10*time.Second)
 	if assert.NoError(t, err) {
 		assert.IsType(t, &heartbeat.Monitor{}, bh)
 	}
 }
 
-func TestNewBeatingHeartWithInvalidInput(t *testing.T) {
+func TestNewHeartbeatMonitorWithInvalidInput(t *testing.T) {
 	_, err := heartbeat.NewMonitor(10*time.Second, 5*time.Second)
 	assert.Error(t, err)
 }
 
-func TestNewBeatingHeartWithInvalidInput2(t *testing.T) {
+func TestNewHeartbeatMonitorWithInvalidInput2(t *testing.T) {
 	_, err := heartbeat.NewMonitor(5*time.Second, 5*time.Second)
 	assert.Error(t, err)
 }
 
-func TestRunningHeartWithoutBeatTimeout(t *testing.T) {
+func TestNewHeartbeatMonitorWithoutBeatTimeout(t *testing.T) {
 	zerolog.TimeFieldFormat = time.RFC3339Nano
 	consoleWriter := zerolog.NewConsoleWriter()
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000000"
@@ -72,7 +72,7 @@ func TestRunningHeartWithoutBeatTimeout(t *testing.T) {
 	assert.True(t, childContextCanceled)
 }
 
-func TestRunningHeartWithBeatTimeout(t *testing.T) {
+func TestNewHeartbeatMonitorWithBeatTimeout(t *testing.T) {
 	zerolog.TimeFieldFormat = time.RFC3339Nano
 	consoleWriter := zerolog.NewConsoleWriter()
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000000"
