@@ -6,13 +6,19 @@ import (
 	"github.com/rs/zerolog"
 )
 
+const localProvisionerKind = "local"
+
 type LocalProvisioner struct {
 	localInjector           *Server
 	localInjectorCtx        context.Context
 	localInjectorCancelFunc context.CancelFunc
 }
 
-func (lp *LocalProvisioner) Setup(ctx context.Context) (map[string]InjectorClient, error) {
+func init() {
+	RegisterProvisioner(localProvisionerKind, &LocalProvisioner{})
+}
+
+func (lp *LocalProvisioner) Setup(ctx context.Context, _ map[string]any) (map[string]InjectorClient, error) {
 	logger := zerolog.Ctx(ctx).With().Str("component", "Local Injector Provisioner").Logger()
 	logger.Info().Msg("Creating local provisioner")
 	lp.localInjectorCtx, lp.localInjectorCancelFunc = context.WithCancel(ctx)

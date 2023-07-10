@@ -9,7 +9,7 @@ import (
 
 func TestLocalProvisionerSetup(t *testing.T) {
 	provisioner := injector.LocalProvisioner{}
-	clientMap, err := provisioner.Setup(context.TODO())
+	clientMap, err := provisioner.Setup(context.TODO(), map[string]any{})
 
 	if assert.NoError(t, err) {
 		assert.IsType(t, map[string]injector.InjectorClient{}, clientMap)
