@@ -49,13 +49,15 @@ func (s *HeartbeatServerTestSuite) TestServerStatusGrpcRequest() {
 	}
 }
 
-func (s *HeartbeatServerTestSuite) TestServerLockGrpcRequest() {
+func (s *HeartbeatServerTestSuite) TestServerLockGrpcRequestWithGracefulTermination() {
 	server, _, err := heartbeat.NewServer(s.ctx, 10*time.Millisecond, 15*time.Millisecond)
 
 	if assert.NoError(s.T(), err) {
 		heartbeat.RegisterHeartbeatServer(s.heartbeatInProcChannel, server)
 
-		go s.heartbeatClient.Monitor(s.ctx, 10*time.Millisecond, 15*time.Millisecond)
+		clientCtx, clientCancelFunc := context.WithCancel(s.ctx)
+
+		go s.heartbeatClient.Monitor(clientCtx, 10*time.Millisecond, 15*time.Millisecond)
 		defer s.cancelFunc(context.Canceled)
 		time.Sleep(50 * time.Millisecond)
 		statusResponse, err := s.heartbeatClient.GetStatus(context.TODO(), &heartbeat.StatusRequest{})
@@ -65,7 +67,32 @@ func (s *HeartbeatServerTestSuite) TestServerLockGrpcRequest() {
 			assert.Equal(s.T(), heartbeat.LockStatus_LOCKED, status)
 		}
 
-		s.cancelFunc(context.Canceled)
+		clientCancelFunc()
+		time.Sleep(20 * time.Millisecond)
+		statusResponse, err = s.heartbeatClient.GetStatus(context.TODO(), &heartbeat.StatusRequest{})
+		if assert.NoError(s.T(), err) {
+			status := statusResponse.GetStatus()
+			assert.Equal(s.T(), heartbeat.LockStatus_AVAILABLE, status)
+		}
+	}
+}
+
+func (s *HeartbeatServerTestSuite) TestServerLockGrpcRequestWithHeartbeatTimeout() {
+	server, _, err := heartbeat.NewServer(s.ctx, 10*time.Millisecond, 15*time.Millisecond)
+
+	if assert.NoError(s.T(), err) {
+		heartbeat.RegisterHeartbeatServer(s.heartbeatInProcChannel, server)
+
+		go s.heartbeatClient.Monitor(s.ctx, 20*time.Millisecond, 25*time.Millisecond)
+		defer s.cancelFunc(context.Canceled)
+		time.Sleep(10 * time.Millisecond)
+		statusResponse, err := s.heartbeatClient.GetStatus(context.TODO(), &heartbeat.StatusRequest{})
+
+		if assert.NoError(s.T(), err) {
+			status := statusResponse.GetStatus()
+			assert.Equal(s.T(), heartbeat.LockStatus_LOCKED, status)
+		}
+
 		time.Sleep(20 * time.Millisecond)
 		statusResponse, err = s.heartbeatClient.GetStatus(context.TODO(), &heartbeat.StatusRequest{})
 		if assert.NoError(s.T(), err) {

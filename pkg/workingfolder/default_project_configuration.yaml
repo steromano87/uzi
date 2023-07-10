@@ -45,6 +45,10 @@ rest:
   enableKeepAlive: true
   enableCompression: true
 
+heartbeat:
+  interval: 10s
+  timeout: 15s
+
 telemetry:
   hostMetrics:
     pollInterval: 15s

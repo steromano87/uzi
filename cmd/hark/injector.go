@@ -36,7 +36,7 @@ func runInjector(cmd *cobra.Command, args []string) {
 	tcpListener, err := net.Listen("tcp", ":9000")
 	cobra.CheckErr(err)
 
-	inj, _ := injector.NewInjector(logger.WithContext(mainCtx))
+	inj := injector.NewServer()
 
 	grpcServerOpts := make([]grpc.ServerOption, 0)
 	grpcServer := grpc.NewServer(grpcServerOpts...)
@@ -50,7 +50,6 @@ func runInjector(cmd *cobra.Command, args []string) {
 		logger.Info().Msg("Starting graceful shutdown")
 		cancelFunc()
 		grpcServer.GracefulStop()
-		inj.Stop()
 		mainWg.Done()
 	}()
 

@@ -1,9 +1,8 @@
-package configuration
+package workingfolder
 
 import (
 	"bytes"
 	"github.com/spf13/viper"
-	"github.com/steromano87/harkonnen/v1/pkg/workingfolder"
 	"os"
 	"strings"
 )
@@ -20,11 +19,12 @@ type Configuration struct {
 	WorkingFolder    string
 	Name             string
 	HarkonnenVersion string
-	Load             Load
-	Injectors        map[string]Injector
-	Logging          Logging
-	Cockpit          Cockpit
+	Load             LoadConfiguration
+	Injectors        map[string]InjectorConfiguration
+	Logging          LoggingConfiguration
+	Cockpit          CockpitConfiguration
 	Client           ClientConfiguration
+	Heartbeat        HeartbeatConfiguration
 	Telemetry        TelemetryConfiguration
 }
 
@@ -60,7 +60,7 @@ func MustNewDefault() *Configuration {
 	// Viper setup
 	config.Viper = viper.New()
 	config.SetConfigType(Format)
-	err := config.ReadConfig(bytes.NewBufferString(workingfolder.DefaultProjectConfigurationContent))
+	err := config.ReadConfig(bytes.NewBufferString(DefaultProjectConfigurationContent))
 	if err != nil {
 		panic(err)
 	}

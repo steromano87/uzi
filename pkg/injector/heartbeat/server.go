@@ -118,7 +118,7 @@ func (s *Server) outgoingBeatLoop(controlCtx context.Context, stream Heartbeat_L
 			if context.Cause(controlCtx) == ErrHeartbeatRequestTimeout {
 				s.contextualizedLogger().Error().Err(context.Cause(controlCtx)).Msg("Timeout receiving heartbeat, releasing lock...")
 				s.controlCancelCauseFunc(ErrHeartbeatRequestTimeout)
-				return status.Error(codes.Aborted, "HeartbeatConfiguration timeout exceeded")
+				return status.Error(codes.Aborted, "Heartbeat timeout exceeded")
 			}
 
 			if context.Cause(controlCtx) == context.Canceled {

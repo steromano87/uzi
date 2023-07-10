@@ -133,7 +133,7 @@ func (bh *Monitor) incomingBeatMonitorLoop(ctx context.Context) {
 
 		case <-bh.beatTimeoutTimer.C:
 			bh.contextualizedLogger().Error().Msg("Incoming heartbeat timeout, canceling child context")
-			bh.externalCtxCancelFunc(errors.New("incoming heartbeat timeout"))
+			bh.externalCtxCancelFunc(ErrHeartbeatRequestTimeout)
 			return
 		}
 	}

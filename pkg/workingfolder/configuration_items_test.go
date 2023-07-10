@@ -1,15 +1,15 @@
-package configuration_test
+package workingfolder_test
 
 import (
-	"github.com/steromano87/harkonnen/v1/pkg/configuration"
+	"github.com/steromano87/harkonnen/v1/pkg/workingfolder"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestInjectorDefaultConfiguration(t *testing.T) {
-	config := configuration.MustNewDefault()
+	config := workingfolder.MustNewDefault()
 
-	assert.IsType(t, map[string]configuration.Injector{}, config.Injectors)
+	assert.IsType(t, map[string]workingfolder.InjectorConfiguration{}, config.Injectors)
 
 	defaultInjector, ok := config.Injectors["localhost"]
 	if assert.True(t, ok) {

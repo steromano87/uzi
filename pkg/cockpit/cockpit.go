@@ -5,21 +5,22 @@ import (
 	"errors"
 	"github.com/fullstorydev/grpchan/inprocgrpc"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/configuration"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"github.com/steromano87/harkonnen/v1/pkg/scheduler"
 	"github.com/steromano87/harkonnen/v1/pkg/utils"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
+	"github.com/steromano87/harkonnen/v1/pkg/version"
+	"github.com/steromano87/harkonnen/v1/pkg/workingfolder"
 )
 
 type Cockpit struct {
 	ctx    context.Context
 	logger *zerolog.Logger
-	config *configuration.Configuration
+	config *workingfolder.Configuration
 
 	injectorReferences map[string]*injector.Reference
 
-	localInjector           *injector.Injector
+	localInjector           *injector.Server
 	localInjectorCtx        context.Context
 	localInjectorCancelFunc context.CancelFunc
 
@@ -29,7 +30,7 @@ type Cockpit struct {
 	variables variables.Holder
 }
 
-func New(ctx context.Context, config *configuration.Configuration, loadProfile scheduler.LoadProfile) (*Cockpit, error) {
+func New(ctx context.Context, config *workingfolder.Configuration, loadProfile scheduler.LoadProfile) (*Cockpit, error) {
 	cockpit := new(Cockpit)
 	cockpit.ctx = ctx
 	cockpit.logger = zerolog.Ctx(ctx)
@@ -108,7 +109,7 @@ func (c *Cockpit) initScheduler() error {
 		c.scheduler.RegisterInjector(name, reference.Weight)
 	}
 
-	c.contextLogger().Info().Str("schedulerType", schedulerType).Msg("Scheduler initialized")
+	c.contextLogger().Info().Str("schedulerType", schedulerType).Msg("SchedulerConfiguration initialized")
 
 	return nil
 }
@@ -156,11 +157,7 @@ func (c *Cockpit) startLocalInjector(reference *injector.Reference) error {
 	grpcChannel := inprocgrpc.Channel{}
 	c.localInjectorCtx, c.localInjectorCancelFunc = context.WithCancel(c.ctx)
 
-	localInjector, err := injector.NewInjector(c.localInjectorCtx)
-	if err != nil {
-		return err
-
-	}
+	localInjector := injector.NewServer()
 	c.localInjector = localInjector
 	injector.RegisterInjectorServer(&grpcChannel, localInjector)
 
@@ -179,7 +176,7 @@ func (c *Cockpit) checkInitialInjectorsStatus() error {
 
 	for injectorID, reference := range c.injectorReferences {
 		c.contextLogger().Info().Str("injectorID", injectorID).Msg("Sending hello message to injector")
-		response, err := reference.InjectorClient.GetStatus(c.ctx, &injector.StatusRequest{})
+		_, err := reference.InjectorClient.Initialize(c.ctx, &injector.InitializationRequest{})
 		if err != nil {
 			c.contextLogger().Error().Str(
 				injectorID, "injectorID",
@@ -191,7 +188,7 @@ func (c *Cockpit) checkInitialInjectorsStatus() error {
 		c.contextLogger().Info().Str(
 			"injectorID", injectorID,
 		).Str(
-			"injectorVersion", response.GetVersion(),
+			"injectorVersion", version.Version,
 		).Msg("Received positive handshake")
 	}
 

@@ -7,19 +7,22 @@ import (
 )
 
 type LocalProvisioner struct {
-	localInjector *Injector
+	localInjector           *Server
+	localInjectorCtx        context.Context
+	localInjectorCancelFunc context.CancelFunc
 }
 
 func (lp *LocalProvisioner) Setup(ctx context.Context) (map[string]InjectorClient, error) {
 	logger := zerolog.Ctx(ctx).With().Str("component", "Local Injector Provisioner").Logger()
 	logger.Info().Msg("Creating local provisioner")
-	localInjector, err := NewInjector(ctx)
+	lp.localInjectorCtx, lp.localInjectorCancelFunc = context.WithCancel(ctx)
+
+	lp.localInjector = NewServer()
+	err := lp.localInjector.Run(lp.localInjectorCtx, configuration.Heartbeat.Interval, configuration.Heartbeat.Timeout)
 	if err != nil {
 		logger.Error().Err(err).Msg("Error creating local injector")
 		return nil, err
 	}
-
-	lp.localInjector = localInjector
 
 	grpcChannel := &inprocgrpc.Channel{}
 	RegisterInjectorServer(grpcChannel, lp.localInjector)
@@ -32,7 +35,8 @@ func (lp *LocalProvisioner) Setup(ctx context.Context) (map[string]InjectorClien
 func (lp *LocalProvisioner) TearDown(ctx context.Context) error {
 	logger := zerolog.Ctx(ctx).With().Str("component", "Local Injector Provisioner").Logger()
 	logger.Info().Msg("Stopping local injector")
-	lp.localInjector.Stop()
+	lp.localInjectorCancelFunc()
 	logger.Info().Msg("Local injector stopped")
+	lp.localInjector = nil
 	return nil
 }
