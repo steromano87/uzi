@@ -3,18 +3,18 @@ package dsl
 import (
 	"context"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
-	"github.com/steromano87/harkonnen/v1/pkg/workingfolder"
+	"github.com/steromano87/harkonnen/v1/pkg/workspace"
 )
 
 type Context struct {
 	context.Context
 
-	config           *workingfolder.Configuration
+	config           *workspace.Configuration
 	metricsCollector StepMetricsCollector
 	vars             *variables.Holder
 }
 
-func NewContext(ctx context.Context, config *workingfolder.Configuration, vars *variables.Holder, metricsCollector StepMetricsCollector) (Context, context.CancelFunc) {
+func NewContext(ctx context.Context, config *workspace.Configuration, vars *variables.Holder, metricsCollector StepMetricsCollector) (Context, context.CancelFunc) {
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
 
 	return Context{
@@ -25,7 +25,7 @@ func NewContext(ctx context.Context, config *workingfolder.Configuration, vars *
 	}, cancelFunc
 }
 
-func (c *Context) UpdateConfig(config *workingfolder.Configuration) {
+func (c *Context) UpdateConfig(config *workspace.Configuration) {
 	c.config = config
 }
 
@@ -34,7 +34,7 @@ func (c *Context) UpdateVariables(newVars variables.Holder) {
 	c.vars.UpdateIterVars(newVars.IterVars())
 }
 
-func (c *Context) Config() *workingfolder.Configuration {
+func (c *Context) Config() *workspace.Configuration {
 	return c.config
 }
 

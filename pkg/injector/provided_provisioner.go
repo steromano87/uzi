@@ -22,6 +22,7 @@ type ProvidedInjectorSpec struct {
 	Name       string
 	Address    string
 	Port       uint16
+	Weight     uint
 	Connection *grpc.ClientConn
 }
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
-	"github.com/steromano87/harkonnen/v1/pkg/workingfolder"
+	"github.com/steromano87/harkonnen/v1/pkg/workspace"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -26,7 +26,7 @@ func runRun(cmd *cobra.Command, args []string) {
 	_, cancelFunc := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancelFunc()
 
-	config, err := workingfolder.New(filepath.Join(workingFolder, workingfolder.ConfigurationFile))
+	config, err := workspace.New(filepath.Join(workingFolder, workspace.ConfigurationFile))
 	cobra.CheckErr(err)
 	config.WorkingFolder = workingFolder
 

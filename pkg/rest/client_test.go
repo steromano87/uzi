@@ -8,7 +8,7 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/rest"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
-	"github.com/steromano87/harkonnen/v1/pkg/workingfolder"
+	"github.com/steromano87/harkonnen/v1/pkg/workspace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"io"
@@ -35,7 +35,7 @@ func (s *ClientTestSuite) SetupTest() {
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	s.logger = zerolog.New(consoleWriter).With().Timestamp().Logger()
 
-	config := workingfolder.MustNewDefault()
+	config := workspace.MustNewDefault()
 
 	s.telemetryServer = telemetry.NewServer(config)
 	s.ctx, _ = dsl.NewContext(s.logger.WithContext(context.TODO()), config, variables.NewHolder(), s.telemetryServer)

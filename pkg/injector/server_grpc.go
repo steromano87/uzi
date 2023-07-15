@@ -6,7 +6,7 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/dsl/pipeline"
 	"github.com/steromano87/harkonnen/v1/pkg/injector/heartbeat"
 	"github.com/steromano87/harkonnen/v1/pkg/utils"
-	"github.com/steromano87/harkonnen/v1/pkg/workingfolder"
+	"github.com/steromano87/harkonnen/v1/pkg/workspace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -57,7 +57,7 @@ func (s *Server) Initialize(ctx context.Context, request *InitializationRequest)
 	s.contextualizedLogger().Info().Msg("Parsing configuration")
 	go func() {
 		var err error
-		configuration, err = workingfolder.ParseConfiguration(s.WorkingFolder())
+		configuration, err = workspace.ParseConfiguration(s.WorkingFolder())
 		resultChan <- err
 	}()
 
@@ -79,7 +79,7 @@ func (s *Server) Initialize(ctx context.Context, request *InitializationRequest)
 	var referencePipeline pipeline.Pipeline
 	go func() {
 		var err error
-		pipContent, pipFile, err := workingfolder.ParsePipeline(s.WorkingFolder())
+		pipContent, pipFile, err := workspace.ParsePipeline(s.WorkingFolder())
 		if err != nil {
 			resultChan <- err
 			return

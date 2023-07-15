@@ -10,13 +10,13 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/utils"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 	"github.com/steromano87/harkonnen/v1/pkg/version"
-	"github.com/steromano87/harkonnen/v1/pkg/workingfolder"
+	"github.com/steromano87/harkonnen/v1/pkg/workspace"
 )
 
 type Cockpit struct {
 	ctx    context.Context
 	logger *zerolog.Logger
-	config *workingfolder.Configuration
+	config *workspace.Configuration
 
 	injectorReferences map[string]*injector.Reference
 
@@ -30,7 +30,7 @@ type Cockpit struct {
 	variables variables.Holder
 }
 
-func New(ctx context.Context, config *workingfolder.Configuration, loadProfile scheduler.LoadProfile) (*Cockpit, error) {
+func New(ctx context.Context, config *workspace.Configuration, loadProfile scheduler.LoadProfile) (*Cockpit, error) {
 	cockpit := new(Cockpit)
 	cockpit.ctx = ctx
 	cockpit.logger = zerolog.Ctx(ctx)

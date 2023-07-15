@@ -2,7 +2,7 @@ package telemetry
 
 import (
 	"context"
-	config "github.com/steromano87/harkonnen/v1/pkg/workingfolder"
+	config "github.com/steromano87/harkonnen/v1/pkg/workspace"
 )
 
 //go:generate sh -c "protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative *.proto"

@@ -4,14 +4,14 @@ import (
 	"context"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/injector/heartbeat"
-	"github.com/steromano87/harkonnen/v1/pkg/workingfolder"
+	configuration2 "github.com/steromano87/harkonnen/v1/pkg/workspace"
 	"os"
 	"path/filepath"
 	"time"
 )
 
 // Global configuration
-var configuration = workingfolder.MustNewDefault()
+var configuration = configuration2.MustNewDefault()
 
 type Server struct {
 	*heartbeat.Server

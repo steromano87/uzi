@@ -1,4 +1,4 @@
-package workingfolder
+package workspace
 
 import (
 	"bytes"
@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	Name      = "harkonnen"
-	Format    = "yaml"
-	EnvPrefix = "HARK"
+	ConfigurationName      = "harkonnen"
+	ConfigurationFormat    = "yaml"
+	ConfigurationEnvPrefix = "HARK"
 )
 
 type Configuration struct {
@@ -59,14 +59,14 @@ func MustNewDefault() *Configuration {
 
 	// Viper setup
 	config.Viper = viper.New()
-	config.SetConfigType(Format)
+	config.SetConfigType(ConfigurationFormat)
 	err := config.ReadConfig(bytes.NewBufferString(DefaultProjectConfigurationContent))
 	if err != nil {
 		panic(err)
 	}
 
-	config.SetConfigName(Name)
-	config.SetEnvPrefix(EnvPrefix)
+	config.SetConfigName(ConfigurationName)
+	config.SetEnvPrefix(ConfigurationEnvPrefix)
 	config.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	config.AutomaticEnv()
 	err = config.Update()

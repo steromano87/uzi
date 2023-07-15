@@ -1,4 +1,4 @@
-package workingfolder
+package workspace
 
 const (
 	SessionsFolder  = "sessions"
