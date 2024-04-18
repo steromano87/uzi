@@ -6,11 +6,16 @@ import (
 )
 
 var (
-	teardownType = "teardown"
+	setupType   = "setup"
+	setupLabels []string
 
+	mainType   = "main"
+	mainLabels []string
+
+	teardownType   = "teardown"
 	teardownLabels []string
 
-	teardownSchema = &hcl.BodySchema{
+	stepContainerSchema = &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{},
 		Blocks:     dsl.RegisteredSteps(),
 	}

@@ -1,7 +1,6 @@
-package basesteps
+package base
 
 import (
-	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
 	"time"
 )
@@ -14,11 +13,13 @@ type Transaction struct {
 }
 
 func (t *Transaction) Run(ctx dsl.Context) error {
-	t.contextLogger(ctx).Info().Msg("Transaction started")
+	logger := ctx.Logger.With().Str("step", "Transaction").Str("name", t.name).Logger()
+
+	logger.Info().Msg("Transaction started")
 	t.start = time.Now()
 	defer func() {
 		t.end = time.Now()
-		t.contextLogger(ctx).Info().Dur("duration", t.Duration()).Msg("Transaction ended")
+		logger.Info().Dur("duration", t.Duration()).Msg("Transaction ended")
 	}()
 	for _, step := range t.steps {
 		err := step.Run(ctx)
@@ -32,9 +33,4 @@ func (t *Transaction) Run(ctx dsl.Context) error {
 
 func (t *Transaction) Duration() time.Duration {
 	return t.end.Sub(t.start)
-}
-
-func (t *Transaction) contextLogger(ctx dsl.Context) *zerolog.Logger {
-	logger := zerolog.Ctx(ctx).With().Str("step", "Transaction").Str("name", t.name).Logger()
-	return &logger
 }

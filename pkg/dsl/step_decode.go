@@ -4,7 +4,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 )
 
-func DecodeStepBlocks(ctx *hcl.EvalContext, blocks []*hcl.Block) ([]Step, error) {
+func Decode(ctx *hcl.EvalContext, blocks []*hcl.Block) ([]Step, error) {
 	steps := make([]Step, 0)
 
 	for _, block := range blocks {

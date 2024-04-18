@@ -1,4 +1,4 @@
-package basesteps
+package base
 
 import (
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"

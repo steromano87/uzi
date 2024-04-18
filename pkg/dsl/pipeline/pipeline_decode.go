@@ -4,9 +4,7 @@ import (
 	"errors"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
-
-	_ "github.com/steromano87/harkonnen/v1/pkg/dsl/basesteps"
-	_ "github.com/steromano87/harkonnen/v1/pkg/rest"
+	"github.com/steromano87/harkonnen/v1/pkg/dsl"
 )
 
 func Decode(dslFileContent []byte, dslFilePath string) (Pipeline, error) {
@@ -43,32 +41,22 @@ func decodeBody(ctx *hcl.EvalContext, body hcl.Body) (Pipeline, error) {
 	teardownCount := 0
 
 	for _, block := range bodyContent.Blocks {
+		stepContainer, err := decodeStepContainer(ctx, block)
+		if err != nil {
+			return Pipeline{}, err
+		}
+
 		switch block.Type {
 		case setupType:
-			setup := StepContainer{}
-			err := setup.DecodeFromHCLBlock(ctx, block)
-			if err != nil {
-				return Pipeline{}, err
-			}
-			pipeline.Setup = setup
+			pipeline.Setup = stepContainer
 			setupCount++
 
 		case mainType:
-			main := StepContainer{}
-			err := main.DecodeFromHCLBlock(ctx, block)
-			if err != nil {
-				return Pipeline{}, err
-			}
-			pipeline.Main = main
+			pipeline.Main = stepContainer
 			mainCount++
 
 		case teardownType:
-			teardown := StepContainer{}
-			err := teardown.DecodeFromHCLBlock(ctx, block)
-			if err != nil {
-				return Pipeline{}, err
-			}
-			pipeline.Teardown = teardown
+			pipeline.Teardown = stepContainer
 			teardownCount++
 		}
 	}
@@ -86,4 +74,20 @@ func decodeBody(ctx *hcl.EvalContext, body hcl.Body) (Pipeline, error) {
 	}
 
 	return pipeline, nil
+}
+
+func decodeStepContainer(ctx *hcl.EvalContext, block *hcl.Block) (StepContainer, error) {
+	body, diagnostics := block.Body.Content(stepContainerSchema)
+	if diagnostics != nil && diagnostics.HasErrors() {
+		return StepContainer{}, diagnostics.Errs()[0]
+	}
+
+	decodedSteps, err := dsl.Decode(ctx, body.Blocks)
+	if err != nil {
+		return StepContainer{}, err
+	}
+
+	return StepContainer{
+		steps: decodedSteps,
+	}, nil
 }

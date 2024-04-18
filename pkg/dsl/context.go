@@ -2,6 +2,8 @@ package dsl
 
 import (
 	"context"
+	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 	"github.com/steromano87/harkonnen/v1/pkg/workspace"
 )
@@ -9,39 +11,21 @@ import (
 type Context struct {
 	context.Context
 
-	config           *workspace.Configuration
-	metricsCollector StepMetricsCollector
-	vars             *variables.Holder
+	Logger *zerolog.Logger
+	Vars   *variables.Holder
+	Config *workspace.Configuration
+
+	telemetry.LogSink
+	telemetry.StepMetricsSink
 }
 
-func NewContext(ctx context.Context, config *workspace.Configuration, vars *variables.Holder, metricsCollector StepMetricsCollector) (Context, context.CancelFunc) {
-	cancelCtx, cancelFunc := context.WithCancel(ctx)
+func NewContext(ctx context.Context) (Context, context.CancelFunc) {
+	derivedCtx, cancelFunc := context.WithCancel(ctx)
 
 	return Context{
-		Context:          cancelCtx,
-		config:           config,
-		metricsCollector: metricsCollector,
-		vars:             vars,
+		Context: derivedCtx,
+		Logger:  nil,
+		Vars:    variables.NewHolder(),
+		Config:  workspace.MustNewDefault(),
 	}, cancelFunc
-}
-
-func (c *Context) UpdateConfig(config *workspace.Configuration) {
-	c.config = config
-}
-
-func (c *Context) UpdateVariables(newVars variables.Holder) {
-	c.vars.SetGlobals(newVars.Globals())
-	c.vars.UpdateIterVars(newVars.IterVars())
-}
-
-func (c *Context) Config() *workspace.Configuration {
-	return c.config
-}
-
-func (c *Context) Variables() *variables.Holder {
-	return c.vars
-}
-
-func (c *Context) MetricsCollector() StepMetricsCollector {
-	return c.metricsCollector
 }

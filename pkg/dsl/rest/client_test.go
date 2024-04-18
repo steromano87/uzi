@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
-	"github.com/steromano87/harkonnen/v1/pkg/rest"
+	rest2 "github.com/steromano87/harkonnen/v1/pkg/dsl/rest"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
-	"github.com/steromano87/harkonnen/v1/pkg/variables"
-	"github.com/steromano87/harkonnen/v1/pkg/workspace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"io"
@@ -19,13 +17,59 @@ import (
 	"time"
 )
 
+/////////////////////////////////////
+// Mocked telemetry sinks for test //
+/////////////////////////////////////
+
+type TestLogSink struct {
+	Logs []*telemetry.Log
+}
+
+func NewTestLogSink() *TestLogSink {
+	tls := new(TestLogSink)
+	tls.Logs = make([]*telemetry.Log, 0)
+
+	return tls
+}
+
+func (tls *TestLogSink) AddLog(log *telemetry.Log) {
+	tls.Logs = append(tls.Logs, log)
+}
+
+type TestStepMetricsSink struct {
+	Samples      []*telemetry.Sample
+	Transactions []*telemetry.Transaction
+}
+
+func NewTestStepMetricsSink() *TestStepMetricsSink {
+	tsms := new(TestStepMetricsSink)
+	tsms.Samples = make([]*telemetry.Sample, 0)
+	tsms.Transactions = make([]*telemetry.Transaction, 0)
+
+	return tsms
+}
+
+func (tsms *TestStepMetricsSink) AddSample(sample *telemetry.Sample) {
+	tsms.Samples = append(tsms.Samples, sample)
+}
+
+func (tsms *TestStepMetricsSink) AddTransaction(transaction *telemetry.Transaction) {
+	tsms.Transactions = append(tsms.Transactions, transaction)
+}
+
+////////////////
+// Test suite //
+////////////////
+
 type ClientTestSuite struct {
 	suite.Suite
 	ctx             dsl.Context
+	cancelFunc      context.CancelFunc
 	logger          zerolog.Logger
-	telemetryServer *telemetry.Server
+	logSink         *TestLogSink
+	stepMetricsSink *TestStepMetricsSink
 
-	client     *rest.Client
+	client     *rest2.Client
 	testServer *httptest.Server
 }
 
@@ -35,12 +79,14 @@ func (s *ClientTestSuite) SetupTest() {
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	s.logger = zerolog.New(consoleWriter).With().Timestamp().Logger()
 
-	config := workspace.MustNewDefault()
+	s.logSink = NewTestLogSink()
+	s.stepMetricsSink = NewTestStepMetricsSink()
 
-	s.telemetryServer = telemetry.NewServer(config)
-	s.ctx, _ = dsl.NewContext(s.logger.WithContext(context.TODO()), config, variables.NewHolder(), s.telemetryServer)
+	s.ctx, s.cancelFunc = dsl.NewContext(context.TODO())
+	s.ctx.LogSink = s.logSink
+	s.ctx.StepMetricsSink = s.stepMetricsSink
 
-	s.client = rest.NewClient(s.ctx)
+	s.client = rest2.NewClient(s.ctx)
 
 	handler := http.NewServeMux()
 	handler.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -76,12 +122,12 @@ func (s *ClientTestSuite) TearDownTest() {
 }
 
 func (s *ClientTestSuite) TestNewSampler() {
-	assert.IsType(s.T(), &rest.Client{}, s.client)
+	assert.IsType(s.T(), &rest2.Client{}, s.client)
 }
 
 func (s *ClientTestSuite) TestGetRequest() {
-	request := rest.Request{
-		Method:     rest.GET,
+	request := rest2.Request{
+		Method:     rest2.GET,
 		Url:        s.testServer.URL,
 		Parameters: nil,
 	}
@@ -89,7 +135,7 @@ func (s *ClientTestSuite) TestGetRequest() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.telemetryServer.SampleCollector.GetSamples()
+		samples := s.stepMetricsSink.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -102,10 +148,10 @@ func (s *ClientTestSuite) TestGetRequest() {
 
 				assert.Equal(s.T(), s.testServer.URL, restData.GetUrl())
 				assert.Empty(s.T(), restData.GetQueryString())
-				assert.Equal(s.T(), rest.GET, restData.GetMethod())
+				assert.Equal(s.T(), rest2.GET, restData.GetMethod())
 			}
 
-			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+			responseBody := s.ctx.Vars.LastResponse()["Body"].(string)
 
 			assert.Contains(s.T(), responseBody, "Request method: 'GET'")
 			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
@@ -120,8 +166,8 @@ func (s *ClientTestSuite) TestGetRequestWithQueryString() {
 	parameters.Set("key1", "value1")
 	parameters.Set("key2", "1")
 
-	request := rest.Request{
-		Method:     rest.GET,
+	request := rest2.Request{
+		Method:     rest2.GET,
 		Url:        s.testServer.URL,
 		Parameters: &parameters,
 	}
@@ -129,7 +175,7 @@ func (s *ClientTestSuite) TestGetRequestWithQueryString() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.telemetryServer.SampleCollector.GetSamples()
+		samples := s.stepMetricsSink.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -142,10 +188,10 @@ func (s *ClientTestSuite) TestGetRequestWithQueryString() {
 
 				assert.Equal(s.T(), s.testServer.URL, restData.GetUrl())
 				assert.Equal(s.T(), parameters.Encode(), restData.GetQueryString())
-				assert.Equal(s.T(), rest.GET, restData.GetMethod())
+				assert.Equal(s.T(), rest2.GET, restData.GetMethod())
 			}
 
-			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+			responseBody := s.ctx.Vars.LastResponse()["Body"].(string)
 
 			assert.Contains(s.T(), responseBody, "Request method: 'GET'")
 			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
@@ -156,15 +202,15 @@ func (s *ClientTestSuite) TestGetRequestWithQueryString() {
 }
 
 func (s *ClientTestSuite) TestPostNoBody() {
-	request := rest.Request{
-		Method: rest.POST,
+	request := rest2.Request{
+		Method: rest2.POST,
 		Url:    s.testServer.URL,
 	}
 
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.telemetryServer.SampleCollector.GetSamples()
+		samples := s.stepMetricsSink.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -177,10 +223,10 @@ func (s *ClientTestSuite) TestPostNoBody() {
 
 				assert.Equal(s.T(), s.testServer.URL, restData.GetUrl())
 				assert.Empty(s.T(), restData.GetQueryString())
-				assert.Equal(s.T(), rest.POST, restData.GetMethod())
+				assert.Equal(s.T(), rest2.POST, restData.GetMethod())
 			}
 
-			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+			responseBody := s.ctx.Vars.LastResponse()["Body"].(string)
 
 			assert.Contains(s.T(), responseBody, "Request method: 'POST'")
 			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
@@ -191,15 +237,15 @@ func (s *ClientTestSuite) TestPostNoBody() {
 }
 
 func (s *ClientTestSuite) TestPutNoBody() {
-	request := rest.Request{
-		Method: rest.PUT,
+	request := rest2.Request{
+		Method: rest2.PUT,
 		Url:    s.testServer.URL,
 	}
 
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.telemetryServer.SampleCollector.GetSamples()
+		samples := s.stepMetricsSink.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -212,10 +258,10 @@ func (s *ClientTestSuite) TestPutNoBody() {
 
 				assert.Equal(s.T(), s.testServer.URL, restData.GetUrl())
 				assert.Empty(s.T(), restData.GetQueryString())
-				assert.Equal(s.T(), rest.PUT, restData.GetMethod())
+				assert.Equal(s.T(), rest2.PUT, restData.GetMethod())
 			}
 
-			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+			responseBody := s.ctx.Vars.LastResponse()["Body"].(string)
 
 			assert.Contains(s.T(), responseBody, "Request method: 'PUT'")
 			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
@@ -226,15 +272,15 @@ func (s *ClientTestSuite) TestPutNoBody() {
 }
 
 func (s *ClientTestSuite) TestPatchNoBody() {
-	request := rest.Request{
-		Method: rest.PATCH,
+	request := rest2.Request{
+		Method: rest2.PATCH,
 		Url:    s.testServer.URL,
 	}
 
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.telemetryServer.SampleCollector.GetSamples()
+		samples := s.stepMetricsSink.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -247,10 +293,10 @@ func (s *ClientTestSuite) TestPatchNoBody() {
 
 				assert.Equal(s.T(), s.testServer.URL, restData.GetUrl())
 				assert.Empty(s.T(), restData.GetQueryString())
-				assert.Equal(s.T(), rest.PATCH, restData.GetMethod())
+				assert.Equal(s.T(), rest2.PATCH, restData.GetMethod())
 			}
 
-			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+			responseBody := s.ctx.Vars.LastResponse()["Body"].(string)
 
 			assert.Contains(s.T(), responseBody, "Request method: 'PATCH'")
 			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
@@ -261,15 +307,15 @@ func (s *ClientTestSuite) TestPatchNoBody() {
 }
 
 func (s *ClientTestSuite) TestDeleteNoBody() {
-	request := rest.Request{
-		Method: rest.DELETE,
+	request := rest2.Request{
+		Method: rest2.DELETE,
 		Url:    s.testServer.URL,
 	}
 
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.telemetryServer.SampleCollector.GetSamples()
+		samples := s.stepMetricsSink.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -282,10 +328,10 @@ func (s *ClientTestSuite) TestDeleteNoBody() {
 
 				assert.Equal(s.T(), s.testServer.URL, restData.GetUrl())
 				assert.Empty(s.T(), restData.GetQueryString())
-				assert.Equal(s.T(), rest.DELETE, restData.GetMethod())
+				assert.Equal(s.T(), rest2.DELETE, restData.GetMethod())
 			}
 
-			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+			responseBody := s.ctx.Vars.LastResponse()["Body"].(string)
 
 			assert.Contains(s.T(), responseBody, "Request method: 'DELETE'")
 			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
@@ -296,15 +342,15 @@ func (s *ClientTestSuite) TestDeleteNoBody() {
 }
 
 func (s *ClientTestSuite) TestHeadNoBody() {
-	request := rest.Request{
-		Method: rest.HEAD,
+	request := rest2.Request{
+		Method: rest2.HEAD,
 		Url:    s.testServer.URL,
 	}
 
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.telemetryServer.SampleCollector.GetSamples()
+		samples := s.stepMetricsSink.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -317,10 +363,10 @@ func (s *ClientTestSuite) TestHeadNoBody() {
 
 				assert.Equal(s.T(), s.testServer.URL, restData.GetUrl())
 				assert.Empty(s.T(), restData.GetQueryString())
-				assert.Equal(s.T(), rest.HEAD, restData.GetMethod())
+				assert.Equal(s.T(), rest2.HEAD, restData.GetMethod())
 			}
 
-			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+			responseBody := s.ctx.Vars.LastResponse()["Body"].(string)
 
 			assert.Empty(s.T(), responseBody, "HEAD body must be empty")
 		}
@@ -328,15 +374,15 @@ func (s *ClientTestSuite) TestHeadNoBody() {
 }
 
 func (s *ClientTestSuite) TestOptionsNoBody() {
-	request := rest.Request{
-		Method: rest.OPTIONS,
+	request := rest2.Request{
+		Method: rest2.OPTIONS,
 		Url:    s.testServer.URL,
 	}
 
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.telemetryServer.SampleCollector.GetSamples()
+		samples := s.stepMetricsSink.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -349,10 +395,10 @@ func (s *ClientTestSuite) TestOptionsNoBody() {
 
 				assert.Equal(s.T(), s.testServer.URL, restData.GetUrl())
 				assert.Empty(s.T(), restData.GetQueryString())
-				assert.Equal(s.T(), rest.OPTIONS, restData.GetMethod())
+				assert.Equal(s.T(), rest2.OPTIONS, restData.GetMethod())
 			}
 
-			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+			responseBody := s.ctx.Vars.LastResponse()["Body"].(string)
 
 			assert.Contains(s.T(), responseBody, "Request method: 'OPTIONS'")
 			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
@@ -366,8 +412,8 @@ func (s *ClientTestSuite) TestPostFormRequest() {
 	values := url.Values{}
 	values.Set("test", "example")
 
-	request := rest.Request{
-		Method: rest.POST,
+	request := rest2.Request{
+		Method: rest2.POST,
 		Url:    s.testServer.URL,
 		Body:   values.Encode(),
 	}
@@ -375,7 +421,7 @@ func (s *ClientTestSuite) TestPostFormRequest() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.telemetryServer.SampleCollector.GetSamples()
+		samples := s.stepMetricsSink.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -388,10 +434,10 @@ func (s *ClientTestSuite) TestPostFormRequest() {
 
 				assert.Equal(s.T(), s.testServer.URL, restData.GetUrl())
 				assert.Empty(s.T(), restData.GetQueryString())
-				assert.Equal(s.T(), rest.POST, restData.GetMethod())
+				assert.Equal(s.T(), rest2.POST, restData.GetMethod())
 			}
 
-			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+			responseBody := s.ctx.Vars.LastResponse()["Body"].(string)
 
 			assert.Contains(s.T(), responseBody, "Request method: 'POST'")
 			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))
@@ -404,8 +450,8 @@ func (s *ClientTestSuite) TestPostFormRequest() {
 func (s *ClientTestSuite) TestRequestMalformedUrl() {
 	malformedUrl := "http:// invalid url"
 
-	request := rest.Request{
-		Method:     rest.GET,
+	request := rest2.Request{
+		Method:     rest2.GET,
 		Url:        malformedUrl,
 		Parameters: nil,
 	}
@@ -416,30 +462,30 @@ func (s *ClientTestSuite) TestRequestMalformedUrl() {
 
 func (s *ClientTestSuite) TestRequestInvalidPartialUrl() {
 	baseUrl, _ := url.Parse(s.testServer.URL)
-	s.ctx.Config().Client.Rest.BaseUrl = baseUrl.String()
-	s.ctx.Config().Client.Rest.FollowRedirects = false
+	s.ctx.Config.Client.Rest.BaseUrl = baseUrl.String()
+	s.ctx.Config.Client.Rest.FollowRedirects = false
 
 	invalidPartialUrl := "test"
 
-	request := rest.Request{
-		Method:     rest.GET,
+	request := rest2.Request{
+		Method:     rest2.GET,
 		Url:        invalidPartialUrl,
 		Parameters: nil,
 	}
 
 	err := s.client.Execute(request)
 	if assert.Error(s.T(), err) {
-		assert.IsType(s.T(), rest.ErrInvalidPartialUrl{}, err)
+		assert.IsType(s.T(), rest2.ErrInvalidPartialUrl{}, err)
 	}
 }
 
 func (s *ClientTestSuite) TestRequestWithRedirect_WithoutRedirectSetting() {
 	baseUrl, _ := url.Parse(s.testServer.URL)
-	s.ctx.Config().Client.Rest.BaseUrl = baseUrl.String()
-	s.ctx.Config().Client.Rest.FollowRedirects = false
+	s.ctx.Config.Client.Rest.BaseUrl = baseUrl.String()
+	s.ctx.Config.Client.Rest.FollowRedirects = false
 
-	request := rest.Request{
-		Method:     rest.GET,
+	request := rest2.Request{
+		Method:     rest2.GET,
 		Url:        "/redirect",
 		Parameters: nil,
 	}
@@ -447,7 +493,7 @@ func (s *ClientTestSuite) TestRequestWithRedirect_WithoutRedirectSetting() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.telemetryServer.SampleCollector.GetSamples()
+		samples := s.stepMetricsSink.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -462,10 +508,10 @@ func (s *ClientTestSuite) TestRequestWithRedirect_WithoutRedirectSetting() {
 				assert.False(s.T(), restData.GetIsRedirect())
 				assert.Equal(s.T(), restData.GetUrl(), restData.GetFinalUrl())
 				assert.Empty(s.T(), restData.GetQueryString())
-				assert.Equal(s.T(), rest.GET, restData.GetMethod())
+				assert.Equal(s.T(), rest2.GET, restData.GetMethod())
 			}
 
-			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+			responseBody := s.ctx.Vars.LastResponse()["Body"].(string)
 
 			assert.Empty(s.T(), responseBody)
 		}
@@ -474,11 +520,11 @@ func (s *ClientTestSuite) TestRequestWithRedirect_WithoutRedirectSetting() {
 
 func (s *ClientTestSuite) TestRequestWithRedirect_WithRedirectSetting() {
 	baseUrl, _ := url.Parse(s.testServer.URL)
-	s.ctx.Config().Client.Rest.BaseUrl = baseUrl.String()
-	s.ctx.Config().Client.Rest.FollowRedirects = true
+	s.ctx.Config.Client.Rest.BaseUrl = baseUrl.String()
+	s.ctx.Config.Client.Rest.FollowRedirects = true
 
-	request := rest.Request{
-		Method:     rest.GET,
+	request := rest2.Request{
+		Method:     rest2.GET,
 		Url:        "/redirect",
 		Parameters: nil,
 	}
@@ -486,7 +532,7 @@ func (s *ClientTestSuite) TestRequestWithRedirect_WithRedirectSetting() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.telemetryServer.SampleCollector.GetSamples()
+		samples := s.stepMetricsSink.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -501,10 +547,10 @@ func (s *ClientTestSuite) TestRequestWithRedirect_WithRedirectSetting() {
 				assert.True(s.T(), restData.GetIsRedirect())
 				assert.Equal(s.T(), s.testServer.URL+"/redirected", restData.GetFinalUrl())
 				assert.Empty(s.T(), restData.GetQueryString())
-				assert.Equal(s.T(), rest.GET, restData.GetMethod())
+				assert.Equal(s.T(), rest2.GET, restData.GetMethod())
 			}
 
-			responseBody := s.ctx.Variables().LastResponse()["Body"].(string)
+			responseBody := s.ctx.Vars.LastResponse()["Body"].(string)
 
 			assert.Contains(s.T(), responseBody, "Request method: 'GET'")
 			assert.Contains(s.T(), responseBody, fmt.Sprintf("Request host: '%s'", s.testServer.URL))

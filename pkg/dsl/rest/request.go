@@ -31,7 +31,7 @@ type Request struct {
 }
 
 func (r *Request) Run(ctx dsl.Context) error {
-	restClient, ok := ctx.Variables().Locals()[restClientVariablesKey].(*Client)
+	restClient, ok := ctx.Vars.Locals()[restClientVariablesKey].(*Client)
 	if !ok {
 		restClient = NewClient(ctx)
 	}

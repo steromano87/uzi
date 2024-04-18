@@ -1,4 +1,4 @@
-package basesteps
+package base
 
 import (
 	"github.com/hashicorp/hcl/v2"

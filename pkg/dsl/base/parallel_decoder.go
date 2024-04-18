@@ -1,4 +1,4 @@
-package basesteps
+package base
 
 import (
 	"github.com/hashicorp/hcl/v2"
@@ -25,7 +25,7 @@ func (p ParallelDecoder) Decode(ctx *hcl.EvalContext, block *hcl.Block) (dsl.Ste
 		return nil, diagnostics.Errs()[0]
 	}
 
-	decodedSteps, err := dsl.DecodeStepBlocks(ctx, body.Blocks)
+	decodedSteps, err := dsl.Decode(ctx, body.Blocks)
 	if err != nil {
 		return nil, err
 	}

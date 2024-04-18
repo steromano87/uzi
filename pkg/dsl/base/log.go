@@ -1,4 +1,4 @@
-package basesteps
+package base
 
 import (
 	"errors"
@@ -14,23 +14,23 @@ type Log struct {
 
 func (log *Log) Run(ctx dsl.Context) error {
 	var partialLogger *zerolog.Event
-	loggerFromCtx := zerolog.Ctx(ctx).With().Str("step", "Log").Logger()
+	baseLogger := ctx.Logger.With().Str("step", "Log").Logger()
 
 	switch log.level {
 	case "error":
-		partialLogger = loggerFromCtx.Error()
+		partialLogger = baseLogger.Error()
 
 	case "warning":
-		partialLogger = loggerFromCtx.Warn()
+		partialLogger = baseLogger.Warn()
 
 	case "info":
-		partialLogger = loggerFromCtx.Info()
+		partialLogger = baseLogger.Info()
 
 	case "debug":
-		partialLogger = loggerFromCtx.Debug()
+		partialLogger = baseLogger.Debug()
 
 	case "trace":
-		partialLogger = loggerFromCtx.Trace()
+		partialLogger = baseLogger.Trace()
 
 	default:
 		return errors.New(fmt.Sprintf("%s is not a valid log level", log.level))

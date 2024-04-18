@@ -2,7 +2,7 @@ package pipeline_test
 
 import (
 	"github.com/Flaque/filet"
-	pipeline2 "github.com/steromano87/harkonnen/v1/pkg/dsl/pipeline"
+	"github.com/steromano87/harkonnen/v1/pkg/dsl/pipeline"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"testing"
@@ -19,10 +19,10 @@ main {}
 	tempScript := filet.TmpFile(s.T(), "", tempScriptContent)
 	defer filet.CleanUp(s.T())
 
-	decodedPipeline, err := pipeline2.Decode([]byte(tempScriptContent), tempScript.Name())
+	decodedPipeline, err := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
 
 	if assert.NoError(s.T(), err) {
-		assert.IsType(s.T(), pipeline2.Pipeline{}, decodedPipeline)
+		assert.IsType(s.T(), pipeline.Pipeline{}, decodedPipeline)
 	}
 }
 
@@ -33,7 +33,7 @@ main {
 	tempScript := filet.TmpFile(s.T(), "", tempScriptContent)
 	defer filet.CleanUp(s.T())
 
-	_, err := pipeline2.Decode([]byte(tempScriptContent), tempScript.Name())
+	_, err := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
 
 	assert.Error(s.T(), err)
 }
@@ -47,7 +47,7 @@ setup {}
 	tempScript := filet.TmpFile(s.T(), "", tempScriptContent)
 	defer filet.CleanUp(s.T())
 
-	_, err := pipeline2.Decode([]byte(tempScriptContent), tempScript.Name())
+	_, err := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
 
 	assert.Error(s.T(), err)
 }
@@ -59,7 +59,7 @@ func (s *DecoderTestSuite) TestInvalidDslFileWithZeroMainsParsing() {
 	tempScript := filet.TmpFile(s.T(), "", tempScriptContent)
 	defer filet.CleanUp(s.T())
 
-	_, err := pipeline2.Decode([]byte(tempScriptContent), tempScript.Name())
+	_, err := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
 
 	assert.Error(s.T(), err)
 }

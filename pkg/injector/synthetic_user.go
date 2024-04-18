@@ -2,6 +2,7 @@ package injector
 
 import (
 	"context"
+	"errors"
 	"github.com/rs/xid"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
@@ -98,7 +99,11 @@ func (su *SyntheticUser) Run(ctx context.Context, pip pipeline.Pipeline) {
 	su.gracefulShutdownInProgress = false
 	su.pipelineToRun = pip
 
-	pipCtx, pipCancelFunc := dsl.NewContext(ctx, configuration, su.variablesHolder, su.telemetryServer)
+	pipCtx, pipCancelFunc := dsl.NewContext(ctx)
+	pipCtx.Config = configuration
+	pipCtx.Vars = su.variablesHolder
+	pipCtx.Logger = su.logger
+	// TODO: add step metrics sink
 	su.pipelineCtx = pipCtx
 	su.pipelineCancelFunc = pipCancelFunc
 
@@ -125,7 +130,7 @@ func (su *SyntheticUser) runLifecycle(ctx dsl.Context) {
 	su.setStatus(SyntheticUserStatus_RUNNING)
 	err = su.runMain(ctx)
 	if err != nil {
-		if err == ErrForcedShutdownRequested {
+		if errors.Is(err, ErrForcedShutdownRequested) {
 			su.contextualizedLogger().Warn().Err(err).Msg("Forced shutdown requested, immediately stop execution")
 			su.setStatus(SyntheticUserStatus_STOPPED)
 			return
