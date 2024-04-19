@@ -21,21 +21,6 @@ import (
 // Mocked telemetry sinks for test //
 /////////////////////////////////////
 
-type TestLogSink struct {
-	Logs []*telemetry.Log
-}
-
-func NewTestLogSink() *TestLogSink {
-	tls := new(TestLogSink)
-	tls.Logs = make([]*telemetry.Log, 0)
-
-	return tls
-}
-
-func (tls *TestLogSink) AddLog(log *telemetry.Log) {
-	tls.Logs = append(tls.Logs, log)
-}
-
 type TestStepMetricsSink struct {
 	Samples      []*telemetry.Sample
 	Transactions []*telemetry.Transaction
@@ -64,9 +49,8 @@ func (tsms *TestStepMetricsSink) AddTransaction(transaction *telemetry.Transacti
 type ClientTestSuite struct {
 	suite.Suite
 	ctx             dsl.Context
-	cancelFunc      context.CancelFunc
+	cancelFunc      context.CancelCauseFunc
 	logger          zerolog.Logger
-	logSink         *TestLogSink
 	stepMetricsSink *TestStepMetricsSink
 
 	client     *rest2.Client
@@ -79,11 +63,9 @@ func (s *ClientTestSuite) SetupTest() {
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	s.logger = zerolog.New(consoleWriter).With().Timestamp().Logger()
 
-	s.logSink = NewTestLogSink()
 	s.stepMetricsSink = NewTestStepMetricsSink()
 
 	s.ctx, s.cancelFunc = dsl.NewContext(context.TODO())
-	s.ctx.LogSink = s.logSink
 	s.ctx.StepMetricsSink = s.stepMetricsSink
 
 	s.client = rest2.NewClient(s.ctx)
