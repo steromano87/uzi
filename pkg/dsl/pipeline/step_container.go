@@ -1,6 +1,8 @@
 package pipeline
 
 import (
+	"context"
+	"fmt"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
 )
 
@@ -12,24 +14,28 @@ func (sc *StepContainer) Steps() []dsl.Step {
 	return sc.steps
 }
 
+func (sc *StepContainer) Len() int {
+	return len(sc.steps)
+}
+
 func (sc *StepContainer) Run(ctx dsl.Context) error {
-	ctx.Logger.Info().Msg("Step run started")
-
-	for _, step := range sc.steps {
-		err := step.Run(ctx)
-		if err != nil {
-			return err
-		}
-
-		// Check whether the context has been canceled after every step to have more checkpoints for interruption
+	for stepIndex, step := range sc.steps {
+		// Check whether the context has been canceled before every step to have more checkpoints for interruption
 		select {
 		case <-ctx.Done():
-			ctx.Logger.Info().Msg("Context canceled, step run stopped")
-			return nil
+			ctxErr := context.Cause(ctx)
+			ctx.Logger.Warn().Str("reason", ctxErr.Error()).Msg("Step run stop requested")
+			return ctxErr
 		default:
+			stepLogger := ctx.Logger.With().Str("progress", fmt.Sprintf("%d/%d", stepIndex+1, sc.Len())).Logger()
+			stepLogger.Debug().Msg("Step run start")
+			err := step.Run(ctx)
+			if err != nil {
+				return err
+			}
+			stepLogger.Debug().Msg("Step run end")
 		}
 	}
 
-	ctx.Logger.Info().Msg("Step run completed")
 	return nil
 }
