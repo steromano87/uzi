@@ -9,6 +9,7 @@ type Pipeline struct {
 	Main     StepContainer
 	Teardown StepContainer
 
+	IterationCounter
 	gracefulShutdownRequested bool
 }
 
@@ -19,8 +20,11 @@ func (p *Pipeline) RunSetup(ctx dsl.Context) error {
 func (p *Pipeline) RunMain(ctx dsl.Context) error {
 	// Run the main block until a graceful shutdown is requested
 	for !p.gracefulShutdownRequested {
+		p.IterationCounter.AddInProgressIteration()
 		if err := p.RunMainOnce(ctx); err != nil {
-			return err
+			p.IterationCounter.AddFailedIteration()
+		} else {
+			p.IterationCounter.AddPassedIteration()
 		}
 	}
 
