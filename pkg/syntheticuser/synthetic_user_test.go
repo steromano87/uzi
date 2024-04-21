@@ -202,6 +202,11 @@ func (s *SyntheticUserTestSuite) TestUniqueIdForEachSynthUser() {
 	assert.NotEqual(s.T(), user1.Id(), user2.Id())
 }
 
+func (s *SyntheticUserTestSuite) TestString() {
+	user := syntheticuser.New(s.pip)
+	assert.Regexp(s.T(), `SyntheticUser\[id=.+, status=Ready\]`, user.String())
+}
+
 func TestSyntheticUserTestSuite(t *testing.T) {
 	suite.Run(t, new(SyntheticUserTestSuite))
 }
