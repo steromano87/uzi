@@ -110,7 +110,7 @@ func (s *SyntheticUserTestSuite) TestStartAndForcedShutdown() {
 	time.Sleep(10 * time.Millisecond)
 	assert.Equal(s.T(), injector.SyntheticUserStatus_RUNNING, user.Status())
 
-	s.cancelFunc(injector.ErrForcedShutdownRequested)
+	s.cancelFunc(pipeline.ErrForcedShutdownRequested)
 	user.Wait()
 
 	assert.Equal(s.T(), injector.SyntheticUserStatus_STOPPED, user.Status())

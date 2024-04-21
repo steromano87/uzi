@@ -18,7 +18,7 @@ type SyntheticUser struct {
 
 	pipelineToRun      pipeline.Pipeline
 	pipelineCtx        dsl.Context
-	pipelineCancelFunc context.CancelFunc
+	pipelineCancelFunc context.CancelCauseFunc
 
 	logger          *zerolog.Logger
 	variablesHolder *variables.Holder
@@ -130,7 +130,7 @@ func (su *SyntheticUser) runLifecycle(ctx dsl.Context) {
 	su.setStatus(SyntheticUserStatus_RUNNING)
 	err = su.runMain(ctx)
 	if err != nil {
-		if errors.Is(err, ErrForcedShutdownRequested) {
+		if errors.Is(err, pipeline.ErrForcedShutdownRequested) {
 			su.contextualizedLogger().Warn().Err(err).Msg("Forced shutdown requested, immediately stop execution")
 			su.setStatus(SyntheticUserStatus_STOPPED)
 			return
