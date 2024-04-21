@@ -1,6 +1,8 @@
 package pipeline
 
 import (
+	"context"
+	"errors"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
 )
 
@@ -19,16 +21,23 @@ func (p *Pipeline) RunSetup(ctx dsl.Context) error {
 
 func (p *Pipeline) RunMain(ctx dsl.Context) error {
 	// Run the main block until a graceful shutdown is requested
-	for !p.gracefulShutdownRequested {
+	for !p.gracefulShutdownRequested && !p.IterationCounter.MaxIterationsReached() {
 		p.IterationCounter.AddInProgressIteration()
-		if err := p.RunMainOnce(ctx); err != nil {
-			p.IterationCounter.AddFailedIteration()
-		} else {
+		err := p.RunMainOnce(ctx)
+
+		switch {
+		case errors.Is(err, context.Canceled), errors.Is(err, ErrForcedShutdownRequested):
+			return err
+
+		case err == nil:
 			p.IterationCounter.AddPassedIteration()
+
+		default:
+			p.IterationCounter.AddFailedIteration()
 		}
 	}
 
-	ctx.Logger.Debug().Msg("Exited main loop")
+	ctx.Logger.Debug().Msg("Gracefully exited main loop")
 	p.gracefulShutdownRequested = false
 	return nil
 }

@@ -24,7 +24,7 @@ func (sc *StepContainer) Run(ctx dsl.Context) error {
 		select {
 		case <-ctx.Done():
 			ctxErr := context.Cause(ctx)
-			ctx.Logger.Warn().Str("reason", ctxErr.Error()).Msg("Step run stop requested")
+			ctx.Logger.Warn().Str("reason", ctxErr.Error()).Msg("Step run interrupted")
 			return ctxErr
 		default:
 			stepLogger := ctx.Logger.With().Str("progress", fmt.Sprintf("%d/%d", stepIndex+1, sc.Len())).Logger()

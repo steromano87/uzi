@@ -141,8 +141,84 @@ func (s *PipelineTestSuite) TestPipeline_RunMainWithGracefulShutdown() {
 		// Expected length is 3 because of start and end logs
 		if assert.Greater(s.T(), len(s.logSink.Logs), 6) {
 			logEntry := s.logSink.Logs[len(s.logSink.Logs)-1]
-			assert.Contains(s.T(), logEntry, "Exited main loop")
+			assert.Contains(s.T(), logEntry, "Gracefully exited main loop")
 		}
+	}
+}
+
+func (s *PipelineTestSuite) TestPipeline_RunMainWithForcedShutdown() {
+	ctx, cancelFunc := dsl.NewContext(context.TODO())
+	ctx.Logger = &s.logger
+	errorChan := make(chan error)
+
+	// Run pipeline in separate goroutine
+	go func() {
+		errorChan <- s.noOpPipeline.RunMain(ctx)
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+	cancelFunc(nil)
+	err := <-errorChan
+
+	if assert.ErrorIs(s.T(), err, context.Canceled) {
+		// Expected length is 3 because of start and end logs
+		if assert.Greater(s.T(), len(s.logSink.Logs), 6) {
+			logEntry := s.logSink.Logs[len(s.logSink.Logs)-1]
+			assert.Contains(s.T(), logEntry, "Step run interrupted")
+		}
+	}
+}
+
+func (s *PipelineTestSuite) TestPipeline_RunMainWithGracefulShutdownAndError() {
+	failingScriptContent := `
+main {
+	fail {
+		message = "Thou shall not pass"
+	}
+}
+`
+	tempScript := filet.TmpFile(s.T(), "", failingScriptContent)
+	defer filet.CleanUp(s.T())
+
+	failingPipeline, _ := pipeline.Decode([]byte(failingScriptContent), tempScript.Name())
+
+	ctx, _ := dsl.NewContext(context.TODO())
+	ctx.Logger = &s.logger
+	errorChan := make(chan error)
+
+	// Run pipeline in separate goroutine
+	go func() {
+		errorChan <- failingPipeline.RunMain(ctx)
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+	failingPipeline.RequestGracefulShutdown(ctx)
+	err := <-errorChan
+
+	if assert.NoError(s.T(), err) {
+		assert.Zero(s.T(), failingPipeline.PassedIterations())
+		assert.EqualValues(s.T(), failingPipeline.CompletedIterations(), failingPipeline.FailedIterations())
+	}
+}
+
+func (s *PipelineTestSuite) TestPipeline_RunMainWithMaxIterations() {
+	ctx, _ := dsl.NewContext(context.TODO())
+	ctx.Logger = &s.logger
+	s.noOpPipeline.MaxIterations = 5
+	errorChan := make(chan error)
+
+	// Run pipeline in separate goroutine
+	go func() {
+		errorChan <- s.noOpPipeline.RunMain(ctx)
+	}()
+
+	err := <-errorChan
+
+	if assert.NoError(s.T(), err) {
+		assert.EqualValues(s.T(), 5, s.noOpPipeline.CompletedIterations())
+		assert.EqualValues(s.T(), 5, s.noOpPipeline.PassedIterations())
+		assert.Zero(s.T(), s.noOpPipeline.InProgressIterations())
+		assert.Zero(s.T(), s.noOpPipeline.FailedIterations())
 	}
 }
 
