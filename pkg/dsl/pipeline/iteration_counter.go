@@ -48,3 +48,13 @@ func (ic *IterationCounter) MaxIterationsReached() bool {
 
 	return ic.completedIterations+ic.inProgressIterations >= ic.MaxIterations
 }
+
+func (ic *IterationCounter) Add(otherCounter IterationCounter) IterationCounter {
+	return IterationCounter{
+		MaxIterations:        ic.MaxIterations,
+		completedIterations:  ic.completedIterations + otherCounter.completedIterations,
+		inProgressIterations: ic.inProgressIterations + otherCounter.inProgressIterations,
+		passedIterations:     ic.passedIterations + otherCounter.passedIterations,
+		failedIterations:     ic.failedIterations + otherCounter.failedIterations,
+	}
+}
