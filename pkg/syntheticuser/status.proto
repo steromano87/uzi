@@ -1,0 +1,13 @@
+syntax = "proto3";
+package syntheticuser;
+option go_package = "github.com/steromano87/harkonnen/v1/pkg/syntheticuser";
+
+enum Status {
+  READY = 0;
+  SETUP_IN_PROGRESS = 1;
+  RUNNING = 2;
+  GRACEFULLY_SHUTTING_DOWN = 3;
+  TEARDOWN_IN_PROGRESS = 4;
+  STOPPED = 5;
+  ERROR = 6;
+}

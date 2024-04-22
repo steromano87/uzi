@@ -1,0 +1,21 @@
+syntax = "proto3";
+package syntheticuser;
+option go_package = "github.com/steromano87/harkonnen/v1/pkg/syntheticuser";
+
+import "google/protobuf/empty.proto";
+import "counters.proto";
+
+service Spawner {
+  rpc GetSyntheticUserCounters(google.protobuf.Empty) returns (Counters) {};
+  rpc SetActiveSyntheticUsers(ActiveSyntheticUsersRequest) returns (ActiveSyntheticUsersResponse) {};
+}
+
+
+message ActiveSyntheticUsersRequest {
+  uint64 desiredActiveSyntheticUsers = 1;
+}
+
+message ActiveSyntheticUsersResponse {
+  uint64 previouslyActiveSyntheticUsers = 1;
+  uint64 currentlyActiveSyntheticUsers = 2;
+}

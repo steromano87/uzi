@@ -1,0 +1,13 @@
+syntax = "proto3";
+package syntheticuser;
+option go_package = "github.com/steromano87/harkonnen/v1/pkg/syntheticuser";
+
+message Counters {
+  uint64 ready = 1;
+  uint64 setupInProgress = 2;
+  uint64 running = 3;
+  uint64 gracefullyShuttingDown = 4;
+  uint64 teardownInProgress = 5;
+  uint64 stopped = 6;
+  uint64 error = 7;
+}

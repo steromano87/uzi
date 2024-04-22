@@ -9,7 +9,7 @@ type StatusChangeFunc func(oldStatus, newStatus Status)
 
 func NewStatusHolder() StatusHolder {
 	return StatusHolder{
-		status:            Ready,
+		status:            Status_READY,
 		statusChangeFuncs: make([]StatusChangeFunc, 0),
 	}
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/syntheticuser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-	"sync"
 	"testing"
 	"time"
 )
@@ -63,47 +62,45 @@ func (s *SyntheticUserTestSuite) TestNewSyntheticUser() {
 	user := syntheticuser.New(s.pip)
 
 	if assert.IsType(s.T(), &syntheticuser.SyntheticUser{}, user) {
-		assert.Equal(s.T(), syntheticuser.Ready, user.Status())
+		assert.Equal(s.T(), syntheticuser.Status_READY, user.Status())
 	}
 }
 
 func (s *SyntheticUserTestSuite) TestStartAndGracefulShutdown() {
 	user := syntheticuser.New(s.pip)
-	wg := &sync.WaitGroup{}
-	var err error
+	errChan := make(chan error)
 
 	go func() {
-		err = user.Run(s.ctx, wg)
+		errChan <- user.Run(s.ctx)
 	}()
 
 	time.Sleep(10 * time.Millisecond)
-	assert.Equal(s.T(), syntheticuser.Running, user.Status())
+	assert.Equal(s.T(), syntheticuser.Status_RUNNING, user.Status())
 
 	user.RequestGracefulShutdown()
-	wg.Wait()
+	err := <-errChan
 
 	if assert.NoError(s.T(), err) {
-		assert.Equal(s.T(), syntheticuser.Stopped, user.Status())
+		assert.Equal(s.T(), syntheticuser.Status_STOPPED, user.Status())
 	}
 }
 
 func (s *SyntheticUserTestSuite) TestStartAndForcedShutdown() {
 	user := syntheticuser.New(s.pip)
-	wg := &sync.WaitGroup{}
-	var err error
+	errChan := make(chan error)
 
 	go func() {
-		err = user.Run(s.ctx, wg)
+		errChan <- user.Run(s.ctx)
 	}()
 
 	time.Sleep(10 * time.Millisecond)
-	assert.Equal(s.T(), syntheticuser.Running, user.Status())
+	assert.Equal(s.T(), syntheticuser.Status_RUNNING, user.Status())
 
 	s.cancelFunc(pipeline.ErrForcedShutdownRequested)
-	wg.Wait()
+	err := <-errChan
 
 	if assert.ErrorIs(s.T(), err, pipeline.ErrForcedShutdownRequested) {
-		assert.Equal(s.T(), syntheticuser.Stopped, user.Status())
+		assert.Equal(s.T(), syntheticuser.Status_STOPPED, user.Status())
 	}
 }
 
@@ -111,7 +108,7 @@ func (s *SyntheticUserTestSuite) TestStatusDuringSetupPhase() {
 	tempScriptContent := `
 setup {
 	fixed_wait {
-		amount = "10s"
+		amount = "500ms"
 	}
 
 	log {
@@ -140,14 +137,18 @@ teardown {
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
 
 	user := syntheticuser.New(decodedPipeline)
-	wg := &sync.WaitGroup{}
+	errChan := make(chan error)
+
 	go func() {
-		_ = user.Run(s.ctx, wg)
+		errChan <- user.Run(s.ctx)
 	}()
 	defer s.cancelFunc(nil)
 
 	time.Sleep(100 * time.Millisecond)
-	assert.Equal(s.T(), syntheticuser.Starting, user.Status())
+	status := user.Status()
+	user.RequestGracefulShutdown()
+	<-errChan
+	assert.Equal(s.T(), syntheticuser.Status_SETUP_IN_PROGRESS, status)
 }
 
 func (s *SyntheticUserTestSuite) TestStatusDuringTeardownPhase() {
@@ -170,7 +171,7 @@ main {
 
 teardown {
 	fixed_wait {
-		amount = "10s"
+		amount = "500ms"
 	}
 
 	log {
@@ -183,16 +184,19 @@ teardown {
 	decodedPipeline, _ := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
 
 	user := syntheticuser.New(decodedPipeline)
-	wg := &sync.WaitGroup{}
+	errChan := make(chan error)
+
 	go func() {
-		_ = user.Run(s.ctx, wg)
+		errChan <- user.Run(s.ctx)
 	}()
 	defer s.cancelFunc(nil)
 
 	time.Sleep(10 * time.Millisecond)
 	user.RequestGracefulShutdown()
 	time.Sleep(100 * time.Millisecond)
-	assert.Equal(s.T(), syntheticuser.Stopping, user.Status())
+	status := user.Status()
+	<-errChan
+	assert.Equal(s.T(), syntheticuser.Status_TEARDOWN_IN_PROGRESS, status)
 }
 
 func (s *SyntheticUserTestSuite) TestUniqueIdForEachSynthUser() {
@@ -204,7 +208,7 @@ func (s *SyntheticUserTestSuite) TestUniqueIdForEachSynthUser() {
 
 func (s *SyntheticUserTestSuite) TestString() {
 	user := syntheticuser.New(s.pip)
-	assert.Regexp(s.T(), `SyntheticUser\[id=.+, status=Ready\]`, user.String())
+	assert.Regexp(s.T(), `SyntheticUser\[id=.+, status=READY\]`, user.String())
 }
 
 func TestSyntheticUserTestSuite(t *testing.T) {

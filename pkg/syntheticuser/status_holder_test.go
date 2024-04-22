@@ -21,10 +21,10 @@ func TestStatusHolder_StatusChangeFuncCallback(t *testing.T) {
 	statusChangeHolder := StatusChangeHolder{}
 
 	statusHolder.RegisterStatusChangeFunc(statusChangeHolder.OnStatusChange)
-	statusHolder.SetStatus(syntheticuser.Starting)
+	statusHolder.SetStatus(syntheticuser.Status_SETUP_IN_PROGRESS)
 
-	if assert.Equal(t, syntheticuser.Starting, statusHolder.Status()) {
-		assert.Equal(t, syntheticuser.Ready, statusChangeHolder.OldStatus)
-		assert.Equal(t, syntheticuser.Starting, statusChangeHolder.NewStatus)
+	if assert.Equal(t, syntheticuser.Status_SETUP_IN_PROGRESS, statusHolder.Status()) {
+		assert.Equal(t, syntheticuser.Status_READY, statusChangeHolder.OldStatus)
+		assert.Equal(t, syntheticuser.Status_SETUP_IN_PROGRESS, statusChangeHolder.NewStatus)
 	}
 }
