@@ -58,6 +58,10 @@ teardown {
 	s.pip = decodedPipeline
 }
 
+func (s *SpawnerTestSuite) TearDownTest() {
+	s.cancelFunc(nil)
+}
+
 func (s *SpawnerTestSuite) TestSpawnerStartedWithZeroRunningUsers() {
 	spawner := syntheticuser.NewSpawner(s.ctx, s.pip, 5)
 	errChan := make(chan error)
@@ -146,6 +150,21 @@ func (s *SpawnerTestSuite) TestScaleUpAndDownUpToTwoUsers() {
 
 	s.cancelFunc(nil)
 	assert.ErrorIs(s.T(), <-errChan, context.Canceled)
+}
+
+func (s *SpawnerTestSuite) TestScaleUpBeyondMaxQuota() {
+	spawner := syntheticuser.NewSpawner(s.ctx, s.pip, 5)
+	errChan := make(chan error)
+	go func(ctx context.Context) {
+		errChan <- spawner.Serve()
+	}(s.ctx)
+	defer s.cancelFunc(nil)
+
+	err := spawner.ReconcileActiveUsers(6)
+
+	if assert.Error(s.T(), err) {
+		assert.Zero(s.T(), spawner.ActiveUsers())
+	}
 }
 
 func TestSpawnerTestSuite(t *testing.T) {
