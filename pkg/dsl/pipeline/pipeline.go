@@ -50,7 +50,6 @@ func (p *Pipeline) RunTeardown(ctx dsl.Context) error {
 	return p.Teardown.Run(ctx)
 }
 
-func (p *Pipeline) RequestGracefulShutdown(ctx dsl.Context) {
-	ctx.Logger.Debug().Msg("Graceful shutdown requested")
+func (p *Pipeline) RequestGracefulShutdown() {
 	p.gracefulShutdownRequested = true
 }

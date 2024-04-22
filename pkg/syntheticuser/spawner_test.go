@@ -17,6 +17,7 @@ type SpawnerTestSuite struct {
 	ctx        context.Context
 	cancelFunc context.CancelCauseFunc
 	pip        pipeline.Pipeline
+	logger     *zerolog.Logger
 }
 
 func (s *SpawnerTestSuite) SetupTest() {
@@ -24,10 +25,9 @@ func (s *SpawnerTestSuite) SetupTest() {
 	consoleWriter := zerolog.NewConsoleWriter()
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000000"
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
+	s.logger = &logger
 
-	tempCtx, cancelFunc := context.WithCancelCause(context.TODO())
-	s.ctx = logger.WithContext(tempCtx)
-	s.cancelFunc = cancelFunc
+	s.ctx, s.cancelFunc = context.WithCancelCause(context.TODO())
 
 	tempScriptContent := `
 setup {
@@ -63,11 +63,9 @@ func (s *SpawnerTestSuite) TearDownTest() {
 }
 
 func (s *SpawnerTestSuite) TestSpawnerStartedWithZeroRunningUsers() {
-	spawner := syntheticuser.NewSpawner(s.ctx, s.pip, 5)
-	errChan := make(chan error)
-	go func() {
-		errChan <- spawner.Serve()
-	}()
+	spawner := syntheticuser.NewSpawner(s.pip, 5)
+	spawner.SetLogger(s.logger)
+	spawner.Serve(s.ctx)
 
 	if assert.Zero(s.T(), spawner.ActiveUsers()) {
 		assert.EqualValues(s.T(), 5, spawner.Counters().Ready)
@@ -78,15 +76,14 @@ func (s *SpawnerTestSuite) TestSpawnerStartedWithZeroRunningUsers() {
 	}
 
 	s.cancelFunc(nil)
-	assert.NoError(s.T(), <-errChan)
+	err := spawner.Wait()
+	assert.NoError(s.T(), err)
 }
 
 func (s *SpawnerTestSuite) TestScaleUpToOneUser() {
-	spawner := syntheticuser.NewSpawner(s.ctx, s.pip, 5)
-	errChan := make(chan error)
-	go func(ctx context.Context) {
-		errChan <- spawner.Serve()
-	}(s.ctx)
+	spawner := syntheticuser.NewSpawner(s.pip, 5)
+	spawner.SetLogger(s.logger)
+	spawner.Serve(s.ctx)
 
 	err := spawner.ReconcileActiveUsers(1)
 	time.Sleep(100 * time.Millisecond)
@@ -96,15 +93,14 @@ func (s *SpawnerTestSuite) TestScaleUpToOneUser() {
 	}
 
 	s.cancelFunc(nil)
-	assert.ErrorIs(s.T(), <-errChan, context.Canceled)
+	err = spawner.Wait()
+	assert.ErrorIs(s.T(), err, context.Canceled)
 }
 
 func (s *SpawnerTestSuite) TestScaleDownFromOneUser() {
-	spawner := syntheticuser.NewSpawner(s.ctx, s.pip, 5)
-	errChan := make(chan error)
-	go func(ctx context.Context) {
-		errChan <- spawner.Serve()
-	}(s.ctx)
+	spawner := syntheticuser.NewSpawner(s.pip, 5)
+	spawner.SetLogger(s.logger)
+	spawner.Serve(s.ctx)
 
 	err := spawner.ReconcileActiveUsers(1)
 	time.Sleep(100 * time.Millisecond)
@@ -123,15 +119,14 @@ func (s *SpawnerTestSuite) TestScaleDownFromOneUser() {
 	}
 
 	s.cancelFunc(nil)
-	assert.NoError(s.T(), <-errChan)
+	err = spawner.Wait()
+	assert.NoError(s.T(), err)
 }
 
 func (s *SpawnerTestSuite) TestScaleUpAndDownUpToTwoUsers() {
-	spawner := syntheticuser.NewSpawner(s.ctx, s.pip, 5)
-	errChan := make(chan error)
-	go func(ctx context.Context) {
-		errChan <- spawner.Serve()
-	}(s.ctx)
+	spawner := syntheticuser.NewSpawner(s.pip, 5)
+	spawner.SetLogger(s.logger)
+	spawner.Serve(s.ctx)
 
 	err := spawner.ReconcileActiveUsers(2)
 	time.Sleep(100 * time.Millisecond)
@@ -149,15 +144,14 @@ func (s *SpawnerTestSuite) TestScaleUpAndDownUpToTwoUsers() {
 	}
 
 	s.cancelFunc(nil)
-	assert.ErrorIs(s.T(), <-errChan, context.Canceled)
+	err = spawner.Wait()
+	assert.ErrorIs(s.T(), err, context.Canceled)
 }
 
 func (s *SpawnerTestSuite) TestScaleUpBeyondMaxQuota() {
-	spawner := syntheticuser.NewSpawner(s.ctx, s.pip, 5)
-	errChan := make(chan error)
-	go func(ctx context.Context) {
-		errChan <- spawner.Serve()
-	}(s.ctx)
+	spawner := syntheticuser.NewSpawner(s.pip, 5)
+	spawner.SetLogger(s.logger)
+	spawner.Serve(s.ctx)
 	defer s.cancelFunc(nil)
 
 	err := spawner.ReconcileActiveUsers(6)

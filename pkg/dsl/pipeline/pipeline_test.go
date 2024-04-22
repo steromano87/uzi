@@ -134,7 +134,7 @@ func (s *PipelineTestSuite) TestPipeline_RunMainWithGracefulShutdown() {
 	}()
 
 	time.Sleep(10 * time.Millisecond)
-	s.noOpPipeline.RequestGracefulShutdown(ctx)
+	s.noOpPipeline.RequestGracefulShutdown()
 	err := <-errorChan
 
 	if assert.NoError(s.T(), err) {
@@ -192,7 +192,7 @@ main {
 	}()
 
 	time.Sleep(10 * time.Millisecond)
-	failingPipeline.RequestGracefulShutdown(ctx)
+	failingPipeline.RequestGracefulShutdown()
 	err := <-errorChan
 
 	if assert.NoError(s.T(), err) {

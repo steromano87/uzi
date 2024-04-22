@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/Flaque/filet"
 	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/dsl"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl/pipeline"
 	"github.com/steromano87/harkonnen/v1/pkg/syntheticuser"
 	"github.com/stretchr/testify/assert"
@@ -14,7 +15,7 @@ import (
 
 type SyntheticUserTestSuite struct {
 	suite.Suite
-	ctx        context.Context
+	ctx        dsl.Context
 	cancelFunc context.CancelCauseFunc
 	pip        pipeline.Pipeline
 }
@@ -25,9 +26,8 @@ func (s *SyntheticUserTestSuite) SetupTest() {
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000000"
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
 
-	tempCtx, cancelFunc := context.WithCancelCause(context.TODO())
-	s.ctx = logger.WithContext(tempCtx)
-	s.cancelFunc = cancelFunc
+	s.ctx, s.cancelFunc = dsl.NewContext(context.TODO())
+	s.ctx.Logger = &logger
 
 	tempScriptContent := `
 setup {

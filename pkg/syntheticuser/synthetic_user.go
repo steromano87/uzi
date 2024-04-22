@@ -8,18 +8,14 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl/pipeline"
-	"github.com/steromano87/harkonnen/v1/pkg/variables"
 )
 
 type SyntheticUser struct {
-	id                 xid.ID
-	pipelineToRun      pipeline.Pipeline
-	pipelineCtx        dsl.Context
-	pipelineCancelFunc context.CancelCauseFunc
-	logger             zerolog.Logger
+	id            xid.ID
+	pipelineToRun pipeline.Pipeline
+	logger        zerolog.Logger
 
 	StatusHolder
-	VariablesHolder *variables.Holder
 }
 
 func New(pip pipeline.Pipeline) *SyntheticUser {
@@ -31,32 +27,35 @@ func New(pip pipeline.Pipeline) *SyntheticUser {
 	return synthUser
 }
 
-func (su *SyntheticUser) Run(ctx context.Context) error {
-	su.logger = zerolog.Ctx(ctx).With().Str("component", "Synthetic User").Str("id", su.Id()).Logger()
-	su.pipelineCtx, su.pipelineCancelFunc = dsl.NewContext(ctx)
+func (su *SyntheticUser) Run(ctx dsl.Context) error {
+	// Inject synthetic user ID into logger to keep trace of the executed steps for each user
+	newLogger := ctx.Logger.With().Str("syntheticUserId", su.Id()).Logger()
+	ctx.Logger = &newLogger
+
+	su.logger = ctx.Logger.With().Str("component", "Synthetic User").Logger()
 
 	// Run setup
-	if err := su.runSetup(); err != nil {
+	if err := su.runSetup(ctx); err != nil {
 		return err
 	}
 
 	// Run main loop
-	if err := su.runMainLoop(); err != nil {
+	if err := su.runMainLoop(ctx); err != nil {
 		return err
 	}
 
 	// Run teardown
-	if err := su.runTeardown(); err != nil {
+	if err := su.runTeardown(ctx); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (su *SyntheticUser) runSetup() error {
+func (su *SyntheticUser) runSetup(ctx dsl.Context) error {
 	su.logger.Info().Msg("Starting setup phase")
 	su.SetStatus(Status_SETUP_IN_PROGRESS)
-	if err := su.pipelineToRun.RunSetup(su.pipelineCtx); err != nil {
+	if err := su.pipelineToRun.RunSetup(ctx); err != nil {
 		su.logger.Error().Err(err).Msg("Encountered an unrecoverable error while running setup steps, stopping pipeline execution")
 		su.SetStatus(Status_ERROR)
 		return err
@@ -65,10 +64,10 @@ func (su *SyntheticUser) runSetup() error {
 	return nil
 }
 
-func (su *SyntheticUser) runMainLoop() error {
+func (su *SyntheticUser) runMainLoop(ctx dsl.Context) error {
 	su.logger.Info().Msg("Starting main loop")
 	su.SetStatus(Status_RUNNING)
-	err := su.pipelineToRun.RunMain(su.pipelineCtx)
+	err := su.pipelineToRun.RunMain(ctx)
 	switch {
 	case errors.Is(err, context.Canceled), errors.Is(err, pipeline.ErrForcedShutdownRequested):
 		su.logger.Warn().AnErr("reason", err).Msg("Forced shutdown requested, stopping pipeline execution")
@@ -81,10 +80,10 @@ func (su *SyntheticUser) runMainLoop() error {
 	}
 }
 
-func (su *SyntheticUser) runTeardown() error {
+func (su *SyntheticUser) runTeardown(ctx dsl.Context) error {
 	su.logger.Info().Msg("Starting teardown phase")
 	su.SetStatus(Status_TEARDOWN_IN_PROGRESS)
-	if err := su.pipelineToRun.RunTeardown(su.pipelineCtx); err != nil {
+	if err := su.pipelineToRun.RunTeardown(ctx); err != nil {
 		su.logger.Error().Err(err).Msg("Encountered an unrecoverable error while running teardown steps, stopping pipeline execution")
 		su.SetStatus(Status_ERROR)
 		return err
@@ -95,7 +94,8 @@ func (su *SyntheticUser) runTeardown() error {
 }
 
 func (su *SyntheticUser) RequestGracefulShutdown() {
-	su.pipelineToRun.RequestGracefulShutdown(su.pipelineCtx)
+	su.logger.Info().Msg("Graceful shutdown requested")
+	su.pipelineToRun.RequestGracefulShutdown()
 	su.SetStatus(Status_GRACEFULLY_SHUTTING_DOWN)
 }
 
