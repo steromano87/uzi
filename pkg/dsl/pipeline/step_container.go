@@ -28,12 +28,12 @@ func (sc *StepContainer) Run(ctx dsl.Context) error {
 			return ctxErr
 		default:
 			stepLogger := ctx.Logger.With().Str("progress", fmt.Sprintf("%d/%d", stepIndex+1, sc.Len())).Logger()
-			stepLogger.Debug().Msg("Step run start")
+			stepLogger.Trace().Msg("Step run start")
 			err := step.Run(ctx)
 			if err != nil {
 				return err
 			}
-			stepLogger.Debug().Msg("Step run end")
+			stepLogger.Trace().Msg("Step run end")
 		}
 	}
 
