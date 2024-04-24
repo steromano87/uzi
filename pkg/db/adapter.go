@@ -3,8 +3,8 @@ package db
 import (
 	"context"
 	"errors"
+	"github.com/glebarez/sqlite"
 	"gorm.io/driver/mysql"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
