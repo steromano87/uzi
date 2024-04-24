@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl/pipeline"
+	"github.com/steromano87/harkonnen/v1/pkg/log"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 	"github.com/steromano87/harkonnen/v1/pkg/workspace"
 	"golang.org/x/sync/errgroup"
@@ -60,7 +61,7 @@ func NewSpawner(pip pipeline.Pipeline, maxSynthUserQuota uint64) *Spawner {
 
 func (s *Spawner) SetLogger(logger *zerolog.Logger) {
 	s.syntheticUsersLogger = logger
-	mainLogger := logger.With().Str("component", "Spawner").Logger()
+	mainLogger := logger.With().Str(log.ComponentKey, "Spawner").Logger()
 	s.mainLogger = &mainLogger
 }
 

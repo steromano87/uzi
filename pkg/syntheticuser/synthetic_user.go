@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl/pipeline"
+	"github.com/steromano87/harkonnen/v1/pkg/log"
 )
 
 type SyntheticUser struct {
@@ -32,7 +33,7 @@ func (su *SyntheticUser) Run(ctx dsl.Context) error {
 	newLogger := ctx.Logger.With().Str("syntheticUserId", su.Id()).Logger()
 	ctx.Logger = &newLogger
 
-	su.logger = ctx.Logger.With().Str("component", "Synthetic User").Logger()
+	su.logger = ctx.Logger.With().Str(log.ComponentKey, "Synthetic User").Logger()
 
 	// Run setup
 	if err := su.runSetup(ctx); err != nil {

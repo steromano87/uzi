@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/log"
 	"math"
 	"sort"
 	"sync"
@@ -45,7 +46,7 @@ func (f *FixedIntervalScheduler) DeregisterInjector(name string) {
 }
 
 func (f *FixedIntervalScheduler) Run(ctx context.Context) <-chan map[string]uint64 {
-	logger := zerolog.Ctx(ctx).With().Str("component", "Scheduler").Logger()
+	logger := zerolog.Ctx(ctx).With().Str(log.ComponentKey, "Scheduler").Logger()
 
 	f.start = time.Now()
 	f.updateTicker = time.NewTicker(f.updateInterval)
