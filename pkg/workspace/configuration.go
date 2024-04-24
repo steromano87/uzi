@@ -32,35 +32,23 @@ type ClientConfiguration struct {
 	Rest Rest
 }
 
-func New(configFile string) (*Configuration, error) {
-	config := MustNewDefault()
+func NewConfiguration(configFile string) (*Configuration, error) {
+	config := MustNewDefaultConfiguration()
 
-	// Read configuration file
-	fileReader, err := os.Open(configFile)
-	if err != nil {
-		return nil, err
-	}
-	defer func(fileReader *os.File) {
-		_ = fileReader.Close()
-	}(fileReader)
-
-	err = config.ReadConfig(fileReader)
-	if err != nil {
+	if err := config.Reload(configFile); err != nil {
 		return nil, err
 	}
 
-	err = config.Update()
-
-	return config, err
+	return config, nil
 }
 
-func MustNewDefault() *Configuration {
+func MustNewDefaultConfiguration() *Configuration {
 	config := new(Configuration)
 
 	// Viper setup
 	config.Viper = viper.New()
 	config.SetConfigType(ConfigurationFormat)
-	err := config.ReadConfig(bytes.NewBufferString(DefaultProjectConfigurationContent))
+	err := config.ReadConfig(bytes.NewBufferString(DefaultManifestContent))
 	if err != nil {
 		panic(err)
 	}
@@ -74,7 +62,7 @@ func MustNewDefault() *Configuration {
 	return config
 }
 
-func (c *Configuration) Read(configFile string) error {
+func (c *Configuration) Reload(configFile string) error {
 	fileReader, err := os.Open(configFile)
 	if err != nil {
 		return err

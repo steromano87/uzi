@@ -57,9 +57,10 @@ func runInit(cmd *cobra.Command, args []string) {
 	}
 
 	// Bootstrap a new project
-	cobra.CheckErr(workspace.Bootstrap(workingFolderAbsPath))
+	work := workspace.New(workingFolderAbsPath)
+	cobra.CheckErr(work.Hydrate())
 
-	println("New workspace initialized at " + workingFolderAbsPath)
+	println("NewConfiguration workspace initialized at " + workingFolderAbsPath)
 }
 
 func isEmpty(folder string) (bool, error) {

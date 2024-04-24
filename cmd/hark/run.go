@@ -26,7 +26,7 @@ func runRun(cmd *cobra.Command, args []string) {
 	_, cancelFunc := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancelFunc()
 
-	config, err := workspace.New(filepath.Join(workingFolder, workspace.ConfigurationFile))
+	config, err := workspace.NewConfiguration(filepath.Join(workingFolder, workspace.ManifestFile))
 	cobra.CheckErr(err)
 	config.WorkingFolder = workingFolder
 
@@ -42,7 +42,7 @@ func runRun(cmd *cobra.Command, args []string) {
 	}
 	zerolog.SetGlobalLevel(logLevel)
 
-	/*ckp, err := cockpit.New(mainCtx, scheduler.CompositeLoadProfile{})
+	/*ckp, err := cockpit.NewConfiguration(mainCtx, scheduler.CompositeLoadProfile{})
 	if err != nil {
 		logger.Fatal().Err(err).Msg("Unable to create cockpit, exiting...")
 	}

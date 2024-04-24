@@ -7,7 +7,7 @@ import (
 )
 
 func TestInjectorDefaultConfiguration(t *testing.T) {
-	config := workspace.MustNewDefault()
+	config := workspace.MustNewDefaultConfiguration()
 
 	assert.IsType(t, map[string]workspace.InjectorConfiguration{}, config.Injectors)
 

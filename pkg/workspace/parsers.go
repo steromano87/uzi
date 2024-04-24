@@ -6,7 +6,7 @@ import (
 )
 
 func ParseConfiguration(baseFolder string) (*Configuration, error) {
-	return New(filepath.Join(baseFolder, ConfigurationFile))
+	return NewConfiguration(filepath.Join(baseFolder, ManifestFile))
 }
 
 func ParsePipeline(baseFolder string) ([]byte, string, error) {

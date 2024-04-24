@@ -9,7 +9,7 @@ import (
 
 func TestNewDefaultConfiguration(t *testing.T) {
 	assert.NotPanics(t, func() {
-		config := workspace.MustNewDefault()
+		config := workspace.MustNewDefaultConfiguration()
 
 		assert.IsType(t, &workspace.Configuration{}, config)
 		assert.Equal(t, "all", config.HarkonnenVersion)
@@ -22,7 +22,7 @@ func TestNewConfigurationFromFile(t *testing.T) {
 
 	defer filet.CleanUp(t)
 
-	config, err := workspace.New(tempConfigFile.Name())
+	config, err := workspace.NewConfiguration(tempConfigFile.Name())
 
 	if assert.NoError(t, err) {
 		assert.IsType(t, &workspace.Configuration{}, config)
