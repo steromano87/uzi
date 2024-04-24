@@ -8,6 +8,10 @@ import (
 	"time"
 )
 
+func init() {
+	registerEntityForAutoMigration(&Sample{})
+}
+
 type Sample struct {
 	ID            uint           `gorm:"primaryKey;autoincrement"`
 	Timestamp     datatypes.Date `gorm:"index"`

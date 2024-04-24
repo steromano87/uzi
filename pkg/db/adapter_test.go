@@ -10,7 +10,6 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"gorm.io/gorm"
-	"os"
 	"path"
 	"testing"
 )
@@ -37,7 +36,7 @@ func (s *AdapterTestSuite) TearDownTest() {
 func (s *AdapterTestSuite) TestCreateNewSQLiteDBOnFile() {
 	adapter := db.NewAdapter(db.SQLite, path.Join(s.tempWorkingDir, "results.db"))
 
-	err := adapter.Connect(context.TODO())
+	err := adapter.Connect()
 
 	if assert.NoError(s.T(), err) {
 		assert.FileExists(s.T(), path.Join(s.tempWorkingDir, "results.db"))
@@ -47,7 +46,7 @@ func (s *AdapterTestSuite) TestCreateNewSQLiteDBOnFile() {
 func (s *AdapterTestSuite) TestCreateNewSQLiteDBOnMemory() {
 	adapter := db.NewAdapter(db.SQLite, db.SQLiteDSNForInMemoryDB)
 
-	err := adapter.Connect(context.TODO())
+	err := adapter.Connect()
 	assert.NoError(s.T(), err)
 }
 
@@ -98,7 +97,7 @@ func (s *AdapterTestSuite) TestConnectOnMySQLDatabase() {
 			port.Port(),
 			dbName))
 
-		err := adapter.Connect(ctx)
+		err := adapter.Connect()
 		if assert.NoError(s.T(), err) {
 			item := MockedDBEntry{
 				Data: "Random data",
@@ -110,25 +109,25 @@ func (s *AdapterTestSuite) TestConnectOnMySQLDatabase() {
 	}
 }
 
-func (s *AdapterTestSuite) TestSaveItemToDB() {
-	adapter := db.NewAdapter(db.SQLite, path.Join(s.tempWorkingDir, "results.db"))
+func (s *AdapterTestSuite) TestAutoMigrate() {
+	adapter := db.NewAdapter(db.SQLite, db.SQLiteDSNForInMemoryDB)
 
 	ctx := context.TODO()
-	err := adapter.Connect(ctx)
+	err := adapter.Connect()
 
 	if assert.NoError(s.T(), err) {
-		item := MockedDBEntry{
-			Data: "Random data",
-		}
-
-		err := adapter.AutoMigrate(&item)
+		err := adapter.MigrateAll(ctx)
 		if assert.NoError(s.T(), err) {
-			result := adapter.WithContext(ctx).Create(&item)
-
-			if assert.NoError(s.T(), result.Error) {
-				assert.EqualValues(s.T(), 1, result.RowsAffected)
-				fileInfo, _ := os.Stat(path.Join(s.tempWorkingDir, "results.db"))
-				assert.Greater(s.T(), fileInfo.Size(), int64(0))
+			var tables []string
+			err := adapter.Table("sqlite_schema").Where(
+				"name not like ?", "sqlite_%").Where(
+				"name not like ?", "idx_%").Pluck("name", &tables).Error
+			if assert.NoError(s.T(), err) {
+				assert.Len(s.T(), tables, 4)
+				assert.Contains(s.T(), tables, "host_metrics")
+				assert.Contains(s.T(), tables, "logs")
+				assert.Contains(s.T(), tables, "samples")
+				assert.Contains(s.T(), tables, "transactions")
 			}
 		}
 	}

@@ -2,7 +2,9 @@ package db
 
 import "gorm.io/datatypes"
 
-const HostMetricsMsgId = "HOST_METRICS"
+func init() {
+	registerEntityForAutoMigration(&HostMetric{})
+}
 
 type HostMetric struct {
 	Origin    string         `gorm:"primaryKey"`

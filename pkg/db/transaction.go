@@ -4,6 +4,10 @@ import (
 	"gorm.io/datatypes"
 )
 
+func init() {
+	registerEntityForAutoMigration(&Transaction{})
+}
+
 type Transaction struct {
 	Name      string `gorm:"primaryKey"`
 	Iteration uint   `gorm:"primaryKey"`

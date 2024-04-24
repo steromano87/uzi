@@ -11,6 +11,8 @@ import (
 const (
 	SQLite string = "sqlite"
 	MySQL         = "mysql"
+
+	SQLiteDSNForInMemoryDB = "file::memory:?cache=shared"
 )
 
 type Adapter struct {
@@ -27,42 +29,42 @@ func NewAdapter(dbType string, dsn string) *Adapter {
 	return adapter
 }
 
-func (m *Adapter) Connect(ctx context.Context) error {
-	dialector, err := m.getDialector()
+func (a *Adapter) Connect() error {
+	dialector, err := a.getDialector()
 	if err != nil {
 		return err
 	}
 
-	m.DB, err = gorm.Open(dialector, &gorm.Config{})
+	a.DB, err = gorm.Open(dialector, &gorm.Config{PrepareStmt: true})
 	if err != nil {
 		return err
 	}
 
-	err = m.migrateAll(ctx)
-	return err
+	return nil
 }
 
-func (m *Adapter) getDialector() (gorm.Dialector, error) {
-	switch m.dbType {
+func (a *Adapter) Close() error {
+	rawDB, err := a.DB.DB()
+	if err != nil {
+		return err
+	}
+
+	return rawDB.Close()
+}
+
+func (a *Adapter) getDialector() (gorm.Dialector, error) {
+	switch a.dbType {
 	case SQLite:
-		return sqlite.Open(m.dsn), nil
+		return sqlite.Open(a.dsn), nil
 
 	case MySQL:
-		return mysql.Open(m.dsn), nil
+		return mysql.Open(a.dsn), nil
 
 	default:
-		return gorm.Config{}, errors.New("unknown database type: " + m.dbType)
+		return gorm.Config{}, errors.New("unknown database type: " + a.dbType)
 	}
 }
 
-func (m *Adapter) migrateAll(ctx context.Context) error {
-	autoMigrator := autoMigrator{[]any{
-		Log{},
-		Sample{},
-		Transaction{},
-		Iteration{},
-		HostMetric{},
-	}}
-
-	return autoMigrator.migrate(ctx, m.DB)
+func (a *Adapter) MigrateAll(ctx context.Context) error {
+	return autoMigrate(ctx, a.DB)
 }
