@@ -6,10 +6,15 @@ import "google/protobuf/empty.proto";
 import "counters.proto";
 
 service Spawner {
-  rpc GetSyntheticUserCounters(google.protobuf.Empty) returns (Counters) {};
-  rpc SetActiveSyntheticUsers(ActiveSyntheticUsersRequest) returns (ActiveSyntheticUsersResponse) {};
+  rpc GetSyntheticUserCounters(google.protobuf.Empty) returns (Counters) {}
+  rpc SetMaxSyntheticUsersQuota(MaxSyntheticUsersQuotaRequest) returns (google.protobuf.Empty) {}
+  rpc SetActiveSyntheticUsers(ActiveSyntheticUsersRequest) returns (ActiveSyntheticUsersResponse) {}
 }
 
+
+message MaxSyntheticUsersQuotaRequest {
+  uint64 new_quota = 1;
+}
 
 message ActiveSyntheticUsersRequest {
   uint64 desiredActiveSyntheticUsers = 1;

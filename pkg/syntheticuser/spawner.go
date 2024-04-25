@@ -11,6 +11,9 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 	"github.com/steromano87/harkonnen/v1/pkg/workspace"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"time"
 )
 
@@ -20,6 +23,8 @@ type Holder struct {
 }
 
 type Spawner struct {
+	UnimplementedSpawnerServer
+
 	syntheticUsers        []Holder
 	syntheticUserErrGroup *errgroup.Group
 	mainCtx               context.Context
@@ -35,28 +40,42 @@ type Spawner struct {
 	Config               *workspace.Configuration
 }
 
-func NewSpawner(pip pipeline.Pipeline, maxSynthUserQuota uint64) *Spawner {
+func NewSpawner(pip pipeline.Pipeline) *Spawner {
 	spawner := new(Spawner)
 	spawner.pipelineToRun = pip
-	spawner.CountersHolder = NewCountersHolder(maxSynthUserQuota)
-	spawner.syntheticUsers = make([]Holder, maxSynthUserQuota)
 
-	for i := range spawner.syntheticUsers {
-		synthUser := New(pip)
-		synthUser.RegisterStatusChangeFunc(spawner.OnStatusChangeCallback)
-		spawner.syntheticUsers[i] = Holder{user: synthUser}
-		spawner.Counters().Ready++
-	}
-
+	spawner.CountersHolder = NewCountersHolder(0)
 	spawner.syntheticUserErrGroup = new(errgroup.Group)
-	spawner.lastStartedUserIndex = -1
-	spawner.lastStoppedUserIndex = -1
 
 	logger := zerolog.Nop()
 	spawner.SetLogger(&logger)
 	spawner.Vars = variables.NewHolder()
-	spawner.Config = workspace.MustNewDefault()
+	spawner.Config = workspace.MustNewDefaultConfiguration()
 	return spawner
+}
+
+func (s *Spawner) SetMaxSynthUserQuota(maxSynthUserQuota uint64) error {
+	if s.NonStoppedUsers() > 0 {
+		return errors.New(
+			fmt.Sprintf(
+				"cannot change max users quota while there are non-stopped synthetic users (%d)",
+				s.NonStoppedUsers()))
+	}
+
+	s.CountersHolder = NewCountersHolder(maxSynthUserQuota)
+	s.syntheticUsers = make([]Holder, maxSynthUserQuota)
+
+	for i := range s.syntheticUsers {
+		synthUser := New(s.pipelineToRun)
+		synthUser.RegisterStatusChangeFunc(s.OnStatusChangeCallback)
+		s.syntheticUsers[i] = Holder{user: synthUser}
+		s.Counters().Ready++
+	}
+
+	s.lastStartedUserIndex = -1
+	s.lastStoppedUserIndex = -1
+
+	return nil
 }
 
 func (s *Spawner) SetLogger(logger *zerolog.Logger) {
@@ -85,6 +104,10 @@ func (s *Spawner) Serve(ctx context.Context) {
 }
 
 func (s *Spawner) ReconcileActiveUsers(requestedUsers uint64) error {
+	if s.CountersHolder == nil {
+		return errors.New("cannot set active users because they have not been initialized yet")
+	}
+
 	if requestedUsers > s.MaxQuota() {
 		return errors.New(fmt.Sprintf("requested users (%d) exceed max users quota (%d)", requestedUsers, s.MaxQuota()))
 	}
@@ -146,4 +169,34 @@ func (s *Spawner) scaleDownActiveUsers(requestedUsers uint64) error {
 
 func (s *Spawner) Wait() error {
 	return s.syntheticUserErrGroup.Wait()
+}
+
+/////////////////////////
+// GRPC implementation //
+/////////////////////////
+
+// TODO: add context-aware methods to allow cancellation
+
+func (s *Spawner) GetSyntheticUserCounters(_ context.Context, _ *emptypb.Empty) (*Counters, error) {
+	return s.Counters(), nil
+}
+
+func (s *Spawner) SetMaxSyntheticUsersQuota(_ context.Context, request *MaxSyntheticUsersQuotaRequest) (*emptypb.Empty, error) {
+	if err := s.SetMaxSynthUserQuota(request.GetNewQuota()); err != nil {
+		return nil, status.Error(codes.FailedPrecondition, err.Error())
+	}
+
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Spawner) SetActiveSyntheticUsers(_ context.Context, request *ActiveSyntheticUsersRequest) (*ActiveSyntheticUsersResponse, error) {
+	previouslyActiveUsers := s.ActiveUsers()
+	if err := s.ReconcileActiveUsers(request.GetDesiredActiveSyntheticUsers()); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	return &ActiveSyntheticUsersResponse{
+		PreviouslyActiveSyntheticUsers: previouslyActiveUsers,
+		CurrentlyActiveSyntheticUsers:  request.GetDesiredActiveSyntheticUsers(),
+	}, nil
 }

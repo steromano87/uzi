@@ -169,3 +169,9 @@ func (ch *CountersHolder) ActiveUsers() uint64 {
 	defer ch.mu.RUnlock()
 	return ch.counters.SetupInProgress + ch.counters.Running
 }
+
+func (ch *CountersHolder) NonStoppedUsers() uint64 {
+	ch.mu.RLock()
+	defer ch.mu.RUnlock()
+	return ch.counters.SetupInProgress + ch.counters.Running + ch.counters.GracefullyShuttingDown + ch.counters.TeardownInProgress
+}
