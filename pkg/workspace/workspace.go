@@ -3,6 +3,9 @@ package workspace
 import (
 	"context"
 	"errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"os"
 	"path"
 	"path/filepath"
@@ -172,18 +175,18 @@ func (w *Workspace) PipelinePath() (string, error) {
 	return path.Join(w.location, ScriptsFolder, config.Load.Script), nil
 }
 
-func (w *Workspace) RawPipeline() ([]byte, error) {
+func (w *Workspace) Pipeline() ([]byte, string, error) {
 	pipelinePath, err := w.PipelinePath()
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	pipelineContent, err := os.ReadFile(pipelinePath)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return pipelineContent, nil
+	return pipelineContent, pipelinePath, nil
 }
 
 func (w *Workspace) Runs() ([]string, error) {
@@ -226,4 +229,24 @@ func (w *Workspace) DeleteRun(name string) error {
 		w.currentRun = nil
 	}
 	return os.RemoveAll(path.Join(w.location, name))
+}
+
+/////////////////////////
+// GRPC implementation //
+/////////////////////////
+
+func (w *Workspace) Initialize(_ context.Context, request *InitializationRequest) (*InitializationResponse, error) {
+	if err := w.ExtractFromArchive(request.GetArchive(), request.GetCompressionAlgorithm()); err != nil {
+		return nil, status.Error(codes.Unknown, err.Error())
+	}
+
+	return &InitializationResponse{RemoteWorkingFolder: w.location}, nil
+}
+
+func (w *Workspace) Reset(_ context.Context, _ *emptypb.Empty) (*emptypb.Empty, error) {
+	if err := w.DeleteContent(); err != nil {
+		return nil, status.Error(codes.Unknown, err.Error())
+	}
+
+	return &emptypb.Empty{}, nil
 }
