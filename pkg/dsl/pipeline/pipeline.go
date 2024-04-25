@@ -15,6 +15,14 @@ type Pipeline struct {
 	gracefulShutdownRequested bool
 }
 
+func Nop() Pipeline {
+	return Pipeline{
+		Setup:    StepContainer{steps: make([]dsl.Step, 0)},
+		Main:     StepContainer{steps: make([]dsl.Step, 0)},
+		Teardown: StepContainer{steps: make([]dsl.Step, 0)},
+	}
+}
+
 func (p *Pipeline) RunSetup(ctx dsl.Context) error {
 	return p.Setup.Run(ctx)
 }
