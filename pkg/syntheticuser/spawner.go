@@ -34,8 +34,8 @@ type Spawner struct {
 	pipelineToRun        pipeline.Pipeline
 	*CountersHolder
 
-	mainLogger           *zerolog.Logger
-	syntheticUsersLogger *zerolog.Logger
+	mainLogger           zerolog.Logger
+	syntheticUsersLogger zerolog.Logger
 	Vars                 *variables.Holder
 	Config               *workspace.Configuration
 }
@@ -47,8 +47,7 @@ func NewSpawner(pip pipeline.Pipeline) *Spawner {
 	spawner.CountersHolder = NewCountersHolder(0)
 	spawner.syntheticUserErrGroup = new(errgroup.Group)
 
-	logger := zerolog.Nop()
-	spawner.SetLogger(&logger)
+	spawner.SetLogger(zerolog.Nop())
 	spawner.Vars = variables.NewHolder()
 	spawner.Config = workspace.MustNewDefaultConfiguration()
 	return spawner
@@ -78,10 +77,9 @@ func (s *Spawner) SetMaxSynthUserQuota(maxSynthUserQuota uint64) error {
 	return nil
 }
 
-func (s *Spawner) SetLogger(logger *zerolog.Logger) {
+func (s *Spawner) SetLogger(logger zerolog.Logger) {
 	s.syntheticUsersLogger = logger
-	mainLogger := logger.With().Str(log.ComponentKey, "Spawner").Logger()
-	s.mainLogger = &mainLogger
+	s.mainLogger = logger.With().Str(log.ComponentKey, "Spawner").Logger()
 }
 
 func (s *Spawner) Serve(ctx context.Context) {
@@ -131,7 +129,7 @@ func (s *Spawner) scaleUpActiveUsers(requestedUsers uint64) error {
 
 		// Create a new DSL context for every user
 		ctx, cancelFunc := dsl.NewContext(s.mainCtx)
-		ctx.Logger = s.syntheticUsersLogger
+		ctx.Logger = &s.syntheticUsersLogger
 		ctx.Vars = s.Vars
 		ctx.Config = s.Config
 

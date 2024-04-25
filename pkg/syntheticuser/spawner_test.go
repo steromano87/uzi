@@ -17,15 +17,14 @@ type SpawnerTestSuite struct {
 	ctx        context.Context
 	cancelFunc context.CancelCauseFunc
 	pip        pipeline.Pipeline
-	logger     *zerolog.Logger
+	logger     zerolog.Logger
 }
 
 func (s *SpawnerTestSuite) SetupTest() {
 	zerolog.TimeFieldFormat = time.RFC3339Nano
 	consoleWriter := zerolog.NewConsoleWriter()
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000000"
-	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
-	s.logger = &logger
+	s.logger = zerolog.New(consoleWriter).With().Timestamp().Logger()
 
 	s.ctx, s.cancelFunc = context.WithCancelCause(context.TODO())
 
