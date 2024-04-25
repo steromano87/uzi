@@ -62,7 +62,8 @@ func (s *SpawnerTestSuite) TearDownTest() {
 }
 
 func (s *SpawnerTestSuite) TestSpawnerStartedWithZeroRunningUsers() {
-	spawner := syntheticuser.NewSpawner(s.pip)
+	spawner := syntheticuser.NewSpawner()
+	spawner.SetPipeline(s.pip)
 	_ = spawner.SetMaxSynthUserQuota(5)
 	spawner.SetLogger(s.logger)
 	spawner.Serve(s.ctx)
@@ -81,7 +82,8 @@ func (s *SpawnerTestSuite) TestSpawnerStartedWithZeroRunningUsers() {
 }
 
 func (s *SpawnerTestSuite) TestScaleUpToOneUser() {
-	spawner := syntheticuser.NewSpawner(s.pip)
+	spawner := syntheticuser.NewSpawner()
+	spawner.SetPipeline(s.pip)
 	_ = spawner.SetMaxSynthUserQuota(5)
 	spawner.SetLogger(s.logger)
 	spawner.Serve(s.ctx)
@@ -99,7 +101,8 @@ func (s *SpawnerTestSuite) TestScaleUpToOneUser() {
 }
 
 func (s *SpawnerTestSuite) TestScaleDownFromOneUser() {
-	spawner := syntheticuser.NewSpawner(s.pip)
+	spawner := syntheticuser.NewSpawner()
+	spawner.SetPipeline(s.pip)
 	_ = spawner.SetMaxSynthUserQuota(5)
 	spawner.SetLogger(s.logger)
 	spawner.Serve(s.ctx)
@@ -126,7 +129,8 @@ func (s *SpawnerTestSuite) TestScaleDownFromOneUser() {
 }
 
 func (s *SpawnerTestSuite) TestScaleUpAndDownUpToTwoUsers() {
-	spawner := syntheticuser.NewSpawner(s.pip)
+	spawner := syntheticuser.NewSpawner()
+	spawner.SetPipeline(s.pip)
 	_ = spawner.SetMaxSynthUserQuota(5)
 	spawner.SetLogger(s.logger)
 	spawner.Serve(s.ctx)
@@ -152,7 +156,8 @@ func (s *SpawnerTestSuite) TestScaleUpAndDownUpToTwoUsers() {
 }
 
 func (s *SpawnerTestSuite) TestScaleUpBeyondMaxQuota() {
-	spawner := syntheticuser.NewSpawner(s.pip)
+	spawner := syntheticuser.NewSpawner()
+	spawner.SetPipeline(s.pip)
 	_ = spawner.SetMaxSynthUserQuota(5)
 	spawner.Serve(s.ctx)
 	defer s.cancelFunc(nil)

@@ -40,9 +40,9 @@ type Spawner struct {
 	Config               *workspace.Configuration
 }
 
-func NewSpawner(pip pipeline.Pipeline) *Spawner {
+func NewSpawner() *Spawner {
 	spawner := new(Spawner)
-	spawner.pipelineToRun = pip
+	spawner.pipelineToRun = pipeline.Nop()
 
 	spawner.CountersHolder = NewCountersHolder(0)
 	spawner.syntheticUserErrGroup = new(errgroup.Group)
@@ -51,6 +51,10 @@ func NewSpawner(pip pipeline.Pipeline) *Spawner {
 	spawner.Vars = variables.NewHolder()
 	spawner.Config = workspace.MustNewDefaultConfiguration()
 	return spawner
+}
+
+func (s *Spawner) SetPipeline(pip pipeline.Pipeline) {
+	s.pipelineToRun = pip
 }
 
 func (s *Spawner) SetMaxSynthUserQuota(maxSynthUserQuota uint64) error {
