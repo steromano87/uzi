@@ -3,9 +3,8 @@ package workspace
 import (
 	"context"
 	"errors"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
+	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/log"
 	"os"
 	"path"
 	"path/filepath"
@@ -28,13 +27,13 @@ const (
 type Workspace struct {
 	location   string
 	currentRun *Run
-
-	UnimplementedWorkspaceServer
+	logger     zerolog.Logger
 }
 
 func New(location string) Workspace {
 	work := Workspace{
 		location: location,
+		logger:   zerolog.Nop(),
 	}
 	return work
 }
@@ -43,18 +42,13 @@ func NewTemp() Workspace {
 	return New("")
 }
 
+func (w *Workspace) SetLogger(logger zerolog.Logger) {
+	w.logger = logger.With().Str(log.ComponentKey, "Workspace").Logger()
+}
+
 func (w *Workspace) Hydrate() error {
-	switch w.location {
-	case "":
-		dir, err := os.MkdirTemp("", TempFolderPrefix)
-		if err != nil {
-			return err
-		}
-		w.location = dir
-	default:
-		if err := os.MkdirAll(w.location, FolderPerms); err != nil {
-			return err
-		}
+	if err := w.EnsureWorkspace(); err != nil {
+		return err
 	}
 
 	if err := w.createManifestFile(); err != nil {
@@ -71,6 +65,29 @@ func (w *Workspace) Hydrate() error {
 
 	if err := w.createRunsFolder(); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (w *Workspace) EnsureWorkspace() error {
+	// If location is unset, create a temporary folder and set it as workspace location
+	if w.location == "" {
+		dir, err := os.MkdirTemp("", TempFolderPrefix)
+		if err != nil {
+			return err
+		}
+		w.location = dir
+		w.logger.Info().Str("location", w.Location()).Msg("Temporary workspace created")
+		return nil
+	}
+
+	// If the folder is set, but does not exist, create it
+	if _, err := os.Stat(w.location); os.IsNotExist(err) {
+		if err := os.MkdirAll(w.location, FolderPerms); err != nil {
+			return err
+		}
+		return nil
 	}
 
 	return nil
@@ -137,11 +154,19 @@ func (w *Workspace) DeleteContent() error {
 		}
 	}
 
+	w.logger.Info().Str("location", w.Location()).Msg("Workspace content cleaned")
+
 	return nil
 }
 
 func (w *Workspace) Delete() error {
-	return os.RemoveAll(w.location)
+	oldLocation := w.Location()
+	if err := os.RemoveAll(w.location); err != nil {
+		return err
+	}
+	w.location = ""
+	w.logger.Info().Str("location", oldLocation).Msg("Workspace deleted")
+	return nil
 }
 
 func (w *Workspace) ExtractFromArchive(archiveContent []byte, algorithm CompressionAlgorithm) error {
@@ -229,24 +254,4 @@ func (w *Workspace) DeleteRun(name string) error {
 		w.currentRun = nil
 	}
 	return os.RemoveAll(path.Join(w.location, name))
-}
-
-/////////////////////////
-// GRPC implementation //
-/////////////////////////
-
-func (w *Workspace) Initialize(_ context.Context, request *InitializationRequest) (*InitializationResponse, error) {
-	if err := w.ExtractFromArchive(request.GetArchive(), request.GetCompressionAlgorithm()); err != nil {
-		return nil, status.Error(codes.Unknown, err.Error())
-	}
-
-	return &InitializationResponse{RemoteWorkingFolder: w.location}, nil
-}
-
-func (w *Workspace) Reset(_ context.Context, _ *emptypb.Empty) (*emptypb.Empty, error) {
-	if err := w.DeleteContent(); err != nil {
-		return nil, status.Error(codes.Unknown, err.Error())
-	}
-
-	return &emptypb.Empty{}, nil
 }
