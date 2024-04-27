@@ -107,7 +107,7 @@ func (c *Client) Execute(request Request) error {
 		},
 	}
 
-	c.ctx.AddSample(requestSample)
+	c.ctx.SaveSample(requestSample)
 
 	return c.saveLastResponse(response)
 }

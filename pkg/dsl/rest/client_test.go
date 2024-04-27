@@ -21,24 +21,24 @@ import (
 // Mocked telemetry sinks for test //
 /////////////////////////////////////
 
-type TestStepMetricsSink struct {
+type TestLoadMetricsSaver struct {
 	Samples      []*telemetry.Sample
 	Transactions []*telemetry.Transaction
 }
 
-func NewTestStepMetricsSink() *TestStepMetricsSink {
-	tsms := new(TestStepMetricsSink)
+func NewTestLoadMetricsSaver() *TestLoadMetricsSaver {
+	tsms := new(TestLoadMetricsSaver)
 	tsms.Samples = make([]*telemetry.Sample, 0)
 	tsms.Transactions = make([]*telemetry.Transaction, 0)
 
 	return tsms
 }
 
-func (tsms *TestStepMetricsSink) AddSample(sample *telemetry.Sample) {
+func (tsms *TestLoadMetricsSaver) SaveSample(sample *telemetry.Sample) {
 	tsms.Samples = append(tsms.Samples, sample)
 }
 
-func (tsms *TestStepMetricsSink) AddTransaction(transaction *telemetry.Transaction) {
+func (tsms *TestLoadMetricsSaver) SaveTransaction(transaction *telemetry.Transaction) {
 	tsms.Transactions = append(tsms.Transactions, transaction)
 }
 
@@ -48,10 +48,10 @@ func (tsms *TestStepMetricsSink) AddTransaction(transaction *telemetry.Transacti
 
 type ClientTestSuite struct {
 	suite.Suite
-	ctx             dsl.Context
-	cancelFunc      context.CancelCauseFunc
-	logger          zerolog.Logger
-	stepMetricsSink *TestStepMetricsSink
+	ctx              dsl.Context
+	cancelFunc       context.CancelCauseFunc
+	logger           zerolog.Logger
+	loadMetricsSaver *TestLoadMetricsSaver
 
 	client     *rest2.Client
 	testServer *httptest.Server
@@ -63,10 +63,10 @@ func (s *ClientTestSuite) SetupTest() {
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	s.logger = zerolog.New(consoleWriter).With().Timestamp().Logger()
 
-	s.stepMetricsSink = NewTestStepMetricsSink()
+	s.loadMetricsSaver = NewTestLoadMetricsSaver()
 
 	s.ctx, s.cancelFunc = dsl.NewContext(context.TODO())
-	s.ctx.StepMetricsSink = s.stepMetricsSink
+	s.ctx.LoadMetricsSaver = s.loadMetricsSaver
 
 	s.client = rest2.NewClient(s.ctx)
 
@@ -117,7 +117,7 @@ func (s *ClientTestSuite) TestGetRequest() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.stepMetricsSink.Samples
+		samples := s.loadMetricsSaver.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -157,7 +157,7 @@ func (s *ClientTestSuite) TestGetRequestWithQueryString() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.stepMetricsSink.Samples
+		samples := s.loadMetricsSaver.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -192,7 +192,7 @@ func (s *ClientTestSuite) TestPostNoBody() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.stepMetricsSink.Samples
+		samples := s.loadMetricsSaver.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -227,7 +227,7 @@ func (s *ClientTestSuite) TestPutNoBody() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.stepMetricsSink.Samples
+		samples := s.loadMetricsSaver.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -262,7 +262,7 @@ func (s *ClientTestSuite) TestPatchNoBody() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.stepMetricsSink.Samples
+		samples := s.loadMetricsSaver.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -297,7 +297,7 @@ func (s *ClientTestSuite) TestDeleteNoBody() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.stepMetricsSink.Samples
+		samples := s.loadMetricsSaver.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -332,7 +332,7 @@ func (s *ClientTestSuite) TestHeadNoBody() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.stepMetricsSink.Samples
+		samples := s.loadMetricsSaver.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -364,7 +364,7 @@ func (s *ClientTestSuite) TestOptionsNoBody() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.stepMetricsSink.Samples
+		samples := s.loadMetricsSaver.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -403,7 +403,7 @@ func (s *ClientTestSuite) TestPostFormRequest() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.stepMetricsSink.Samples
+		samples := s.loadMetricsSaver.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -475,7 +475,7 @@ func (s *ClientTestSuite) TestRequestWithRedirect_WithoutRedirectSetting() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.stepMetricsSink.Samples
+		samples := s.loadMetricsSaver.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -514,7 +514,7 @@ func (s *ClientTestSuite) TestRequestWithRedirect_WithRedirectSetting() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.stepMetricsSink.Samples
+		samples := s.loadMetricsSaver.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]

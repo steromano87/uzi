@@ -15,16 +15,17 @@ type Context struct {
 	Vars   *variables.Holder
 	Config *workspace.Configuration
 
-	telemetry.StepMetricsSink
+	telemetry.LoadMetricsSaver
 }
 
 func NewContext(ctx context.Context) (Context, context.CancelCauseFunc) {
 	derivedCtx, cancelFunc := context.WithCancelCause(ctx)
 
 	return Context{
-		Context: derivedCtx,
-		Logger:  zerolog.Ctx(ctx),
-		Vars:    variables.NewHolder(),
-		Config:  workspace.MustNewDefault(),
+		Context:          derivedCtx,
+		Logger:           zerolog.Ctx(ctx),
+		Vars:             variables.NewHolder(),
+		Config:           workspace.MustNewDefaultConfiguration(),
+		LoadMetricsSaver: telemetry.NewLoadMetricsNoOpSaver(*zerolog.Ctx(ctx)),
 	}, cancelFunc
 }
