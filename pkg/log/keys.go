@@ -1,7 +1,7 @@
 package log
 
 const (
-	HostIdKey          = "hostId"
+	AgentId            = "agentId"
 	SyntheticUserIdKey = "syntheticUserId"
 	TransactionIdKey   = "transactionId"
 	ComponentKey       = "component"
