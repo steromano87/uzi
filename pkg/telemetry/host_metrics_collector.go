@@ -8,28 +8,26 @@ import (
 	"github.com/shirou/gopsutil/net"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"runtime"
-	"sync"
 	"time"
 )
 
 type HostMetricsCollector struct {
-	metrics []*HostMetrics
-	mu      sync.Mutex
-
 	pollInterval    time.Duration
 	measureInterval time.Duration
+
+	saver HostMetricsSaver
 }
 
 func NewHostMetricsCollector(pollInterval time.Duration, measureInterval time.Duration) *HostMetricsCollector {
 	mc := new(HostMetricsCollector)
-	mc.metrics = make([]*HostMetrics, 0)
 	mc.pollInterval = pollInterval
 	mc.measureInterval = measureInterval
 
 	return mc
 }
 
-func (c *HostMetricsCollector) StartHostMetricsCollection(ctx context.Context) {
+func (c *HostMetricsCollector) Start(ctx context.Context, saver HostMetricsSaver) {
+	c.saver = saver
 	ticker := time.NewTicker(c.pollInterval)
 
 	go func() {
@@ -75,38 +73,25 @@ func (c *HostMetricsCollector) gatherMetrics(ctx context.Context) error {
 		return err
 	}
 
-	metrics := HostMetrics{
+	sample := &HostMetricsSample{
 		Timestamp: timestamppb.Now(),
 		Cpu:       cpuPercent[0],
-		Memory: &HostMetrics_Memory{
+		Memory: &HostMetricsSample_Memory{
 			Total: memUsage.Total,
 			Used:  memUsage.Used,
 		},
-		Storage: &HostMetrics_Storage{
+		Storage: &HostMetricsSample_Storage{
 			Total: diskUsage.Total,
 			Used:  diskUsage.Used,
 		},
-		Network: &HostMetrics_Network{
+		Network: &HostMetricsSample_Network{
 			UpSpeed:   float64(netUsageAfter[0].BytesSent-netUsageBefore[0].BytesSent) / c.measureInterval.Seconds(),
 			DownSpeed: float64(netUsageAfter[0].BytesRecv-netUsageBefore[0].BytesRecv) / c.measureInterval.Seconds(),
 		},
 	}
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.metrics = append(c.metrics, &metrics)
-
+	c.saver.SaveHostMetricsSample(sample)
 	return nil
-}
-
-func (c *HostMetricsCollector) GetHostMetrics() []*HostMetrics {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	output := make([]*HostMetrics, len(c.metrics))
-	copy(output, c.metrics)
-	c.metrics = make([]*HostMetrics, 0)
-	return output
 }
 
 func (c *HostMetricsCollector) getRootDir() string {

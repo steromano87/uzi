@@ -9,6 +9,14 @@ import (
 	"time"
 )
 
+type TestHostMetricsSaver struct {
+	Samples []*telemetry.HostMetricsSample
+}
+
+func (t *TestHostMetricsSaver) SaveHostMetricsSample(hostMetrics *telemetry.HostMetricsSample) {
+	t.Samples = append(t.Samples, hostMetrics)
+}
+
 type HostMetricsCollectorTestSuite struct {
 	suite.Suite
 }
@@ -23,17 +31,19 @@ func (s *HostMetricsCollectorTestSuite) TestMetricsCollection() {
 	measuringInterval := 50 * time.Millisecond
 	collector := telemetry.NewHostMetricsCollector(pollingInterval, measuringInterval)
 	ctx, cancelFunc := context.WithCancel(context.TODO())
+	testSaver := &TestHostMetricsSaver{
+		Samples: make([]*telemetry.HostMetricsSample, 0),
+	}
 
-	collector.StartHostMetricsCollection(ctx)
+	collector.Start(ctx, testSaver)
 
 	time.Sleep(2 * pollingInterval)
 	cancelFunc()
 
-	metrics := collector.GetHostMetrics()
-	if assert.NotEmpty(s.T(), metrics) {
-		metric := metrics[0]
+	if assert.NotEmpty(s.T(), testSaver.Samples) {
+		metric := testSaver.Samples[0]
 
-		if assert.IsType(s.T(), &telemetry.HostMetrics{}, metric) {
+		if assert.IsType(s.T(), &telemetry.HostMetricsSample{}, metric) {
 			assert.GreaterOrEqual(s.T(), metric.GetCpu(), 0.0)
 			assert.Greater(s.T(), metric.GetMemory().GetTotal(), uint64(0))
 			assert.LessOrEqual(s.T(), metric.GetMemory().GetUsed(), metric.GetMemory().GetTotal())
