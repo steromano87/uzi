@@ -10,6 +10,7 @@ require (
 	github.com/fullstorydev/grpchan v1.1.1
 	github.com/glebarez/sqlite v1.11.0
 	github.com/hashicorp/hcl/v2 v2.20.1
+	github.com/klauspost/compress v1.17.8
 	github.com/mitchellh/hashstructure/v2 v2.0.2
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/rs/xid v1.5.0
@@ -65,7 +66,6 @@ require (
 	github.com/jhump/protoreflect v1.16.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
-	github.com/klauspost/compress v1.17.8 // indirect
 	github.com/lufia/plan9stats v0.0.0-20240408141607-282e7b5d6b74 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
