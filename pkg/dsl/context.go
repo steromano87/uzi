@@ -5,7 +5,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
-	"github.com/steromano87/harkonnen/v1/pkg/workspace"
+	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
 )
 
 type Context struct {
@@ -13,7 +13,7 @@ type Context struct {
 
 	Logger *zerolog.Logger
 	Vars   *variables.Holder
-	Config *workspace.Configuration
+	Config *configuration.Manifest
 
 	telemetry.LoadMetricsSaver
 }
@@ -25,7 +25,7 @@ func NewContext(ctx context.Context) (Context, context.CancelCauseFunc) {
 		Context:          derivedCtx,
 		Logger:           zerolog.Ctx(ctx),
 		Vars:             variables.NewHolder(),
-		Config:           workspace.MustNewDefaultConfiguration(),
+		Config:           configuration.MustNewDefault(),
 		LoadMetricsSaver: telemetry.NewLoadMetricsNoOpSaver(*zerolog.Ctx(ctx)),
 	}, cancelFunc
 }

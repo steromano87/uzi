@@ -7,19 +7,18 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/workspace"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 )
 
 var initCmd = &cobra.Command{
 	Use:   "init [flags] [folder]",
-	Short: "Initialize a new workspace",
+	Short: "Initializes a new workspace",
 	Run:   runInit,
 	Args:  cobra.MaximumNArgs(1),
 }
 
 func init() {
-	initCmd.Flags().Bool("overwrite", false, "wipe out all existing files in the selected folder before initializing a new workspace")
+	initCmd.Flags().Bool("overwrite", false, "wipe out all existing files in the selected folder before initializing a new workspacePath")
 	registerSubcommand(initCmd)
 }
 
@@ -43,24 +42,20 @@ func runInit(cmd *cobra.Command, args []string) {
 	if !empty && !shouldOverwrite {
 		cobra.CheckErr(
 			errors.New(fmt.Sprintf(
-				"folder '%s' is not empty! If you want to init the workspace anyway, re-type the command with the '--overwrite flag'",
-				workingFolder)))
+				"folder '%s' is not empty! If you want to init the workspacePath anyway, re-type the command with the '--overwrite flag'",
+				workspacePath)))
 	}
 
 	// If not empty and override flag is set, wipe out the folder content
 	if !empty && shouldOverwrite {
-		dir, err := os.ReadDir(workingFolderAbsPath)
-		cobra.CheckErr(err)
-		for _, d := range dir {
-			cobra.CheckErr(os.RemoveAll(path.Join([]string{workingFolderAbsPath, d.Name()}...)))
-		}
+		cobra.CheckErr(os.RemoveAll(workingFolderAbsPath))
 	}
 
 	// Bootstrap a new project
 	work := workspace.New(workingFolderAbsPath)
 	cobra.CheckErr(work.Hydrate())
 
-	println("NewConfiguration workspace initialized at " + workingFolderAbsPath)
+	println("New workspace initialized at " + work.Location())
 }
 
 func isEmpty(folder string) (bool, error) {

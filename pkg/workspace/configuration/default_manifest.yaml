@@ -1,0 +1,54 @@
+name: My loading project with Harkonnen
+
+harkonnenVersion: "all"
+
+#################
+# Configuration #
+#################
+
+load:
+  script: "my_script.hcl"
+  maxIterations: 0
+  profile:
+    kind: LinearRamp
+    spec:
+      maxUsers: 5
+      initialDelay: 0s
+      rampUp: 10s
+      sustain: 5m
+      rampDown: 5s
+
+injector:
+  kind: local
+  spec:
+    shutdownTimeout: 2m
+
+logging:
+  level: info
+
+controller:
+  scheduler:
+    updateInterval: 2s
+
+rest:
+  timeout: 30s
+  baseUrl: ""
+  followRedirects: true
+  keepCookies: true
+  idleConnectionTimeout: 10s
+  tlsHandshakeTimeout: 10s
+  responseHeaderTimeout: 10s
+  maxIdleConnections: 100
+  maxConnectionsPerHost: 100
+  maxIdleConnectionsPerHost: 100
+  enableKeepAlive: true
+  enableCompression: true
+
+heartbeat:
+  interval: 10s
+  timeout: 15s
+
+telemetry:
+  hostMetrics:
+    pollInterval: 15s
+    measureInterval: 250ms

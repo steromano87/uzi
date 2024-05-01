@@ -1,12 +1,13 @@
 package workspace
 
 import (
+	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
 	"os"
 	"path/filepath"
 )
 
-func ParseConfiguration(baseFolder string) (*Configuration, error) {
-	return NewConfiguration(filepath.Join(baseFolder, ManifestFile))
+func ParseConfiguration(baseFolder string) (*configuration.Manifest, error) {
+	return configuration.New(filepath.Join(baseFolder, ManifestFile))
 }
 
 func ParsePipeline(baseFolder string) ([]byte, string, error) {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/log"
+	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
 	"os"
 	"path"
 	"path/filepath"
@@ -67,6 +68,10 @@ func (w *Workspace) Hydrate() error {
 		return err
 	}
 
+	if err := w.createScriptsFolder(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -95,7 +100,7 @@ func (w *Workspace) EnsureWorkspace() error {
 
 func (w *Workspace) createManifestFile() error {
 	configFilePath := path.Join(w.location, ManifestFile)
-	return os.WriteFile(configFilePath, []byte(DefaultManifestContent), FilePerms)
+	return os.WriteFile(configFilePath, []byte(configuration.DefaultManifestContent), FilePerms)
 }
 
 func (w *Workspace) createGlobalVariablesFile() error {
@@ -183,8 +188,8 @@ func (w *Workspace) Location() string {
 	return w.location
 }
 
-func (w *Workspace) Configuration() (*Configuration, error) {
-	config, err := NewConfiguration(path.Join(w.location, ManifestFile))
+func (w *Workspace) Configuration() (*configuration.Manifest, error) {
+	config, err := configuration.New(path.Join(w.location, ManifestFile))
 	if err != nil {
 		return nil, err
 	}

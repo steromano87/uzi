@@ -9,7 +9,7 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/dsl/pipeline"
 	"github.com/steromano87/harkonnen/v1/pkg/log"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
-	"github.com/steromano87/harkonnen/v1/pkg/workspace"
+	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -37,7 +37,7 @@ type Spawner struct {
 	mainLogger           zerolog.Logger
 	syntheticUsersLogger zerolog.Logger
 	Vars                 *variables.Holder
-	Config               *workspace.Configuration
+	Config               *configuration.Manifest
 }
 
 func NewSpawner() *Spawner {
@@ -49,7 +49,7 @@ func NewSpawner() *Spawner {
 
 	spawner.SetLogger(zerolog.Nop())
 	spawner.Vars = variables.NewHolder()
-	spawner.Config = workspace.MustNewDefaultConfiguration()
+	spawner.Config = configuration.MustNewDefault()
 	return spawner
 }
 
