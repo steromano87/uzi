@@ -17,7 +17,7 @@ type SyntheticUserTestSuite struct {
 	suite.Suite
 	ctx        dsl.Context
 	cancelFunc context.CancelCauseFunc
-	pip        pipeline.Pipeline
+	pip        *pipeline.Pipeline
 }
 
 func (s *SyntheticUserTestSuite) SetupTest() {

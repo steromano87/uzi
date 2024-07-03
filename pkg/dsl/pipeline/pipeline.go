@@ -16,8 +16,8 @@ type Pipeline struct {
 	gracefulShutdownRequested atomic.Bool
 }
 
-func Nop() Pipeline {
-	return Pipeline{
+func Nop() *Pipeline {
+	return &Pipeline{
 		Setup:    StepContainer{steps: make([]dsl.Step, 0)},
 		Main:     StepContainer{steps: make([]dsl.Step, 0)},
 		Teardown: StepContainer{steps: make([]dsl.Step, 0)},

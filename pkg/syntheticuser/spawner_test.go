@@ -16,7 +16,7 @@ type SpawnerTestSuite struct {
 	suite.Suite
 	ctx        context.Context
 	cancelFunc context.CancelCauseFunc
-	pip        pipeline.Pipeline
+	pip        *pipeline.Pipeline
 	logger     zerolog.Logger
 }
 

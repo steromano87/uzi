@@ -7,7 +7,7 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
 )
 
-func Decode(dslFileContent []byte, dslFilePath string) (Pipeline, error) {
+func Decode(dslFileContent []byte, dslFilePath string) (*Pipeline, error) {
 	parsedFile, diagnostics := hclsyntax.ParseConfig(dslFileContent, dslFilePath, hcl.Pos{
 		Line:   1,
 		Column: 1,
@@ -15,19 +15,19 @@ func Decode(dslFileContent []byte, dslFilePath string) (Pipeline, error) {
 	})
 
 	if diagnostics != nil && diagnostics.HasErrors() {
-		return Pipeline{}, diagnostics.Errs()[0]
+		return &Pipeline{}, diagnostics.Errs()[0]
 	}
 
 	pipeline, err := decodeBody(&hcl.EvalContext{}, parsedFile.Body)
 	if err != nil {
-		return Pipeline{}, err
+		return &Pipeline{}, err
 	}
 
 	return pipeline, nil
 }
 
-func decodeBody(ctx *hcl.EvalContext, body hcl.Body) (Pipeline, error) {
-	pipeline := Pipeline{
+func decodeBody(ctx *hcl.EvalContext, body hcl.Body) (*Pipeline, error) {
+	pipeline := &Pipeline{
 		Setup:    StepContainer{},
 		Main:     StepContainer{},
 		Teardown: StepContainer{},
@@ -43,7 +43,7 @@ func decodeBody(ctx *hcl.EvalContext, body hcl.Body) (Pipeline, error) {
 	for _, block := range bodyContent.Blocks {
 		stepContainer, err := decodeStepContainer(ctx, block)
 		if err != nil {
-			return Pipeline{}, err
+			return &Pipeline{}, err
 		}
 
 		switch block.Type {
@@ -62,15 +62,15 @@ func decodeBody(ctx *hcl.EvalContext, body hcl.Body) (Pipeline, error) {
 	}
 
 	if setupCount > 1 {
-		return Pipeline{}, errors.New("only zero or one 'Setup' block is allowed in a Pipeline body")
+		return &Pipeline{}, errors.New("only zero or one 'Setup' block is allowed in a Pipeline body")
 	}
 
 	if mainCount != 1 {
-		return Pipeline{}, errors.New("exactly one 'Main' block is required in a Pipeline body")
+		return &Pipeline{}, errors.New("exactly one 'Main' block is required in a Pipeline body")
 	}
 
 	if teardownCount > 1 {
-		return Pipeline{}, errors.New("only zero or one 'Teardown' block is allowed in a Pipeline body")
+		return &Pipeline{}, errors.New("only zero or one 'Teardown' block is allowed in a Pipeline body")
 	}
 
 	return pipeline, nil

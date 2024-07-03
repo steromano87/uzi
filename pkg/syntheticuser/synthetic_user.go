@@ -13,13 +13,13 @@ import (
 
 type SyntheticUser struct {
 	id            xid.ID
-	pipelineToRun pipeline.Pipeline
+	pipelineToRun *pipeline.Pipeline
 	logger        zerolog.Logger
 
 	StatusHolder
 }
 
-func New(pip pipeline.Pipeline) *SyntheticUser {
+func New(pip *pipeline.Pipeline) *SyntheticUser {
 	synthUser := new(SyntheticUser)
 	synthUser.id = xid.New()
 	synthUser.pipelineToRun = pip

@@ -22,7 +22,7 @@ main {}
 	decodedPipeline, err := pipeline.Decode([]byte(tempScriptContent), tempScript.Name())
 
 	if assert.NoError(s.T(), err) {
-		assert.IsType(s.T(), pipeline.Pipeline{}, decodedPipeline)
+		assert.IsType(s.T(), &pipeline.Pipeline{}, decodedPipeline)
 	}
 }
 

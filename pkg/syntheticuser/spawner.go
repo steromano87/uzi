@@ -31,7 +31,7 @@ type Spawner struct {
 
 	lastStartedUserIndex int64
 	lastStoppedUserIndex int64
-	pipelineToRun        pipeline.Pipeline
+	pipelineToRun        *pipeline.Pipeline
 	*CountersHolder
 
 	mainLogger           zerolog.Logger
@@ -53,7 +53,7 @@ func NewSpawner() *Spawner {
 	return spawner
 }
 
-func (s *Spawner) SetPipeline(pip pipeline.Pipeline) {
+func (s *Spawner) SetPipeline(pip *pipeline.Pipeline) {
 	s.pipelineToRun = pip
 }
 

@@ -39,7 +39,7 @@ func (tls *TestLogSink) Write(p []byte) (n int, err error) {
 
 type PipelineTestSuite struct {
 	suite.Suite
-	noOpPipeline pipeline.Pipeline
+	noOpPipeline *pipeline.Pipeline
 	logSink      *TestLogSink
 	logger       zerolog.Logger
 }
