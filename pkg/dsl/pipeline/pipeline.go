@@ -62,3 +62,11 @@ func (p *Pipeline) RunTeardown(ctx dsl.Context) error {
 func (p *Pipeline) RequestGracefulShutdown() {
 	p.gracefulShutdownRequested.Store(true)
 }
+
+func (p *Pipeline) Clone() *Pipeline {
+	return &Pipeline{
+		Setup:    p.Setup,
+		Main:     p.Main,
+		Teardown: p.Teardown,
+	}
+}

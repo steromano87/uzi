@@ -69,7 +69,7 @@ func (s *Spawner) SetMaxSynthUserQuota(maxSynthUserQuota uint64) error {
 	s.syntheticUsers = make([]Holder, maxSynthUserQuota)
 
 	for i := range s.syntheticUsers {
-		synthUser := New(s.pipelineToRun)
+		synthUser := New(s.pipelineToRun.Clone())
 		synthUser.RegisterStatusChangeFunc(s.OnStatusChangeCallback)
 		s.syntheticUsers[i] = Holder{user: synthUser}
 		s.Counters().Ready++
