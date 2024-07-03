@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
+	"sync/atomic"
 )
 
 type Pipeline struct {
@@ -12,7 +13,7 @@ type Pipeline struct {
 	Teardown StepContainer
 
 	IterationCounter
-	gracefulShutdownRequested bool
+	gracefulShutdownRequested atomic.Bool
 }
 
 func Nop() Pipeline {
@@ -29,7 +30,7 @@ func (p *Pipeline) RunSetup(ctx dsl.Context) error {
 
 func (p *Pipeline) RunMain(ctx dsl.Context) error {
 	// Run the main block until a graceful shutdown is requested
-	for !p.gracefulShutdownRequested && !p.IterationCounter.MaxIterationsReached() {
+	for !p.gracefulShutdownRequested.Load() && !p.IterationCounter.MaxIterationsReached() {
 		p.IterationCounter.AddInProgressIteration()
 		err := p.RunMainOnce(ctx)
 
@@ -46,7 +47,7 @@ func (p *Pipeline) RunMain(ctx dsl.Context) error {
 	}
 
 	ctx.Logger.Debug().Msg("Gracefully exited main loop")
-	p.gracefulShutdownRequested = false
+	p.gracefulShutdownRequested.Store(false)
 	return nil
 }
 
@@ -59,5 +60,5 @@ func (p *Pipeline) RunTeardown(ctx dsl.Context) error {
 }
 
 func (p *Pipeline) RequestGracefulShutdown() {
-	p.gracefulShutdownRequested = true
+	p.gracefulShutdownRequested.Store(true)
 }
