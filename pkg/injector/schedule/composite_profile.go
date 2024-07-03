@@ -46,3 +46,12 @@ func maxDuration(durations []time.Duration) time.Duration {
 
 	return maxValue
 }
+
+func (c CompositeProfile) MaxSyntheticUsers() uint64 {
+	var totalUsers uint64
+	for _, profile := range c.Profiles {
+		totalUsers += profile.MaxSyntheticUsers()
+	}
+
+	return totalUsers
+}

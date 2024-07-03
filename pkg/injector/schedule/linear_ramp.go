@@ -63,3 +63,7 @@ func (r LinearRamp) At(elapsed time.Duration) uint64 {
 func (r LinearRamp) TotalDuration() time.Duration {
 	return r.InitialDelay + r.RampUp + r.Sustain + r.RampDown
 }
+
+func (r LinearRamp) MaxSyntheticUsers() uint64 {
+	return r.MaxUsers
+}
