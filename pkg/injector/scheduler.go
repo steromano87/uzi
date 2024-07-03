@@ -37,28 +37,30 @@ func (s *Scheduler) Serve(ctx context.Context, updateInterval time.Duration) err
 	s.start = time.Now()
 	s.ticker = time.NewTicker(updateInterval)
 
-	select {
-	case now := <-s.ticker.C:
-		elapsedTime := now.Sub(s.start)
-		s.logger.Debug().Dur("elapsedTime", elapsedTime).Msg("Updating total expected running users")
-		totalExpectedUsers := s.profile.At(elapsedTime)
-		usersQuotas := s.roster.SplitQuotasByWeight(totalExpectedUsers)
-		if err := s.updateActiveUsers(ctx, usersQuotas); err != nil {
-			s.logger.Error().Err(err).Msg("Error while updating running users")
-		}
+	for {
+		select {
+		case now := <-s.ticker.C:
+			elapsedTime := now.Sub(s.start)
+			s.logger.Debug().Dur("elapsedTime", elapsedTime).Msg("Updating total expected running users")
+			totalExpectedUsers := s.profile.At(elapsedTime)
+			usersQuotas := s.roster.SplitQuotasByWeight(totalExpectedUsers)
+			if err := s.updateActiveUsers(ctx, usersQuotas); err != nil {
+				s.logger.Error().Err(err).Msg("Error while updating running users")
+			}
 
-	case <-ctx.Done():
-		s.logger.Info().AnErr("reason", context.Cause(ctx)).Msg("Shutdown requested, scaling all running users to zero")
-		scaledUsers := make(map[string]uint64)
-		for _, userId := range s.roster.Keys() {
-			scaledUsers[userId] = uint64(0)
-		}
-		if err := s.updateActiveUsers(context.TODO(), scaledUsers); err != nil {
-			s.logger.Error().Err(err).Msg("cannot scale active users to zero")
+		case <-ctx.Done():
+			s.logger.Info().AnErr("reason", context.Cause(ctx)).Msg("Shutdown requested, scaling all running users to zero")
+			scaledUsers := make(map[string]uint64)
+			for _, userId := range s.roster.Keys() {
+				scaledUsers[userId] = uint64(0)
+			}
+			if err := s.updateActiveUsers(context.TODO(), scaledUsers); err != nil {
+				s.logger.Error().Err(err).Msg("cannot scale active users to zero")
+				return err
+			}
+			return nil
 		}
 	}
-
-	return nil
 }
 
 func (s *Scheduler) updateActiveUsers(ctx context.Context, quotas map[string]uint64) error {
