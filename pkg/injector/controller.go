@@ -32,8 +32,8 @@ type Controller struct {
 	controlErrGroup errgroup.Group
 }
 
-func NewController(workdir string, logger zerolog.Logger) Controller {
-	controller := Controller{
+func NewController(workdir string, logger zerolog.Logger) *Controller {
+	controller := &Controller{
 		vars:      variables.NewHolder(),
 		workspace: workspace.New(workdir),
 		roster:    NewRoster(),
@@ -78,7 +78,7 @@ func (c *Controller) Serve(ctx context.Context) error {
 		return err
 	}
 
-	if err := c.initProvider(); err != nil {
+	if err := c.initProvider(ctx); err != nil {
 		return err
 	}
 
@@ -103,23 +103,22 @@ func (c *Controller) initConfig() error {
 	return nil
 }
 
-func (c *Controller) initProvider() error {
+func (c *Controller) initProvider(ctx context.Context) error {
 	provider, err := GetProvider(c.config.Injector.Kind)
 	if err != nil {
 		return err
 	}
 
 	c.provider = provider
-	return nil
-}
-
-func (c *Controller) initScheduler(ctx context.Context) error {
 	roster, err := c.provider.Init(ctx, c.config.RawInjectorSpec())
 	if err != nil {
 		return err
 	}
 	c.roster = roster
+	return nil
+}
 
+func (c *Controller) initScheduler(ctx context.Context) error {
 	profile, err := schedule.Parse(c.config.Load.Profile.Kind, c.config.RawLoadProfileSpec())
 	if err != nil {
 		return err
@@ -127,5 +126,7 @@ func (c *Controller) initScheduler(ctx context.Context) error {
 	c.profile = profile
 
 	c.scheduler = NewScheduler(&c.roster, c.profile)
-	return nil
+	c.scheduler.SetLogger(*zerolog.Ctx(ctx))
+
+	return c.scheduler.InitSynthUsers(ctx)
 }

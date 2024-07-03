@@ -33,6 +33,23 @@ func (s *Scheduler) SetLogger(logger zerolog.Logger) {
 	s.logger = logger.With().Str(log.ComponentKey, "Scheduler").Logger()
 }
 
+func (s *Scheduler) InitSynthUsers(ctx context.Context) error {
+	maxUsersQuotas := s.roster.SplitQuotasByWeight(s.profile.MaxSyntheticUsers())
+	for agentId, quota := range maxUsersQuotas {
+		currentUser, ok := s.roster.Get(agentId)
+		if !ok {
+			return errors.New("cannot find agent with ID " + agentId)
+		}
+		request := &syntheticuser.MaxSyntheticUsersQuotaRequest{NewQuota: quota}
+		_, err := currentUser.Client.SetMaxSyntheticUsersQuota(ctx, request)
+		if err != nil {
+			return errors.New(fmt.Sprintf("cannot initialize synthetic users for agent %s: %s", agentId, err.Error()))
+		}
+	}
+
+	return nil
+}
+
 func (s *Scheduler) Serve(ctx context.Context, updateInterval time.Duration) error {
 	s.start = time.Now()
 	s.ticker = time.NewTicker(updateInterval)
