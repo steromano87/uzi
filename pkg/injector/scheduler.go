@@ -33,7 +33,7 @@ func (s *Scheduler) SetLogger(logger zerolog.Logger) {
 	s.logger = logger.With().Str(log.ComponentKey, "Scheduler").Logger()
 }
 
-func (s *Scheduler) InitSynthUsers(ctx context.Context) error {
+func (s *Scheduler) InitSyntheticUsers(ctx context.Context) error {
 	maxUsersQuotas := s.roster.SplitQuotasByWeight(s.profile.MaxSyntheticUsers())
 	for agentId, quota := range maxUsersQuotas {
 		currentUser, ok := s.roster.Get(agentId)

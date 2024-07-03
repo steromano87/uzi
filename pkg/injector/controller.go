@@ -128,5 +128,5 @@ func (c *Controller) initScheduler(ctx context.Context) error {
 	c.scheduler = NewScheduler(&c.roster, c.profile)
 	c.scheduler.SetLogger(*zerolog.Ctx(ctx))
 
-	return c.scheduler.InitSynthUsers(ctx)
+	return c.scheduler.InitSyntheticUsers(ctx)
 }
