@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"sync"
 	"time"
 )
 
@@ -28,6 +29,7 @@ type Spawner struct {
 	syntheticUsers        []Holder
 	syntheticUserErrGroup *errgroup.Group
 	mainCtx               context.Context
+	mainCtxRWMu           sync.RWMutex
 
 	lastStartedUserIndex int64
 	lastStoppedUserIndex int64
@@ -87,6 +89,8 @@ func (s *Spawner) SetLogger(logger zerolog.Logger) {
 }
 
 func (s *Spawner) Serve(ctx context.Context) {
+	s.mainCtxRWMu.Lock()
+	defer s.mainCtxRWMu.Unlock()
 	s.mainCtx = ctx
 
 	go func() {
@@ -127,6 +131,8 @@ func (s *Spawner) ReconcileActiveUsers(requestedUsers uint64) error {
 
 func (s *Spawner) scaleUpActiveUsers(requestedUsers uint64) error {
 	usersToStart := requestedUsers - s.ActiveUsers()
+	s.mainCtxRWMu.RLock()
+	defer s.mainCtxRWMu.RUnlock()
 
 	for usersToStart > 0 {
 		s.lastStartedUserIndex++
