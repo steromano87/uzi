@@ -3,17 +3,18 @@ package syntheticuser
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 )
 
 type CountersHolder struct {
 	counters *Counters
 	mu       sync.RWMutex
-	maxQuota uint64
+	maxQuota atomic.Uint64
 }
 
 func NewCountersHolder(maxQuota uint64) *CountersHolder {
 	ch := new(CountersHolder)
-	ch.maxQuota = maxQuota
+	ch.maxQuota.Store(maxQuota)
 	ch.counters = new(Counters)
 	return ch
 }
@@ -89,64 +90,64 @@ func (ch *CountersHolder) mustUpdateFromOldStatus(oldStatus Status) {
 func (ch *CountersHolder) mustUpdateFromNewStatus(newStatus Status) {
 	switch newStatus {
 	case Status_READY:
-		if ch.counters.Ready >= ch.maxQuota {
+		if ch.counters.Ready >= ch.MaxQuota() {
 			panic(fmt.Sprintf(
 				"inconsistent status: users in status %s (%d) cannot be greater than max user quota (%d)",
-				newStatus.String(), ch.counters.Ready, ch.maxQuota),
+				newStatus.String(), ch.counters.Ready, ch.MaxQuota()),
 			)
 		}
 		ch.counters.Ready++
 
 	case Status_SETUP_IN_PROGRESS:
-		if ch.counters.SetupInProgress >= ch.maxQuota {
+		if ch.counters.SetupInProgress >= ch.MaxQuota() {
 			panic(fmt.Sprintf(
 				"inconsistent status: users in status %s (%d) cannot be greater than max user quota (%d)",
-				newStatus.String(), ch.counters.SetupInProgress, ch.maxQuota),
+				newStatus.String(), ch.counters.SetupInProgress, ch.MaxQuota()),
 			)
 		}
 		ch.counters.SetupInProgress++
 
 	case Status_RUNNING:
-		if ch.counters.Running >= ch.maxQuota {
+		if ch.counters.Running >= ch.MaxQuota() {
 			panic(fmt.Sprintf(
 				"inconsistent status: users in status %s (%d) cannot be greater than max user quota (%d)",
-				newStatus.String(), ch.counters.Running, ch.maxQuota),
+				newStatus.String(), ch.counters.Running, ch.MaxQuota()),
 			)
 		}
 		ch.counters.Running++
 
 	case Status_GRACEFULLY_SHUTTING_DOWN:
-		if ch.counters.GracefullyShuttingDown >= ch.maxQuota {
+		if ch.counters.GracefullyShuttingDown >= ch.MaxQuota() {
 			panic(fmt.Sprintf(
 				"inconsistent status: users in status %s (%d) cannot be greater than max user quota (%d)",
-				newStatus.String(), ch.counters.GracefullyShuttingDown, ch.maxQuota),
+				newStatus.String(), ch.counters.GracefullyShuttingDown, ch.MaxQuota()),
 			)
 		}
 		ch.counters.GracefullyShuttingDown++
 
 	case Status_TEARDOWN_IN_PROGRESS:
-		if ch.counters.TeardownInProgress >= ch.maxQuota {
+		if ch.counters.TeardownInProgress >= ch.MaxQuota() {
 			panic(fmt.Sprintf(
 				"inconsistent status: users in status %s (%d) cannot be greater than max user quota (%d)",
-				newStatus.String(), ch.counters.TeardownInProgress, ch.maxQuota),
+				newStatus.String(), ch.counters.TeardownInProgress, ch.MaxQuota()),
 			)
 		}
 		ch.counters.TeardownInProgress++
 
 	case Status_STOPPED:
-		if ch.counters.Stopped >= ch.maxQuota {
+		if ch.counters.Stopped >= ch.MaxQuota() {
 			panic(fmt.Sprintf(
 				"inconsistent status: users in status %s (%d) cannot be greater than max user quota (%d)",
-				newStatus.String(), ch.counters.Stopped, ch.maxQuota),
+				newStatus.String(), ch.counters.Stopped, ch.MaxQuota()),
 			)
 		}
 		ch.counters.Stopped++
 
 	case Status_ERROR:
-		if ch.counters.Error >= ch.maxQuota {
+		if ch.counters.Error >= ch.MaxQuota() {
 			panic(fmt.Sprintf(
 				"inconsistent status: users in status %s (%d) cannot be greater than max user quota (%d)",
-				newStatus.String(), ch.counters.Error, ch.maxQuota),
+				newStatus.String(), ch.counters.Error, ch.MaxQuota()),
 			)
 		}
 		ch.counters.Error++
@@ -161,7 +162,7 @@ func (ch *CountersHolder) Counters() *Counters {
 }
 
 func (ch *CountersHolder) MaxQuota() uint64 {
-	return ch.maxQuota
+	return ch.maxQuota.Load()
 }
 
 func (ch *CountersHolder) ActiveUsers() uint64 {
