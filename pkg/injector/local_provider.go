@@ -36,10 +36,15 @@ func (l *LocalProvider) Init(ctx context.Context, spec *viper.Viper) (Roster, er
 		return Roster{}, err
 	}
 
-	l.localAgent = NewLocalAgent(parsedSpec.Workspace, *logger)
 	grpcChannel := &inprocgrpc.Channel{}
+	l.localAgent = NewLocalAgent(parsedSpec.Workspace, *logger, grpcChannel)
+	l.localAgent.SetLogger(*logger)
+	if err := l.localAgent.InitializeFromWorkspace(); err != nil {
+		return Roster{}, err
+	}
+
 	go func() {
-		_ = l.localAgent.ServeLocal(ctx, grpcChannel)
+		_ = l.localAgent.ServeLocal(ctx)
 	}()
 
 	l.localAgentClient = NewLocalClient(grpcChannel)

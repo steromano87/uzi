@@ -45,8 +45,6 @@ func runAgent(cmd *cobra.Command, _ []string) {
 
 	logger.Info().Msg("Starting remote agent")
 
-	agent := injector.NewRemoteAgent(agentId, logger)
-
 	listeningPort, err := cmd.Flags().GetUint16("port")
 	cobra.CheckErr(err)
 
@@ -56,8 +54,11 @@ func runAgent(cmd *cobra.Command, _ []string) {
 
 	grpcServerOpts := make([]grpc.ServerOption, 0)
 	grpcServer := grpc.NewServer(grpcServerOpts...)
+
+	agent := injector.NewRemoteAgent(agentId, logger, grpcServer, tcpListener)
+
 	logger.Info().Msg("Remote injector started, press Ctrl+C to stop it")
-	cobra.CheckErr(agent.ServeRemote(mainCtx, grpcServer, tcpListener))
+	cobra.CheckErr(agent.ServeRemote(mainCtx))
 
 	logger.Info().Msg("Agent stopped")
 }

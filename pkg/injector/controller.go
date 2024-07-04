@@ -53,28 +53,8 @@ func (c *Controller) SetLoadProfile(profile schedule.Profile) {
 	c.profile = profile
 }
 
-func (c *Controller) ParseWorkspace() error {
-	if err := c.workspace.EnsureWorkspace(); err != nil {
-		return err
-	}
-
-	config, err := c.workspace.Configuration()
-	if err != nil {
-		return err
-	}
-	c.config = config
-
-	provider, err := GetProvider(config.Injector.Kind)
-	if err != nil {
-		return err
-	}
-	c.provider = provider
-
-	return nil
-}
-
 func (c *Controller) Serve(ctx context.Context) error {
-	if err := c.initConfig(); err != nil {
+	if err := c.initWorkspace(); err != nil {
 		return err
 	}
 
@@ -94,7 +74,11 @@ func (c *Controller) Serve(ctx context.Context) error {
 	return c.controlErrGroup.Wait()
 }
 
-func (c *Controller) initConfig() error {
+func (c *Controller) initWorkspace() error {
+	if err := c.workspace.EnsureWorkspace(); err != nil {
+		return err
+	}
+
 	config, err := c.workspace.Configuration()
 	if err != nil {
 		return err
@@ -110,7 +94,11 @@ func (c *Controller) initProvider(ctx context.Context) error {
 	}
 
 	c.provider = provider
-	roster, err := c.provider.Init(ctx, c.config.RawInjectorSpec())
+	ctxWithLogger := c.logger.WithContext(ctx)
+
+	rawInjectorSpec := c.config.RawInjectorSpec()
+	rawInjectorSpec.Set("workspace", c.workspace.Location())
+	roster, err := c.provider.Init(ctxWithLogger, rawInjectorSpec)
 	if err != nil {
 		return err
 	}

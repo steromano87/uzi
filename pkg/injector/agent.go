@@ -36,12 +36,13 @@ type Agent struct {
 
 	grpcServer   *grpc.Server
 	grpcServerWG sync.WaitGroup
+	grpcListener net.Listener
 
 	connectedControllerIp   string
 	connectedControllerPort uint16
 }
 
-func NewLocalAgent(workspacePath string, logger zerolog.Logger) *Agent {
+func NewLocalAgent(workspacePath string, logger zerolog.Logger, registrar grpc.ServiceRegistrar) *Agent {
 	agent := new(Agent)
 	agent.id = "local"
 	agent.spawner = syntheticuser.NewSpawner()
@@ -50,18 +51,22 @@ func NewLocalAgent(workspacePath string, logger zerolog.Logger) *Agent {
 	agent.vars = variables.NewHolder()
 
 	agent.SetLogger(logger)
+	agent.Register(registrar)
 
 	return agent
 }
 
-func NewRemoteAgent(id string, logger zerolog.Logger) *Agent {
+func NewRemoteAgent(id string, logger zerolog.Logger, grpcServer *grpc.Server, listener net.Listener) *Agent {
 	agent := new(Agent)
 	agent.id = id
 	agent.spawner = syntheticuser.NewSpawner()
 	agent.vars = variables.NewHolder()
 	agent.workspace = workspace.NewTemp()
+	agent.grpcServer = grpcServer
+	agent.grpcListener = listener
 
 	agent.SetLogger(logger)
+	agent.Register(agent.grpcServer)
 
 	return agent
 }
@@ -82,15 +87,11 @@ func (a *Agent) SetLogger(logger zerolog.Logger) {
 	a.spawner.SetLogger(baseLogger)
 }
 
-func (a *Agent) ServeRemote(ctx context.Context, grpcServer *grpc.Server, listener net.Listener) error {
-	listenerAddr := listener.Addr()
-	a.logger.Info().Str("listener", fmt.Sprintf("%s://%s", listenerAddr.Network(), listenerAddr.String())).Msg("Starting remote agent")
-
+func (a *Agent) ServeRemote(ctx context.Context) error {
 	if err := a.workspace.EnsureWorkspace(); err != nil {
 		a.logger.Error().Err(err).Msg("Cannot start agent, error when setting up workspace")
 	}
-	a.grpcServer = grpcServer
-	a.Register(a.grpcServer)
+
 	a.selfControlCtx, a.selfControlCancelCauseFunc = context.WithCancelCause(ctx)
 	a.spawner.Serve(a.selfControlCtx)
 
@@ -98,19 +99,18 @@ func (a *Agent) ServeRemote(ctx context.Context, grpcServer *grpc.Server, listen
 	a.grpcServerWG.Add(1)
 	defer a.grpcServerWG.Done()
 	a.logger.Info().Msg("Agent started, use Ctrl+C or SIGINT to gracefully stop it")
-	return grpcServer.Serve(listener)
+	return a.grpcServer.Serve(a.grpcListener)
 }
 
-func (a *Agent) ServeLocal(ctx context.Context, cc grpc.ServiceRegistrar) error {
+func (a *Agent) ServeLocal(ctx context.Context) error {
 	a.logger.Info().Msg("Starting local agent")
 	if err := a.workspace.EnsureWorkspace(); err != nil {
 		a.logger.Error().Err(err).Msg("Cannot start agent, error when setting up workspace")
 	}
 
-	a.Register(cc)
 	a.selfControlCtx, a.selfControlCancelCauseFunc = context.WithCancelCause(ctx)
 	a.spawner.Serve(a.selfControlCtx)
-	go a.handleAgentShutdown(true)
+	go a.handleAgentShutdown(false)
 	a.grpcServerWG.Add(1)
 	defer a.grpcServerWG.Done()
 	a.logger.Info().Msg("Local agent started")
@@ -159,6 +159,10 @@ func (a *Agent) InitializeFromArchive(archiveContent []byte, compressionAlgorith
 		return err
 	}
 
+	return a.InitializeFromWorkspace()
+}
+
+func (a *Agent) InitializeFromWorkspace() error {
 	rawPipelineContent, pipelinePath, err := a.workspace.Pipeline()
 	if err != nil {
 		return err
