@@ -57,6 +57,12 @@ func (su *SyntheticUser) runSetup(ctx dsl.Context) error {
 	su.logger.Info().Msg("Starting setup phase")
 	su.SetStatus(Status_SETUP_IN_PROGRESS)
 	if err := su.pipelineToRun.RunSetup(ctx); err != nil {
+		if errors.Is(err, context.Canceled) {
+			su.logger.Warn().AnErr("reason", err).Msg("Forced shutdown requested, stopping pipeline execution")
+			su.SetStatus(Status_STOPPED)
+			return nil
+		}
+
 		su.logger.Error().Err(err).Msg("Encountered an unrecoverable error while running setup steps, stopping pipeline execution")
 		su.SetStatus(Status_ERROR)
 		return err
@@ -85,6 +91,12 @@ func (su *SyntheticUser) runTeardown(ctx dsl.Context) error {
 	su.logger.Info().Msg("Starting teardown phase")
 	su.SetStatus(Status_TEARDOWN_IN_PROGRESS)
 	if err := su.pipelineToRun.RunTeardown(ctx); err != nil {
+		if errors.Is(err, context.Canceled) {
+			su.logger.Warn().AnErr("reason", err).Msg("Forced shutdown requested, stopping pipeline execution")
+			su.SetStatus(Status_STOPPED)
+			return nil
+		}
+
 		su.logger.Error().Err(err).Msg("Encountered an unrecoverable error while running teardown steps, stopping pipeline execution")
 		su.SetStatus(Status_ERROR)
 		return err

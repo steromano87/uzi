@@ -1,7 +1,10 @@
 package syntheticuser
 
+import "sync"
+
 type StatusHolder struct {
 	status            Status
+	statusMutex       sync.RWMutex
 	statusChangeFuncs []StatusChangeFunc
 }
 
@@ -15,10 +18,14 @@ func NewStatusHolder() StatusHolder {
 }
 
 func (sh *StatusHolder) Status() Status {
+	sh.statusMutex.RLock()
+	defer sh.statusMutex.RUnlock()
 	return sh.status
 }
 
 func (sh *StatusHolder) SetStatus(newStatus Status) {
+	sh.statusMutex.Lock()
+	defer sh.statusMutex.Unlock()
 	oldStatus := sh.status
 	sh.status = newStatus
 
