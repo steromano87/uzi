@@ -124,7 +124,7 @@ func (a *Agent) handleAgentShutdown(cleanWorkspaceOnShutdown bool) {
 	case <-a.selfControlCtx.Done():
 		a.logger.Info().AnErr("reason", context.Cause(a.selfControlCtx)).Msg("Requested agent shutdown")
 		defer a.selfControlCancelCauseFunc(context.Canceled)
-		if err := a.spawner.Wait(); err != nil {
+		if err := a.spawner.Wait(); !errors.Is(err, context.Canceled) {
 			a.logger.Error().Err(err).Msg("Encountered an error while waiting for spawner graceful shutdown")
 		} else {
 			a.logger.Info().Msg("Spawner gracefully shut down")
