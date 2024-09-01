@@ -97,7 +97,6 @@ func (a *Agent) ServeRemote(ctx context.Context) error {
 
 	go a.handleAgentShutdown(true)
 	a.grpcServerWG.Add(1)
-	defer a.grpcServerWG.Done()
 	a.logger.Info().Msg("Agent started, use Ctrl+C or SIGINT to gracefully stop it")
 	return a.grpcServer.Serve(a.grpcListener)
 }
@@ -112,10 +111,10 @@ func (a *Agent) ServeLocal(ctx context.Context) error {
 	a.spawner.Serve(a.selfControlCtx)
 	go a.handleAgentShutdown(false)
 	a.grpcServerWG.Add(1)
-	defer a.grpcServerWG.Done()
 	a.logger.Info().Msg("Local agent started")
 
 	a.grpcServerWG.Wait()
+	a.logger.Info().Msg("Local agent stopped")
 	return nil
 }
 
@@ -143,6 +142,8 @@ func (a *Agent) handleAgentShutdown(cleanWorkspaceOnShutdown bool) {
 				a.logger.Info().Msg("Temporary workspace deleted")
 			}
 		}
+
+		a.grpcServerWG.Done()
 	}
 }
 
