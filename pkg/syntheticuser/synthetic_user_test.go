@@ -96,10 +96,10 @@ func (s *SyntheticUserTestSuite) TestStartAndForcedShutdown() {
 	time.Sleep(10 * time.Millisecond)
 	assert.Equal(s.T(), syntheticuser.Status_RUNNING, user.Status())
 
-	s.cancelFunc(pipeline.ErrForcedShutdownRequested)
+	s.cancelFunc(nil)
 	err := <-errChan
 
-	if assert.ErrorIs(s.T(), err, pipeline.ErrForcedShutdownRequested) {
+	if assert.ErrorIs(s.T(), err, context.Canceled) {
 		assert.Equal(s.T(), syntheticuser.Status_STOPPED, user.Status())
 	}
 }

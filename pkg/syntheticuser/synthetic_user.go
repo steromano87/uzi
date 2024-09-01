@@ -12,7 +12,7 @@ import (
 )
 
 type SyntheticUser struct {
-	id            xid.ID
+	id            string
 	pipelineToRun *pipeline.Pipeline
 	logger        zerolog.Logger
 
@@ -21,11 +21,15 @@ type SyntheticUser struct {
 
 func New(pip *pipeline.Pipeline) *SyntheticUser {
 	synthUser := new(SyntheticUser)
-	synthUser.id = xid.New()
+	synthUser.id = xid.New().String()
 	synthUser.pipelineToRun = pip
 	synthUser.StatusHolder = NewStatusHolder()
 
 	return synthUser
+}
+
+func (su *SyntheticUser) SetId(id string) {
+	su.id = id
 }
 
 func (su *SyntheticUser) Run(ctx dsl.Context) error {
@@ -76,7 +80,7 @@ func (su *SyntheticUser) runMainLoop(ctx dsl.Context) error {
 	su.SetStatus(Status_RUNNING)
 	err := su.pipelineToRun.RunMain(ctx)
 	switch {
-	case errors.Is(err, context.Canceled), errors.Is(err, pipeline.ErrForcedShutdownRequested):
+	case errors.Is(err, context.Canceled):
 		su.logger.Warn().AnErr("reason", err).Msg("Forced shutdown requested, stopping pipeline execution")
 		su.SetStatus(Status_STOPPED)
 		return err
@@ -113,9 +117,9 @@ func (su *SyntheticUser) RequestGracefulShutdown() {
 }
 
 func (su *SyntheticUser) Id() string {
-	return su.id.String()
+	return su.id
 }
 
 func (su *SyntheticUser) String() string {
-	return fmt.Sprintf("SyntheticUser[id=%s, status=%s]", su.id.String(), su.status.String())
+	return fmt.Sprintf("SyntheticUser[id=%s, status=%s]", su.id, su.status.String())
 }

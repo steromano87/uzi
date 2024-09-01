@@ -35,7 +35,7 @@ func (p *Pipeline) RunMain(ctx dsl.Context) error {
 		err := p.RunMainOnce(ctx)
 
 		switch {
-		case errors.Is(err, context.Canceled), errors.Is(err, ErrForcedShutdownRequested):
+		case errors.Is(err, context.Canceled):
 			return err
 
 		case err == nil:

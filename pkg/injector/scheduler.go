@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rs/zerolog"
+	harkErrors "github.com/steromano87/harkonnen/v1/pkg/errors"
 	"github.com/steromano87/harkonnen/v1/pkg/injector/schedule"
 	"github.com/steromano87/harkonnen/v1/pkg/log"
 	"github.com/steromano87/harkonnen/v1/pkg/syntheticuser"
@@ -77,7 +78,14 @@ func (s *Scheduler) Serve(ctx context.Context, updateInterval time.Duration) err
 			}
 
 		case <-ctx.Done():
-			s.logger.Warn().Msg("Forced shutdown requested, stopping all active users")
+			switch {
+			case errors.Is(context.Cause(ctx), harkErrors.GracefulShutdownRequested):
+				s.logger.Info().Msg("Early graceful shutdown requested, scaling all users to zero")
+
+			case errors.Is(context.Cause(ctx), context.Canceled), errors.Is(context.Cause(ctx), harkErrors.ForcedShutdownRequested):
+				s.logger.Warn().Msg("Forced shutdown requested, stopping all active users")
+			}
+
 			return s.waitForUsersShutdown(context.TODO())
 		}
 	}

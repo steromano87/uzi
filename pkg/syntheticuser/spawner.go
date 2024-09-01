@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl/pipeline"
+	harkErrors "github.com/steromano87/harkonnen/v1/pkg/errors"
 	"github.com/steromano87/harkonnen/v1/pkg/log"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
@@ -14,7 +15,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -26,13 +29,14 @@ type Holder struct {
 type Spawner struct {
 	UnimplementedSpawnerServer
 
-	syntheticUsers        []Holder
-	syntheticUserErrGroup *errgroup.Group
-	mainCtx               context.Context
-	mainCtxRWMu           sync.RWMutex
+	syntheticUsers          []Holder
+	syntheticUserErrGroup   *errgroup.Group
+	syntheticUserCtx        atomic.Pointer[context.Context]
+	syntheticUserCancelFunc context.CancelFunc
 
-	lastStartedUserIndex int64
-	lastStoppedUserIndex int64
+	reconcileMu          sync.Mutex
+	lastStartedUserIndex atomic.Int64
+	lastStoppedUserIndex atomic.Int64
 	pipelineToRun        *pipeline.Pipeline
 	*CountersHolder
 
@@ -48,6 +52,9 @@ func NewSpawner() *Spawner {
 
 	spawner.CountersHolder = NewCountersHolder(0)
 	spawner.syntheticUserErrGroup = new(errgroup.Group)
+	var ctx context.Context
+	ctx, spawner.syntheticUserCancelFunc = context.WithCancel(context.Background())
+	spawner.syntheticUserCtx.Store(&ctx)
 
 	spawner.SetLogger(zerolog.Nop())
 	spawner.Vars = variables.NewHolder()
@@ -72,13 +79,14 @@ func (s *Spawner) SetMaxSynthUserQuota(maxSynthUserQuota uint64) error {
 
 	for i := range s.syntheticUsers {
 		synthUser := New(s.pipelineToRun.Clone())
+		synthUser.SetId(strconv.Itoa(i))
 		synthUser.RegisterStatusChangeFunc(s.OnStatusChangeCallback)
 		s.syntheticUsers[i] = Holder{user: synthUser}
 		s.Counters().Ready++
 	}
 
-	s.lastStartedUserIndex = -1
-	s.lastStoppedUserIndex = -1
+	s.lastStartedUserIndex.Store(-1)
+	s.lastStoppedUserIndex.Store(-1)
 
 	return nil
 }
@@ -89,19 +97,26 @@ func (s *Spawner) SetLogger(logger zerolog.Logger) {
 }
 
 func (s *Spawner) Serve(ctx context.Context) {
-	s.mainCtxRWMu.Lock()
-	defer s.mainCtxRWMu.Unlock()
-	s.mainCtx = ctx
-
 	go func() {
 		select {
-		case <-s.mainCtx.Done():
+		case <-ctx.Done():
 			if s.ActiveUsers() == 0 {
 				s.mainLogger.Info().Msg("No active users running, exiting...")
 				return
 			}
 
-			s.mainLogger.Info().AnErr("reason", context.Cause(s.mainCtx)).Msg("Stopping all running synthetic users")
+			switch {
+			case errors.Is(context.Cause(ctx), harkErrors.GracefulShutdownRequested):
+				s.mainLogger.Info().Msg("Graceful shutdown requested, scaling all synthetic users to zero")
+				if err := s.ReconcileActiveUsers(0); err != nil {
+					s.mainLogger.Error().Err(err).Msg("Error while scaling all synthetic users to zero")
+				}
+
+			case errors.Is(context.Cause(ctx), context.Canceled), errors.Is(context.Cause(ctx), harkErrors.ForcedShutdownRequested):
+				s.mainLogger.Warn().AnErr("reason", context.Cause(ctx)).Msg("Forced shutdown requested, stopping all running synthetic users")
+				s.syntheticUserCancelFunc()
+			}
+
 			err := s.syntheticUserErrGroup.Wait()
 			s.mainLogger.Info().AnErr("userErrors", err).Msg("All synthetic users have been stopped")
 			return
@@ -110,6 +125,8 @@ func (s *Spawner) Serve(ctx context.Context) {
 }
 
 func (s *Spawner) ReconcileActiveUsers(requestedUsers uint64) error {
+	s.reconcileMu.Lock()
+	defer s.reconcileMu.Unlock()
 	if s.CountersHolder == nil {
 		return errors.New("cannot set active users because they have not been initialized yet")
 	}
@@ -119,10 +136,16 @@ func (s *Spawner) ReconcileActiveUsers(requestedUsers uint64) error {
 	}
 
 	if requestedUsers > s.ActiveUsers() {
+		s.mainLogger.Info().Uint64(
+			"activeUsers", s.ActiveUsers(),
+		).Uint64("requestedUsers", requestedUsers).Msg("Requested users scale up")
 		return s.scaleUpActiveUsers(requestedUsers)
 	}
 
 	if requestedUsers < s.ActiveUsers() {
+		s.mainLogger.Info().Uint64(
+			"activeUsers", s.ActiveUsers(),
+		).Uint64("requestedUsers", requestedUsers).Msg("Requested users scale down")
 		return s.scaleDownActiveUsers(requestedUsers)
 	}
 
@@ -131,26 +154,25 @@ func (s *Spawner) ReconcileActiveUsers(requestedUsers uint64) error {
 
 func (s *Spawner) scaleUpActiveUsers(requestedUsers uint64) error {
 	usersToStart := requestedUsers - s.ActiveUsers()
-	s.mainCtxRWMu.RLock()
-	defer s.mainCtxRWMu.RUnlock()
 
 	for usersToStart > 0 {
-		s.lastStartedUserIndex++
+		s.lastStartedUserIndex.Add(1)
 
 		// Create a new DSL context for every user
-		ctx, cancelFunc := dsl.NewContext(s.mainCtx)
+		mainCtx := s.syntheticUserCtx.Load()
+		ctx, cancelFunc := dsl.NewContext(*mainCtx)
 		ctx.Logger = &s.syntheticUsersLogger
 		ctx.Vars = s.Vars
 		ctx.Config = s.Config
 
-		s.syntheticUsers[s.lastStartedUserIndex].cancelFunc = cancelFunc
+		s.syntheticUsers[s.lastStartedUserIndex.Load()].cancelFunc = cancelFunc
 		s.syntheticUserErrGroup.Go(
 			func() error {
-				return s.syntheticUsers[s.lastStartedUserIndex].user.Run(ctx)
+				return s.syntheticUsers[s.lastStartedUserIndex.Load()].user.Run(ctx)
 			},
 		)
 		s.mainLogger.Info().Str(
-			"syntheticUserId", s.syntheticUsers[s.lastStartedUserIndex].user.Id(),
+			"syntheticUserId", s.syntheticUsers[s.lastStartedUserIndex.Load()].user.Id(),
 		).Msg("Synthetic user started")
 		usersToStart--
 		time.Sleep(5 * time.Millisecond)
@@ -163,10 +185,10 @@ func (s *Spawner) scaleDownActiveUsers(requestedUsers uint64) error {
 	usersToStop := s.ActiveUsers() - requestedUsers
 
 	for usersToStop > 0 {
-		s.lastStoppedUserIndex++
-		s.syntheticUsers[s.lastStoppedUserIndex].user.RequestGracefulShutdown()
+		s.lastStoppedUserIndex.Add(1)
+		s.syntheticUsers[s.lastStoppedUserIndex.Load()].user.RequestGracefulShutdown()
 		s.mainLogger.Info().Str(
-			"syntheticUserId", s.syntheticUsers[s.lastStoppedUserIndex].user.Id(),
+			"syntheticUserId", s.syntheticUsers[s.lastStoppedUserIndex.Load()].user.Id(),
 		).Msg("Requested synthetic user graceful shutdown")
 		usersToStop--
 		time.Sleep(5 * time.Millisecond)

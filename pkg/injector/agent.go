@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl/pipeline"
+	harkErrors "github.com/steromano87/harkonnen/v1/pkg/errors"
 	"github.com/steromano87/harkonnen/v1/pkg/log"
 	"github.com/steromano87/harkonnen/v1/pkg/syntheticuser"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
@@ -198,6 +199,7 @@ func (a *Agent) CleanUp() error {
 func (a *Agent) Register(registrar grpc.ServiceRegistrar) {
 	syntheticuser.RegisterSpawnerServer(registrar, a)
 	workspace.RegisterWorkspaceServer(registrar, a)
+	RegisterAgentServer(registrar, a)
 }
 
 // Spawner service facade
@@ -283,7 +285,7 @@ func (a *Agent) Shutdown(requestCtx context.Context, request *ShutdownRequest) (
 
 	shutdownCtx, shutdownCancelFunc := context.WithTimeout(requestCtx, shutdownTimeout)
 	defer shutdownCancelFunc()
-	a.selfControlCancelCauseFunc(errors.New("remote shutdown"))
+	a.selfControlCancelCauseFunc(harkErrors.GracefulShutdownRequested)
 
 	waitChan := make(chan struct{})
 	go func() {

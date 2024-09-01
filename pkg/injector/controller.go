@@ -71,7 +71,23 @@ func (c *Controller) Serve(ctx context.Context) error {
 		return c.scheduler.Serve(ctx, c.config.Controller.Scheduler.UpdateInterval)
 	})
 
-	return c.controlErrGroup.Wait()
+	// Wait for scheduler shutdown before starting the teardown phase
+	if err := c.controlErrGroup.Wait(); err != nil {
+		c.logger.Error().Err(err).Msg("Encountered an error during runtime")
+		return err
+	}
+
+	// Create another context with timeout for shutting down the provider, otherwise the shutdown call
+	// is immediately aborted because parent context has already been canceled
+	tearDownCtx, tearDownCancelFunc := context.WithTimeout(context.TODO(), c.config.Controller.ShutdownTimeout)
+	defer tearDownCancelFunc()
+
+	if err := c.provider.TearDown(tearDownCtx); err != nil {
+		c.logger.Error().Err(err).Msg("Encountered an error during provider teardown phase")
+		return err
+	}
+
+	return nil
 }
 
 func (c *Controller) initWorkspace() error {

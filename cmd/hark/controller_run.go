@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"github.com/spf13/cobra"
+	"github.com/steromano87/harkonnen/v1/pkg/errors"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
 	"os"
 	"os/signal"
@@ -20,11 +21,30 @@ var controllerRunCmd = &cobra.Command{
 	Run:   runControllerRunCmd,
 }
 
-func runControllerRunCmd(cmd *cobra.Command, args []string) {
-	mainCtx, cancelFunc := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancelFunc()
+func runControllerRunCmd(_ *cobra.Command, _ []string) {
+	sigtermChan := make(chan os.Signal, 2)
+	sigtermCount := 0
+	signal.Notify(sigtermChan, os.Interrupt, syscall.SIGTERM)
+	mainCtx, cancelFunc := context.WithCancelCause(context.Background())
+	defer cancelFunc(nil)
 
 	logger := setupDefaultLogger()
+
+	go func() {
+		for {
+			select {
+			case <-sigtermChan:
+				sigtermCount++
+				if sigtermCount == 1 {
+					logger.Info().Msg("Graceful shutdown requested, press again Ctrl+C to forcefully stop")
+					cancelFunc(errors.GracefulShutdownRequested)
+				} else {
+					logger.Warn().Msg("Forced shutdown requested, stopping everything")
+					cancelFunc(errors.ForcedShutdownRequested)
+				}
+			}
+		}
+	}()
 
 	logger.Info().Msg("Starting controller")
 	controller := injector.NewController(workspacePath, logger)
