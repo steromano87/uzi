@@ -8,7 +8,8 @@ const (
 )
 
 type ControllerConfiguration struct {
-	Scheduler SchedulerConfiguration
+	ShutdownTimeout time.Duration
+	Scheduler       SchedulerConfiguration
 }
 
 type InjectorConfiguration struct {

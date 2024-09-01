@@ -27,6 +27,7 @@ logging:
   level: info
 
 controller:
+  shutdownTimeout: 30s
   scheduler:
     updateInterval: 2s
 
