@@ -77,6 +77,7 @@ func (s *Scheduler) Serve(ctx context.Context, updateInterval time.Duration) err
 			}
 
 		case <-ctx.Done():
+			s.logger.Warn().Msg("Forced shutdown requested, stopping all active users")
 			return s.waitForUsersShutdown(context.TODO())
 		}
 	}
