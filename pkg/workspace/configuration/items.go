@@ -32,6 +32,10 @@ type LoggingConfiguration struct {
 	Level string
 }
 
+type ClientConfiguration struct {
+	Rest Rest
+}
+
 type Rest struct {
 	Timeout                   time.Duration
 	BaseUrl                   string

@@ -31,20 +31,6 @@ controller:
   scheduler:
     updateInterval: 2s
 
-rest:
-  timeout: 30s
-  baseUrl: ""
-  followRedirects: true
-  keepCookies: true
-  idleConnectionTimeout: 10s
-  tlsHandshakeTimeout: 10s
-  responseHeaderTimeout: 10s
-  maxIdleConnections: 100
-  maxConnectionsPerHost: 100
-  maxIdleConnectionsPerHost: 100
-  enableKeepAlive: true
-  enableCompression: true
-
 heartbeat:
   interval: 10s
   timeout: 15s
@@ -58,3 +44,19 @@ telemetry:
     bufferCapacity: 512
     pollInterval: 15s
     measureInterval: 250ms
+
+# Client configurations
+client:
+  rest:
+    timeout: 30s
+    baseUrl: ""
+    followRedirects: true
+    keepCookies: true
+    idleConnectionTimeout: 10s
+    tlsHandshakeTimeout: 10s
+    responseHeaderTimeout: 10s
+    maxIdleConnections: 100
+    maxConnectionsPerHost: 100
+    maxIdleConnectionsPerHost: 100
+    enableKeepAlive: true
+    enableCompression: true

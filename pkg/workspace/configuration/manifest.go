@@ -28,10 +28,6 @@ type Manifest struct {
 	Telemetry        TelemetryConfiguration
 }
 
-type ClientConfiguration struct {
-	Rest Rest
-}
-
 func New(configFile string) (*Manifest, error) {
 	config := MustNewDefault()
 
