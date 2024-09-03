@@ -21,25 +21,31 @@ import (
 // Mocked telemetry sinks for test //
 /////////////////////////////////////
 
-type TestLoadMetricsSaver struct {
+type TestLoadMetricsStorer struct {
 	Samples      []*telemetry.Sample
 	Transactions []*telemetry.Transaction
 }
 
-func NewTestLoadMetricsSaver() *TestLoadMetricsSaver {
-	tsms := new(TestLoadMetricsSaver)
-	tsms.Samples = make([]*telemetry.Sample, 0)
-	tsms.Transactions = make([]*telemetry.Transaction, 0)
+func NewTestLoadMetricsStorer() *TestLoadMetricsStorer {
+	storer := new(TestLoadMetricsStorer)
+	storer.Samples = make([]*telemetry.Sample, 0)
+	storer.Transactions = make([]*telemetry.Transaction, 0)
 
-	return tsms
+	return storer
 }
 
-func (tsms *TestLoadMetricsSaver) SaveSample(sample *telemetry.Sample) {
-	tsms.Samples = append(tsms.Samples, sample)
+func (s *TestLoadMetricsStorer) StoreSample(sample *telemetry.Sample) error {
+	s.Samples = append(s.Samples, sample)
+	return nil
 }
 
-func (tsms *TestLoadMetricsSaver) SaveTransaction(transaction *telemetry.Transaction) {
-	tsms.Transactions = append(tsms.Transactions, transaction)
+func (s *TestLoadMetricsStorer) StoreTransaction(transaction *telemetry.Transaction) error {
+	s.Transactions = append(s.Transactions, transaction)
+	return nil
+}
+
+func (s *TestLoadMetricsStorer) StoreIterationCounters(_ *telemetry.IterationCounters) error {
+	return nil
 }
 
 ////////////////
@@ -48,10 +54,10 @@ func (tsms *TestLoadMetricsSaver) SaveTransaction(transaction *telemetry.Transac
 
 type ClientTestSuite struct {
 	suite.Suite
-	ctx              dsl.Context
-	cancelFunc       context.CancelCauseFunc
-	logger           zerolog.Logger
-	loadMetricsSaver *TestLoadMetricsSaver
+	ctx               dsl.Context
+	cancelFunc        context.CancelCauseFunc
+	logger            zerolog.Logger
+	loadMetricsStorer *TestLoadMetricsStorer
 
 	client     *rest2.Client
 	testServer *httptest.Server
@@ -63,10 +69,10 @@ func (s *ClientTestSuite) SetupTest() {
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
 	s.logger = zerolog.New(consoleWriter).With().Timestamp().Logger()
 
-	s.loadMetricsSaver = NewTestLoadMetricsSaver()
+	s.loadMetricsStorer = NewTestLoadMetricsStorer()
 
 	s.ctx, s.cancelFunc = dsl.NewContext(context.TODO())
-	s.ctx.LoadMetricsSaver = s.loadMetricsSaver
+	s.ctx.LoadMetricsStorer = s.loadMetricsStorer
 
 	s.client = rest2.NewClient(s.ctx)
 
@@ -117,7 +123,7 @@ func (s *ClientTestSuite) TestGetRequest() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.loadMetricsSaver.Samples
+		samples := s.loadMetricsStorer.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -157,7 +163,7 @@ func (s *ClientTestSuite) TestGetRequestWithQueryString() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.loadMetricsSaver.Samples
+		samples := s.loadMetricsStorer.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -192,7 +198,7 @@ func (s *ClientTestSuite) TestPostNoBody() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.loadMetricsSaver.Samples
+		samples := s.loadMetricsStorer.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -227,7 +233,7 @@ func (s *ClientTestSuite) TestPutNoBody() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.loadMetricsSaver.Samples
+		samples := s.loadMetricsStorer.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -262,7 +268,7 @@ func (s *ClientTestSuite) TestPatchNoBody() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.loadMetricsSaver.Samples
+		samples := s.loadMetricsStorer.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -297,7 +303,7 @@ func (s *ClientTestSuite) TestDeleteNoBody() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.loadMetricsSaver.Samples
+		samples := s.loadMetricsStorer.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -332,7 +338,7 @@ func (s *ClientTestSuite) TestHeadNoBody() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.loadMetricsSaver.Samples
+		samples := s.loadMetricsStorer.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -364,7 +370,7 @@ func (s *ClientTestSuite) TestOptionsNoBody() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.loadMetricsSaver.Samples
+		samples := s.loadMetricsStorer.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -403,7 +409,7 @@ func (s *ClientTestSuite) TestPostFormRequest() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.loadMetricsSaver.Samples
+		samples := s.loadMetricsStorer.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -475,7 +481,7 @@ func (s *ClientTestSuite) TestRequestWithRedirect_WithoutRedirectSetting() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.loadMetricsSaver.Samples
+		samples := s.loadMetricsStorer.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]
@@ -514,7 +520,7 @@ func (s *ClientTestSuite) TestRequestWithRedirect_WithRedirectSetting() {
 	err := s.client.Execute(request)
 
 	if assert.NoError(s.T(), err) {
-		samples := s.loadMetricsSaver.Samples
+		samples := s.loadMetricsStorer.Samples
 
 		if assert.Len(s.T(), samples, 1) {
 			sample := samples[0]

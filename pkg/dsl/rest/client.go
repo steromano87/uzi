@@ -107,7 +107,9 @@ func (c *Client) Execute(request Request) error {
 		},
 	}
 
-	c.ctx.SaveSample(requestSample)
+	if err := c.ctx.StoreSample(requestSample); err != nil {
+		c.ctx.Logger.Error().Err(err).Msg("Encountered an error while storing sample")
+	}
 
 	return c.saveLastResponse(response)
 }

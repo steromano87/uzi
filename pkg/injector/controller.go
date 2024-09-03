@@ -5,7 +5,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/injector/schedule"
 	"github.com/steromano87/harkonnen/v1/pkg/log"
-	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 	"github.com/steromano87/harkonnen/v1/pkg/workspace"
 	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
@@ -24,10 +23,6 @@ type Controller struct {
 	roster    Roster
 	scheduler Scheduler
 	profile   schedule.Profile
-
-	telemetry.LoadMetricsServer
-	telemetry.LogServer
-	telemetry.HostMetricsServer
 
 	controlErrGroup errgroup.Group
 }
