@@ -57,10 +57,21 @@ type SchedulerConfiguration struct {
 }
 
 type TelemetryConfiguration struct {
-	HostMetrics HostMetrics
+	LoadMetrics LoadMetricsConfiguration
+	Logs        LogsConfiguration
+	HostMetrics HostMetricsConfiguration
 }
 
-type HostMetrics struct {
+type LoadMetricsConfiguration struct {
+	BufferCapacity uint
+}
+
+type LogsConfiguration struct {
+	BufferCapacity uint
+}
+
+type HostMetricsConfiguration struct {
+	BufferCapacity  uint
 	PollInterval    time.Duration
 	MeasureInterval time.Duration
 }

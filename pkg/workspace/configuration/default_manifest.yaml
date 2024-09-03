@@ -50,6 +50,11 @@ heartbeat:
   timeout: 15s
 
 telemetry:
+  loadMetrics:
+    bufferCapacity: 512
+  logs:
+    bufferCapacity: 512
   hostMetrics:
+    bufferCapacity: 512
     pollInterval: 15s
     measureInterval: 250ms
