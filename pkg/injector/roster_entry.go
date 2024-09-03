@@ -1,9 +1,14 @@
 package injector
 
+import "github.com/steromano87/harkonnen/v1/pkg/telemetry"
+
 type RosterEntry struct {
 	weight uint
-	Client
 	status Status
+
+	Client
+	telemetry.MetricsClient
+	telemetry.LogsClient
 }
 
 func (re RosterEntry) Status() Status {

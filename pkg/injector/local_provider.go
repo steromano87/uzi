@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 	"github.com/steromano87/harkonnen/v1/pkg/log"
+	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"time"
 )
@@ -59,9 +60,11 @@ func (l *LocalProvider) Init(ctx context.Context, spec *viper.Viper) (Roster, er
 	l.localAgentClient = NewLocalClient(grpcChannel)
 	roster := NewRoster()
 	roster.Put("local", RosterEntry{
-		weight: 1,
-		Client: l.localAgentClient,
-		status: Status_AVAILABLE,
+		weight:        1,
+		status:        Status_AVAILABLE,
+		Client:        l.localAgentClient,
+		MetricsClient: telemetry.NewMetricsClient(grpcChannel),
+		LogsClient:    telemetry.NewLogsClient(grpcChannel),
 	})
 	l.localLogger.Info().Msg("Local agent started")
 
