@@ -10,10 +10,10 @@ func init() {
 }
 
 type Transaction struct {
-	Name            string `gorm:"primaryKey"`
-	Iteration       uint   `gorm:"primaryKey"`
-	AgentId         string `gorm:"index:agent_user"`
-	SyntheticUserId string `gorm:"index:agent_user"`
+	Id              uint   `gorm:"primaryKey;autoincrement"`
+	Name            string `gorm:"index:idx_transaction_name"`
+	AgentId         string `gorm:"index:idx_transaction_agent_user"`
+	SyntheticUserId string `gorm:"index:idx_transaction_agent_user"`
 	Start           datatypes.Date
 	End             datatypes.Date
 	Duration        time.Duration
