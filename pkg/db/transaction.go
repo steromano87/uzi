@@ -2,6 +2,7 @@ package db
 
 import (
 	"gorm.io/datatypes"
+	"time"
 )
 
 func init() {
@@ -9,10 +10,12 @@ func init() {
 }
 
 type Transaction struct {
-	Name      string `gorm:"primaryKey"`
-	Iteration uint   `gorm:"primaryKey"`
-	Origin    string `gorm:"index"`
-	Started   datatypes.Date
-	Ended     datatypes.Date
-	Passed    bool `gorm:"index"`
+	Name            string `gorm:"primaryKey"`
+	Iteration       uint   `gorm:"primaryKey"`
+	AgentId         string `gorm:"index:agent_user"`
+	SyntheticUserId string `gorm:"index:agent_user"`
+	Start           datatypes.Date
+	End             datatypes.Date
+	Duration        time.Duration
+	Successful      bool `gorm:"index"`
 }

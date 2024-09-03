@@ -13,14 +13,16 @@ func init() {
 }
 
 type Sample struct {
-	ID            uint           `gorm:"primaryKey;autoincrement"`
-	Timestamp     datatypes.Date `gorm:"index"`
-	Kind          string
-	Name          string
-	Duration      time.Duration
-	SentBytes     uint64
-	ReceivedBytes uint64
-	Data          any `gorm:"serializer:json"`
+	Id              uint           `gorm:"primaryKey;autoincrement"`
+	Timestamp       datatypes.Date `gorm:"index"`
+	AgentId         string         `gorm:"index:agent_user"`
+	SyntheticUserId string         `gorm:"index:agent_user"`
+	Kind            string
+	Name            string
+	Duration        time.Duration
+	SentBytes       uint64
+	ReceivedBytes   uint64
+	Data            any `gorm:"serializer:json"`
 }
 
 func (s Sample) Hash() (uint64, error) {
