@@ -1,0 +1,106 @@
+syntax = "proto3";
+package telemetry;
+option go_package = "github.com/steromano87/harkonnen/v1/pkg/telemetry";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
+
+service Metrics {
+  rpc GetSamples(SampleStreamRequest) returns (stream Sample) {}
+  rpc GetTransactions(TransactionStreamRequest) returns (stream Transaction) {}
+  rpc GetIterationCounters(IterationCountersStreamRequest) returns (stream IterationCounters) {}
+  rpc GetHostMetrics(HostMetricsStreamRequest) returns (stream HostMetrics) {}
+}
+
+//////////////////////////////////////////
+
+message SampleStreamRequest {
+  google.protobuf.Empty _ = 1;
+}
+
+message Sample {
+  google.protobuf.Timestamp timestamp = 1;
+  string synthetic_user_id = 2;
+  google.protobuf.Duration duration = 3;
+
+  string name = 4;
+  uint64 sent_bytes = 5;
+  uint64 received_bytes = 6;
+  string kind = 7;
+
+  oneof sample_data {
+    Rest rest = 100;
+  }
+
+  message Rest {
+    string url = 1;
+    string query_string = 2;
+    string method = 3;
+    bool is_redirect = 4;
+    string final_url = 5;
+  }
+}
+
+//////////////////////////////////////////
+
+message TransactionStreamRequest {
+  google.protobuf.Empty _ = 1;
+}
+
+message Transaction {
+  string synthetic_user_id = 1;
+
+  string name = 2;
+  google.protobuf.Timestamp start = 3;
+  google.protobuf.Timestamp end = 4;
+  google.protobuf.Duration duration = 5;
+  bool successful = 6;
+}
+
+//////////////////////////////////////////
+
+message IterationCountersStreamRequest {
+  google.protobuf.Empty _ = 1;
+}
+
+message IterationCounters {
+  google.protobuf.Timestamp timestamp = 1;
+  string synthetic_user_id = 2;
+
+  uint64 completed = 3;
+  uint64 in_progress = 4;
+  uint64 passed = 5;
+  uint64 failed = 6;
+}
+
+//////////////////////////////////////////
+
+message HostMetricsStreamRequest {
+  google.protobuf.Empty _ = 1;
+}
+
+message HostMetrics {
+  google.protobuf.Timestamp timestamp = 1;
+
+  double cpu = 2;
+  Memory memory = 3;
+  Storage storage = 4;
+  Network network = 5;
+
+
+  message Memory {
+    uint64 total = 1;
+    uint64 used = 2;
+  }
+
+  message Storage {
+    uint64 total = 1;
+    uint64 used = 2;
+  }
+
+  message Network {
+    double up_speed = 1;
+    double down_speed = 2;
+  }
+}

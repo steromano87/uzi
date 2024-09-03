@@ -1,0 +1,19 @@
+syntax = "proto3";
+package telemetry;
+option go_package = "github.com/steromano87/harkonnen/v1/pkg/telemetry";
+
+import "google/protobuf/empty.proto";
+
+service Logs {
+  rpc GetLogEntries(LogEntriesStreamRequest) returns (stream LogEntry) {}
+}
+
+//////////////////////////////////////////
+
+message LogEntriesStreamRequest {
+  google.protobuf.Empty _ = 1;
+}
+
+message LogEntry {
+  bytes rawData = 1;
+}
