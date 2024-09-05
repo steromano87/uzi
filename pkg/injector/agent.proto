@@ -37,8 +37,8 @@ message StatusResponse {
 }
 
 enum Status {
-  AVAILABLE = 0;
-  ATTACHED = 1;
-  READY = 2;
-  RUNNING = 3;
+  STARTING = 0;
+  READY = 1;
+  BUSY = 2;
+  STOPPING = 3;
 }

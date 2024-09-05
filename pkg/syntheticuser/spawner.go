@@ -9,6 +9,7 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/dsl/pipeline"
 	harkErrors "github.com/steromano87/harkonnen/v1/pkg/errors"
 	"github.com/steromano87/harkonnen/v1/pkg/log"
+	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
 	"golang.org/x/sync/errgroup"
@@ -44,6 +45,7 @@ type Spawner struct {
 
 	mainLogger           zerolog.Logger
 	syntheticUsersLogger zerolog.Logger
+	TelemetryServer      *telemetry.Server
 	Vars                 *variables.Holder
 	Config               *configuration.Manifest
 }
@@ -95,7 +97,7 @@ func (s *Spawner) SetMaxSynthUserQuota(maxSynthUserQuota uint64) error {
 
 func (s *Spawner) SetLogger(logger zerolog.Logger) {
 	s.syntheticUsersLogger = logger
-	s.mainLogger = logger.With().Str(log.ComponentKey, "Spawner").Logger()
+	s.mainLogger = logger.With().Str(log.ComponentKey, "spawner").Logger()
 }
 
 func (s *Spawner) Serve(ctx context.Context) {
@@ -168,6 +170,7 @@ func (s *Spawner) scaleUpActiveUsers(requestedUsers uint64) error {
 		mainCtx := s.syntheticUserCtx.Load()
 		ctx, cancelFunc := dsl.NewContext(*mainCtx)
 		ctx.Logger = &s.syntheticUsersLogger
+		ctx.LoadMetricsStorer = s.TelemetryServer
 		ctx.Vars = s.Vars
 		ctx.Config = s.Config
 

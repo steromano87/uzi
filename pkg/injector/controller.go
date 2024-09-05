@@ -62,6 +62,13 @@ func (c *Controller) Serve(ctx context.Context) error {
 		return err
 	}
 
+	// Start one goroutine to collect metricsClient for every roster entry
+	c.roster.Each(func(key string, entry RosterEntry) {
+		c.controlErrGroup.Go(func() error {
+			return entry.ReadSamples(ctxWithLogger)
+		})
+	})
+
 	c.controlErrGroup.Go(func() error {
 		return c.scheduler.Serve(ctx, c.config.Controller.Scheduler.UpdateInterval)
 	})

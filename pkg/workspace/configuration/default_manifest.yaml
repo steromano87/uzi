@@ -21,7 +21,9 @@ load:
 injector:
   kind: local
   spec:
+    startTimeout: 15s
     shutdownTimeout: 2m
+    startupStatusPollInterval: 500ms
 
 logging:
   level: info

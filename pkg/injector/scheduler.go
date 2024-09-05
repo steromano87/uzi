@@ -42,12 +42,12 @@ func (s *Scheduler) InitSyntheticUsers(ctx context.Context) error {
 	for agentId, quota := range maxUsersQuotas {
 		currentUser, ok := s.roster.Get(agentId)
 		if !ok {
-			return errors.New("cannot find agent with ID " + agentId)
+			return errors.New("cannot find agentClient with ID " + agentId)
 		}
 		request := &syntheticuser.MaxSyntheticUsersQuotaRequest{NewQuota: quota}
-		_, err := currentUser.Client.SetMaxSyntheticUsersQuota(ctx, request)
+		_, err := currentUser.spawnerClient.SetMaxSyntheticUsersQuota(ctx, request)
 		if err != nil {
-			return errors.New(fmt.Sprintf("cannot initialize synthetic users for agent %s: %s", agentId, err.Error()))
+			return errors.New(fmt.Sprintf("cannot initialize synthetic users for agentClient %s: %s", agentId, err.Error()))
 		}
 	}
 
@@ -95,13 +95,13 @@ func (s *Scheduler) updateActiveUsers(ctx context.Context, quotas map[string]uin
 	for agentId, quota := range quotas {
 		currentUser, ok := s.roster.Get(agentId)
 		if !ok {
-			return errors.New("cannot find agent with ID " + agentId)
+			return errors.New("cannot find agentClient with ID " + agentId)
 		}
 
 		request := &syntheticuser.ActiveSyntheticUsersRequest{DesiredActiveSyntheticUsers: quota}
-		response, err := currentUser.Client.SetActiveSyntheticUsers(ctx, request)
+		response, err := currentUser.spawnerClient.SetActiveSyntheticUsers(ctx, request)
 		if err != nil {
-			return errors.New(fmt.Sprintf("error while updating running users for agent %s: %s", agentId, err.Error()))
+			return errors.New(fmt.Sprintf("error while updating running users for agentClient %s: %s", agentId, err.Error()))
 		}
 
 		s.logger.Debug().Uint64(
@@ -136,9 +136,9 @@ func (s *Scheduler) waitForUsersShutdown(ctx context.Context) error {
 		default:
 			var totalNonStoppedUsers uint64
 			s.roster.Each(func(agentId string, entry RosterEntry) {
-				activeUsersResponse, err := entry.Client.GetSyntheticUserCounters(ctx, &emptypb.Empty{})
+				activeUsersResponse, err := entry.SpawnerClient().GetSyntheticUserCounters(ctx, &emptypb.Empty{})
 				if err != nil {
-					s.logger.Error().Err(err).Str("agentId", agentId).Msg("cannot get synthetic user counters, skipping to next agent")
+					s.logger.Error().Err(err).Str("agentId", agentId).Msg("cannot get synthetic user counters, skipping to next agentClient")
 				}
 				totalNonStoppedUsers += activeUsersResponse.GetSetupInProgress() +
 					activeUsersResponse.GetRunning() +

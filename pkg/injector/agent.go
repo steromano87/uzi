@@ -9,12 +9,12 @@ import (
 	harkErrors "github.com/steromano87/harkonnen/v1/pkg/errors"
 	"github.com/steromano87/harkonnen/v1/pkg/log"
 	"github.com/steromano87/harkonnen/v1/pkg/syntheticuser"
+	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 	"github.com/steromano87/harkonnen/v1/pkg/version"
 	"github.com/steromano87/harkonnen/v1/pkg/workspace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"net"
@@ -24,23 +24,26 @@ import (
 type Agent struct {
 	syntheticuser.UnimplementedSpawnerServer
 	workspace.UnimplementedWorkspaceServer
+	telemetry.UnimplementedMetricsServer
+	telemetry.UnimplementedLogsServer
 	UnimplementedAgentServer
 
-	id        string
-	spawner   *syntheticuser.Spawner
-	logger    zerolog.Logger
-	vars      *variables.Holder
-	workspace workspace.Workspace
+	id              string
+	spawner         *syntheticuser.Spawner
+	telemetryServer *telemetry.Server
+	logger          zerolog.Logger
+	vars            *variables.Holder
+	workspace       workspace.Workspace
 
 	selfControlCtx             context.Context
 	selfControlCancelCauseFunc context.CancelCauseFunc
 
+	status   Status
+	statusMu sync.RWMutex
+
 	grpcServer   *grpc.Server
 	grpcServerWG sync.WaitGroup
 	grpcListener net.Listener
-
-	connectedControllerIp   string
-	connectedControllerPort uint16
 }
 
 func NewLocalAgent(workspacePath string, logger zerolog.Logger, registrar grpc.ServiceRegistrar) *Agent {
@@ -48,8 +51,9 @@ func NewLocalAgent(workspacePath string, logger zerolog.Logger, registrar grpc.S
 	agent.id = "local"
 	agent.spawner = syntheticuser.NewSpawner()
 	agent.workspace = workspace.New(workspacePath)
-	// TODO: add retrieval of config and vars from workspace
+	// TODO: add retrieval of config and vars from workspaceClient
 	agent.vars = variables.NewHolder()
+	agent.setStatus(Status_STARTING)
 
 	agent.SetLogger(logger)
 	agent.Register(registrar)
@@ -82,55 +86,72 @@ func (a *Agent) Workspace() workspace.Workspace {
 
 func (a *Agent) SetLogger(logger zerolog.Logger) {
 	baseLogger := logger.With().Str(log.AgentId, a.id).Logger()
-	a.logger = baseLogger.With().Str(log.ComponentKey, "Agent").Logger()
+	a.logger = baseLogger.With().Str(log.ComponentKey, "agentClient").Logger()
 
 	a.workspace.SetLogger(baseLogger)
 	a.spawner.SetLogger(baseLogger)
 }
 
+func (a *Agent) setStatus(status Status) {
+	a.statusMu.Lock()
+	defer a.statusMu.Unlock()
+	a.status = status
+}
+
 func (a *Agent) ServeRemote(ctx context.Context) error {
+	a.setStatus(Status_STARTING)
 	if err := a.workspace.EnsureWorkspace(); err != nil {
-		a.logger.Error().Err(err).Msg("Cannot start agent, error when setting up workspace")
+		a.logger.Error().Err(err).Msg("Cannot start agentClient, error when setting up workspaceClient")
 	}
 
 	a.selfControlCtx, a.selfControlCancelCauseFunc = context.WithCancelCause(ctx)
+	config, _ := a.workspace.Configuration()
+	a.telemetryServer = telemetry.NewServer(a.selfControlCtx, config)
+	a.spawner.TelemetryServer = a.telemetryServer
 	a.spawner.Serve(a.selfControlCtx)
 
 	go a.handleAgentShutdown(true)
 	a.grpcServerWG.Add(1)
-	a.logger.Info().Msg("Agent started, use Ctrl+C or SIGINT to gracefully stop it")
+	a.logger.Info().Msg("agentClient started, use Ctrl+C or SIGINT to gracefully stop it")
+	a.setStatus(Status_READY)
 	return a.grpcServer.Serve(a.grpcListener)
 }
 
 func (a *Agent) ServeLocal(ctx context.Context) error {
-	a.logger.Info().Msg("Starting local agent")
+	a.setStatus(Status_STARTING)
+	a.logger.Info().Msg("Starting local agentClient")
 	if err := a.workspace.EnsureWorkspace(); err != nil {
-		a.logger.Error().Err(err).Msg("Cannot start agent, error when setting up workspace")
+		a.logger.Error().Err(err).Msg("Cannot start agentClient, error when setting up workspaceClient")
 	}
 
 	a.selfControlCtx, a.selfControlCancelCauseFunc = context.WithCancelCause(ctx)
+	config, _ := a.workspace.Configuration()
+	a.telemetryServer = telemetry.NewServer(a.selfControlCtx, config)
+	a.spawner.TelemetryServer = a.telemetryServer
 	a.spawner.Serve(a.selfControlCtx)
 	go a.handleAgentShutdown(false)
 	a.grpcServerWG.Add(1)
-	a.logger.Info().Msg("Local agent started")
+	a.logger.Info().Msg("Local agentClient started")
+	a.setStatus(Status_READY)
 
 	a.grpcServerWG.Wait()
-	a.logger.Info().Msg("Local agent stopped")
+	a.logger.Info().Msg("Local agentClient stopped")
 	return nil
 }
 
 func (a *Agent) handleAgentShutdown(cleanWorkspaceOnShutdown bool) {
 	select {
 	case <-a.selfControlCtx.Done():
-		a.logger.Info().AnErr("reason", context.Cause(a.selfControlCtx)).Msg("Requested agent shutdown")
+		a.logger.Info().AnErr("reason", context.Cause(a.selfControlCtx)).Msg("Requested agentClient shutdown")
+		a.setStatus(Status_STOPPING)
 		defer a.selfControlCancelCauseFunc(context.Canceled)
 		if err := a.spawner.Wait(); err != nil && !errors.Is(err, context.Canceled) {
-			a.logger.Error().Err(err).Msg("Encountered an error while waiting for spawner graceful shutdown")
+			a.logger.Error().Err(err).Msg("Encountered an error while waiting for spawnerClient graceful shutdown")
 		} else {
-			a.logger.Info().Msg("Spawner gracefully shut down")
+			a.logger.Info().Msg("spawnerClient gracefully shut down")
 		}
 
-		// If the agent is a local one, no GRPC server is defined
+		// If the agentClient is a local one, no GRPC server is defined
 		if a.grpcServer != nil {
 			a.grpcServer.GracefulStop()
 			a.logger.Info().Msg("GRPC server gracefully shut down")
@@ -138,9 +159,9 @@ func (a *Agent) handleAgentShutdown(cleanWorkspaceOnShutdown bool) {
 
 		if cleanWorkspaceOnShutdown {
 			if err := a.workspace.Delete(); err != nil {
-				a.logger.Error().Err(err).Msg("Cannot delete temporary workspace")
+				a.logger.Error().Err(err).Msg("Cannot delete temporary workspaceClient")
 			} else {
-				a.logger.Info().Msg("Temporary workspace deleted")
+				a.logger.Info().Msg("Temporary workspaceClient deleted")
 			}
 		}
 
@@ -182,9 +203,9 @@ func (a *Agent) InitializeFromWorkspace() error {
 func (a *Agent) CleanUp() error {
 	a.logger.Info().Msg("Cleanup started")
 
-	// Clean workspace
+	// Clean workspaceClient
 	if err := a.workspace.Delete(); err != nil {
-		a.logger.Error().Err(err).Msg("Failed to cleanup workspace")
+		a.logger.Error().Err(err).Msg("Failed to cleanup workspaceClient")
 		return err
 	}
 
@@ -200,9 +221,11 @@ func (a *Agent) Register(registrar grpc.ServiceRegistrar) {
 	syntheticuser.RegisterSpawnerServer(registrar, a)
 	workspace.RegisterWorkspaceServer(registrar, a)
 	RegisterAgentServer(registrar, a)
+	telemetry.RegisterMetricsServer(registrar, a)
+	telemetry.RegisterLogsServer(registrar, a)
 }
 
-// Spawner service facade
+// spawnerClient service facade
 
 func (a *Agent) GetSyntheticUserCounters(_ context.Context, _ *emptypb.Empty) (*syntheticuser.Counters, error) {
 	return a.spawner.Counters(), nil
@@ -228,7 +251,7 @@ func (a *Agent) SetActiveSyntheticUsers(_ context.Context, request *syntheticuse
 	}, nil
 }
 
-// Workspace service facade
+// workspaceClient service facade
 
 func (a *Agent) Initialize(_ context.Context, request *workspace.InitializationRequest) (*workspace.InitializationResponse, error) {
 	if err := a.InitializeFromArchive(request.GetArchive(), request.GetCompressionAlgorithm()); err != nil {
@@ -248,9 +271,53 @@ func (a *Agent) Reset(_ context.Context, _ *emptypb.Empty) (*emptypb.Empty, erro
 	return &emptypb.Empty{}, nil
 }
 
-// Agent own service
+// metricsClient server facade
 
-func (a *Agent) Connect(ctx context.Context, request *ConnectRequest) (*ConnectResponse, error) {
+func (a *Agent) GetSamples(request *telemetry.SampleStreamRequest, g grpc.ServerStreamingServer[telemetry.Sample]) error {
+	if err := a.telemetryServer.GetSamples(request, g); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (a *Agent) GetTransactions(request *telemetry.TransactionStreamRequest, g grpc.ServerStreamingServer[telemetry.Transaction]) error {
+	if err := a.telemetryServer.GetTransactions(request, g); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (a *Agent) GetIterationCounters(request *telemetry.IterationCountersStreamRequest, g grpc.ServerStreamingServer[telemetry.IterationCounters]) error {
+	if err := a.telemetryServer.GetIterationCounters(request, g); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (a *Agent) GetHostMetrics(request *telemetry.HostMetricsStreamRequest, g grpc.ServerStreamingServer[telemetry.HostMetrics]) error {
+	if err := a.telemetryServer.GetHostMetrics(request, g); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// logsClient server facade
+
+func (a *Agent) GetLogEntries(request *telemetry.LogEntriesStreamRequest, g grpc.ServerStreamingServer[telemetry.LogEntry]) error {
+	if err := a.telemetryServer.GetLogEntries(request, g); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// agentClient own service
+
+func (a *Agent) Connect(_ context.Context, request *ConnectRequest) (*ConnectResponse, error) {
 	thisVersion := version.Version
 	otherVersion := request.GetControllerVersion()
 
@@ -259,14 +326,6 @@ func (a *Agent) Connect(ctx context.Context, request *ConnectRequest) (*ConnectR
 			codes.PermissionDenied, fmt.Sprintf(
 				"injector version (%s) and controller version (%s) mismatch", thisVersion, otherVersion))
 	}
-
-	controllerIp, ok := peer.FromContext(ctx)
-	if !ok {
-		return nil, status.Error(codes.InvalidArgument, "cannot determine controller address")
-	}
-
-	a.connectedControllerIp = controllerIp.Addr.String()
-	a.connectedControllerPort = uint16(request.GetControllerPort())
 
 	return &ConnectResponse{
 		InjectorId:      a.id,
@@ -307,4 +366,11 @@ func (a *Agent) Shutdown(requestCtx context.Context, request *ShutdownRequest) (
 	}
 
 	return &emptypb.Empty{}, nil
+}
+
+func (a *Agent) Status(context.Context, *emptypb.Empty) (*StatusResponse, error) {
+	a.statusMu.RLock()
+	defer a.statusMu.RUnlock()
+
+	return &StatusResponse{Status: a.status}, nil
 }

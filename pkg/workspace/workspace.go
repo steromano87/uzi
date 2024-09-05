@@ -44,7 +44,7 @@ func NewTemp() Workspace {
 }
 
 func (w *Workspace) SetLogger(logger zerolog.Logger) {
-	w.logger = logger.With().Str(log.ComponentKey, "Workspace").Logger()
+	w.logger = logger.With().Str(log.ComponentKey, "workspace").Logger()
 }
 
 func (w *Workspace) Hydrate() error {
@@ -159,7 +159,7 @@ func (w *Workspace) DeleteContent() error {
 		}
 	}
 
-	w.logger.Info().Str("location", w.Location()).Msg("Workspace content cleaned")
+	w.logger.Info().Str("location", w.Location()).Msg("workspace content cleaned")
 
 	return nil
 }
@@ -170,7 +170,7 @@ func (w *Workspace) Delete() error {
 		return err
 	}
 	w.location = ""
-	w.logger.Info().Str("location", oldLocation).Msg("Workspace deleted")
+	w.logger.Info().Str("location", oldLocation).Msg("workspace deleted")
 	return nil
 }
 

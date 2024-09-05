@@ -18,7 +18,7 @@ type Server struct {
 	iterationCountersBuffer chan *IterationCounters
 	logsBuffer              chan *LogEntry
 	hostMetricsBuffer       chan *HostMetrics
-	logger                  zerolog.Logger
+	logger                  *zerolog.Logger
 	controlCtx              context.Context
 }
 
@@ -30,7 +30,7 @@ func NewServer(ctx context.Context, config *configuration.Manifest) *Server {
 	server.iterationCountersBuffer = make(chan *IterationCounters, config.Telemetry.LoadMetrics.BufferCapacity)
 	server.logsBuffer = make(chan *LogEntry, config.Telemetry.Logs.BufferCapacity)
 	server.hostMetricsBuffer = make(chan *HostMetrics, config.Telemetry.HostMetrics.BufferCapacity)
-	server.logger = zerolog.Nop()
+	server.logger = zerolog.Ctx(ctx)
 
 	return server
 }
