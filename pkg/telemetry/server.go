@@ -69,6 +69,16 @@ func (s *Server) StoreIterationCounters(counters *IterationCounters) error {
 	}
 }
 
+func (s *Server) StoreHostMetrics(agentMetrics *HostMetrics) error {
+	select {
+	case s.hostMetricsBuffer <- agentMetrics:
+		s.logger.Trace().Msg("Saved host metrics")
+		return nil
+	default:
+		return ErrFullBuffer
+	}
+}
+
 func (s *Server) StoreLogEntry(entry *LogEntry) error {
 	select {
 	case s.logsBuffer <- entry:
@@ -88,16 +98,6 @@ func (s *Server) Write(p []byte) (n int, err error) {
 	}
 
 	return len(p), nil
-}
-
-func (s *Server) StoreHostMetrics(agentMetrics *HostMetrics) error {
-	select {
-	case s.hostMetricsBuffer <- agentMetrics:
-		s.logger.Trace().Msg("Saved host metrics")
-		return nil
-	default:
-		return ErrFullBuffer
-	}
 }
 
 /////////////////////////
