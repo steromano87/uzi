@@ -3,6 +3,7 @@ package telemetry_test
 import (
 	"context"
 	"github.com/fullstorydev/grpchan/inprocgrpc"
+	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
 	"github.com/stretchr/testify/assert"
@@ -13,6 +14,16 @@ import (
 	"testing"
 	"time"
 )
+
+type logHook struct {
+	logEvents []zerolog.Event
+}
+
+func (logHook *logHook) Run(logEvent *zerolog.Event, _ zerolog.Level, _ string) {
+	logHook.logEvents = append(logHook.logEvents, *logEvent)
+}
+
+/////////////////////
 
 type ServerTestSuite struct {
 	suite.Suite
@@ -291,6 +302,86 @@ func (s *ServerTestSuite) TestStoreHostMetrics_Retrieve() {
 			if assert.Len(s.T(), retrievedHostMetrics, 1) {
 				assert.Equal(s.T(), hostMetrics, retrievedHostMetrics[0])
 			}
+		}
+	}
+}
+
+func (s *ServerTestSuite) TestStoreLogEntry_NoError() {
+	server := telemetry.NewServer(s.ctx, s.configuration)
+	logEntry := &telemetry.LogEntry{}
+	err := server.StoreLogEntry(logEntry)
+	assert.NoError(s.T(), err)
+}
+
+func (s *ServerTestSuite) TestStoreLogEntry_Error() {
+	s.configuration.Telemetry.Logs.BufferCapacity = 1
+	server := telemetry.NewServer(s.ctx, s.configuration)
+	logEntry := &telemetry.LogEntry{}
+	if assert.NoError(s.T(), server.StoreLogEntry(logEntry)) {
+		err := server.StoreLogEntry(logEntry)
+		if assert.Error(s.T(), err) {
+			assert.ErrorIs(s.T(), err, telemetry.ErrFullBuffer)
+		}
+	}
+}
+
+func (s *ServerTestSuite) TestWriteLogsAndRetrieveEntries() {
+	server := telemetry.NewServer(s.ctx, s.configuration)
+	logger := zerolog.New(server)
+
+	// GRPC setup
+	grpcChannel := &inprocgrpc.Channel{}
+	telemetry.RegisterLogsServer(grpcChannel, server)
+	logsClient := telemetry.NewLogsClient(grpcChannel)
+	retrievedLogEntries := make([]*telemetry.LogEntry, 0)
+
+	logger.Info().Msg("test message")
+	serverStream, err := logsClient.GetLogEntries(context.TODO(), &telemetry.LogEntriesStreamRequest{})
+	if assert.NoError(s.T(), err) {
+		// Cancel the current context after 500 ms
+		cancelFuncTimer := time.NewTimer(250 * time.Millisecond)
+		go func() {
+			<-cancelFuncTimer.C
+			s.cancelFunc()
+		}()
+
+		for {
+			retrievedLogEntry, err := serverStream.Recv()
+			if err == io.EOF {
+				break
+			}
+
+			if assert.NoError(s.T(), err) {
+				retrievedLogEntries = append(retrievedLogEntries, retrievedLogEntry)
+			}
+		}
+
+		if assert.Len(s.T(), retrievedLogEntries, 1) {
+			assert.NotEmpty(s.T(), retrievedLogEntries[0].GetRawData())
+			assert.Contains(s.T(), string(retrievedLogEntries[0].GetRawData()), "test message")
+		}
+	}
+}
+
+func (s *ServerTestSuite) TestWriteLogsWithError() {
+	s.configuration.Telemetry.Logs.BufferCapacity = 1
+	server := telemetry.NewServer(s.ctx, s.configuration)
+
+	// Logger setup with custom hook to capture log events, thanks to https://stackoverflow.com/a/76851955
+	logger := zerolog.New(server)
+	logHook := &logHook{}
+	logger = logger.Hook(logHook)
+	errorsList := make([]error, 0)
+	zerolog.ErrorHandler = func(err error) {
+		errorsList = append(errorsList, err)
+	}
+
+	logger.Info().Msg("first message")
+	logger.Info().Msg("second message")
+
+	if assert.Len(s.T(), logHook.logEvents, 2) {
+		if assert.Len(s.T(), errorsList, 1) {
+			assert.ErrorIs(s.T(), errorsList[0], telemetry.ErrFullBuffer)
 		}
 	}
 }
