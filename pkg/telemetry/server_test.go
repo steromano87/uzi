@@ -179,6 +179,64 @@ func (s *ServerTestSuite) TestStoreTransaction_Retrieve() {
 	}
 }
 
+func (s *ServerTestSuite) TestStoreIterationCounters_NoError() {
+	server := telemetry.NewServer(s.ctx, s.configuration)
+	counters := &telemetry.IterationCounters{}
+	err := server.StoreIterationCounters(counters)
+	assert.NoError(s.T(), err)
+}
+
+func (s *ServerTestSuite) TestStoreIterationCounters_Error() {
+	s.configuration.Telemetry.LoadMetrics.BufferCapacity = 1
+	server := telemetry.NewServer(s.ctx, s.configuration)
+	counters := &telemetry.IterationCounters{}
+	if assert.NoError(s.T(), server.StoreIterationCounters(counters)) {
+		err := server.StoreIterationCounters(counters)
+		if assert.Error(s.T(), err) {
+			assert.ErrorIs(s.T(), err, telemetry.ErrFullBuffer)
+		}
+	}
+}
+
+func (s *ServerTestSuite) TestStoreIterationCounters_Retrieve() {
+	server := telemetry.NewServer(s.ctx, s.configuration)
+	counters := &telemetry.IterationCounters{}
+
+	// GRPC setup
+	grpcChannel := &inprocgrpc.Channel{}
+	telemetry.RegisterMetricsServer(grpcChannel, server)
+	metricsClient := telemetry.NewMetricsClient(grpcChannel)
+	retrievedCounters := make([]*telemetry.IterationCounters, 0)
+
+	err := server.StoreIterationCounters(counters)
+	if assert.NoError(s.T(), err) {
+		serverStream, err := metricsClient.GetIterationCounters(context.TODO(), &telemetry.IterationCountersStreamRequest{})
+		if assert.NoError(s.T(), err) {
+			// Cancel the current context after 500 ms
+			cancelFuncTimer := time.NewTimer(250 * time.Millisecond)
+			go func() {
+				<-cancelFuncTimer.C
+				s.cancelFunc()
+			}()
+
+			for {
+				retrievedCounter, err := serverStream.Recv()
+				if err == io.EOF {
+					break
+				}
+
+				if assert.NoError(s.T(), err) {
+					retrievedCounters = append(retrievedCounters, retrievedCounter)
+				}
+			}
+
+			if assert.Len(s.T(), retrievedCounters, 1) {
+				assert.Equal(s.T(), counters, retrievedCounters[0])
+			}
+		}
+	}
+}
+
 func (s *ServerTestSuite) TestStoreHostMetrics_NoError() {
 	server := telemetry.NewServer(s.ctx, s.configuration)
 	hostMetrics := &telemetry.HostMetrics{}
