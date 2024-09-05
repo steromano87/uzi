@@ -21,6 +21,8 @@ import (
 	"time"
 )
 
+var ErrOtherActiveUsersReconcileInProgress = errors.New("another active users reconcile already in progress")
+
 type Holder struct {
 	user       *SyntheticUser
 	cancelFunc context.CancelCauseFunc
@@ -125,8 +127,12 @@ func (s *Spawner) Serve(ctx context.Context) {
 }
 
 func (s *Spawner) ReconcileActiveUsers(requestedUsers uint64) error {
-	s.reconcileMu.Lock()
+	// If the lock cannot be acquired, return early with dedicated error
+	if reconcileStatus := s.reconcileMu.TryLock(); !reconcileStatus {
+		return ErrOtherActiveUsersReconcileInProgress
+	}
 	defer s.reconcileMu.Unlock()
+
 	if s.CountersHolder == nil {
 		return errors.New("cannot set active users because they have not been initialized yet")
 	}
