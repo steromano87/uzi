@@ -53,7 +53,7 @@ func (l *LocalProvider) Init(ctx context.Context, spec *viper.Viper) (Roster, er
 
 	l.localAgentCtx, l.localAgentCancelFunc = context.WithCancel(context.WithoutCancel(ctx))
 	l.localAgent = NewLocalAgent(l.spec.Workspace, *logger, grpcChannel)
-	l.localAgent.SetLogger(*logger)
+
 	if err := l.localAgent.InitializeFromWorkspace(); err != nil {
 		return Roster{}, err
 	}
