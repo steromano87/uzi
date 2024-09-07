@@ -49,21 +49,21 @@ func (l *LocalProvider) Init(ctx context.Context, spec *viper.Viper) (Roster, er
 	grpcChannel := &inprocgrpc.Channel{}
 
 	// Decouple the local agentClient's context from parent context to handle its graceful shutdown properly
-	l.localLogger.Info().Dur("startTimeout", l.spec.StartTimeout).Msg("Launching local agentClient")
+	l.localLogger.Info().Dur("startTimeout", l.spec.StartTimeout).Msg("Launching local agent")
 
 	l.localAgentCtx, l.localAgentCancelFunc = context.WithCancel(context.WithoutCancel(ctx))
-	l.localAgent = NewLocalAgent(l.spec.Workspace, *logger, grpcChannel)
+	l.localAgent = NewAgent("local", *logger, grpcChannel)
 
-	if err := l.localAgent.InitializeFromWorkspace(); err != nil {
+	/*if err := l.localAgent.InitializeFromWorkspace(); err != nil {
 		return Roster{}, err
-	}
+	}*/
 
 	l.localRosterEntry = NewRosterEntry(1, grpcChannel)
 	roster := NewRoster()
 	roster.Put("local", l.localRosterEntry)
 
 	go func() {
-		_ = l.localAgent.ServeLocal(l.localAgentCtx)
+		_ = l.localAgent.Serve(l.localAgentCtx)
 	}()
 
 	// Poll local agentClient until it is in READY status

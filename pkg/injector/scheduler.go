@@ -116,13 +116,17 @@ func (s *Scheduler) updateActiveUsers(ctx context.Context, quotas map[string]uin
 
 func (s *Scheduler) waitForUsersShutdown(ctx context.Context) error {
 	s.logger.Info().Msg("Waiting for all active users to shutdown")
-	scaledUsers := make(map[string]uint64)
-	for _, userId := range s.roster.Keys() {
-		scaledUsers[userId] = uint64(0)
-	}
-	if err := s.updateActiveUsers(ctx, scaledUsers); err != nil {
-		s.logger.Error().Err(err).Msg("cannot scale active users to zero")
-		return err
+
+	var updateErr error
+	s.roster.Each(func(agentId string, rosterEntry RosterEntry) {
+		if _, err := rosterEntry.SpawnerClient().Shutdown(ctx, &syntheticuser.ShutdownRequest{}); err != nil {
+			s.logger.Error().Err(err).Str("agentId", agentId).Msg("Cannot scale active users to zero")
+			updateErr = errors.Join(updateErr, err)
+		}
+	})
+
+	if updateErr != nil {
+		return updateErr
 	}
 
 	timeoutCtx, cancelFunc := context.WithTimeout(ctx, s.shutDownTimeout)

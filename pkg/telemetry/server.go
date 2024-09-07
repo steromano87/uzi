@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/log"
 	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
 	"google.golang.org/grpc"
+	"sync"
 )
 
 var ErrFullBuffer = errors.New("full buffer")
@@ -13,26 +15,52 @@ var ErrFullBuffer = errors.New("full buffer")
 type Server struct {
 	UnimplementedMetricsServer
 	UnimplementedLogsServer
+
 	samplesBuffer           chan *Sample
 	transactionsBuffer      chan *Transaction
 	iterationCountersBuffer chan *IterationCounters
 	logsBuffer              chan *LogEntry
 	hostMetricsBuffer       chan *HostMetrics
-	logger                  *zerolog.Logger
-	controlCtx              context.Context
+
+	logger *zerolog.Logger
+
+	controlCtx context.Context
+	streamWG   sync.WaitGroup
 }
 
-func NewServer(ctx context.Context, config *configuration.Manifest) *Server {
+func NewServer() *Server {
 	server := new(Server)
-	server.controlCtx = ctx
+	config := configuration.MustNewDefault()
 	server.samplesBuffer = make(chan *Sample, config.Telemetry.LoadMetrics.BufferCapacity)
 	server.transactionsBuffer = make(chan *Transaction, config.Telemetry.LoadMetrics.BufferCapacity)
 	server.iterationCountersBuffer = make(chan *IterationCounters, config.Telemetry.LoadMetrics.BufferCapacity)
 	server.logsBuffer = make(chan *LogEntry, config.Telemetry.Logs.BufferCapacity)
 	server.hostMetricsBuffer = make(chan *HostMetrics, config.Telemetry.HostMetrics.BufferCapacity)
-	server.logger = zerolog.Ctx(ctx)
+
+	logger := zerolog.Nop()
+	server.setLogger(&logger)
 
 	return server
+}
+
+func (s *Server) Reconfigure(config *configuration.Manifest) {
+	s.samplesBuffer = make(chan *Sample, config.Telemetry.LoadMetrics.BufferCapacity)
+	s.transactionsBuffer = make(chan *Transaction, config.Telemetry.LoadMetrics.BufferCapacity)
+	s.iterationCountersBuffer = make(chan *IterationCounters, config.Telemetry.LoadMetrics.BufferCapacity)
+	s.logsBuffer = make(chan *LogEntry, config.Telemetry.Logs.BufferCapacity)
+	s.hostMetricsBuffer = make(chan *HostMetrics, config.Telemetry.HostMetrics.BufferCapacity)
+}
+
+func (s *Server) Serve(ctx context.Context) {
+	s.setLogger(zerolog.Ctx(ctx))
+	s.controlCtx = ctx
+	<-s.controlCtx.Done()
+	s.streamWG.Wait()
+}
+
+func (s *Server) setLogger(logger *zerolog.Logger) {
+	newLogger := logger.With().Str(log.ComponentKey, "Telemetry server").Logger()
+	s.logger = &newLogger
 }
 
 ///////////////////////////
@@ -105,6 +133,9 @@ func (s *Server) Write(p []byte) (n int, err error) {
 /////////////////////////
 
 func (s *Server) GetSamples(_ *SampleStreamRequest, g grpc.ServerStreamingServer[Sample]) error {
+	s.streamWG.Add(1)
+	defer s.streamWG.Done()
+
 	for {
 		select {
 		case sample := <-s.samplesBuffer:
@@ -122,6 +153,9 @@ func (s *Server) GetSamples(_ *SampleStreamRequest, g grpc.ServerStreamingServer
 }
 
 func (s *Server) GetTransactions(_ *TransactionStreamRequest, g grpc.ServerStreamingServer[Transaction]) error {
+	s.streamWG.Add(1)
+	defer s.streamWG.Done()
+
 	for {
 		select {
 		case transaction := <-s.transactionsBuffer:
@@ -139,6 +173,9 @@ func (s *Server) GetTransactions(_ *TransactionStreamRequest, g grpc.ServerStrea
 }
 
 func (s *Server) GetIterationCounters(_ *IterationCountersStreamRequest, g grpc.ServerStreamingServer[IterationCounters]) error {
+	s.streamWG.Add(1)
+	defer s.streamWG.Done()
+
 	for {
 		select {
 		case iterationCounter := <-s.iterationCountersBuffer:
@@ -156,6 +193,9 @@ func (s *Server) GetIterationCounters(_ *IterationCountersStreamRequest, g grpc.
 }
 
 func (s *Server) GetHostMetrics(_ *HostMetricsStreamRequest, g grpc.ServerStreamingServer[HostMetrics]) error {
+	s.streamWG.Add(1)
+	defer s.streamWG.Done()
+
 	for {
 		select {
 		case hostMetric := <-s.hostMetricsBuffer:
@@ -173,6 +213,9 @@ func (s *Server) GetHostMetrics(_ *HostMetricsStreamRequest, g grpc.ServerStream
 }
 
 func (s *Server) GetLogEntries(_ *LogEntriesStreamRequest, g grpc.ServerStreamingServer[LogEntry]) error {
+	s.streamWG.Add(1)
+	defer s.streamWG.Done()
+
 	for {
 		select {
 		case logEntry := <-s.logsBuffer:

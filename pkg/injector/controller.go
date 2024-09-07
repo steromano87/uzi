@@ -69,6 +69,27 @@ func (c *Controller) Serve(ctx context.Context) error {
 		})
 	})
 
+	workspaceArchive, err := c.workspace.CompressToArchive(workspace.CompressionAlgorithm_ZIP)
+	if err != nil {
+		c.logger.Error().Err(err).Msg("Unrecoverable error while compressing workspace")
+		return err
+	}
+
+	c.roster.Each(func(key string, entry RosterEntry) {
+		_, err := entry.WorkspaceClient().Initialize(ctx, &workspace.InitializationRequest{
+			Archive:              workspaceArchive,
+			CompressionAlgorithm: workspace.CompressionAlgorithm_ZIP,
+		})
+		if err != nil {
+			c.logger.Error().Err(err).Str("agentId", key).Msg("Unrecoverable error while initializing agent")
+		}
+	})
+
+	if err := c.scheduler.InitSyntheticUsers(ctx); err != nil {
+		c.logger.Error().Err(err).Msg("Unrecoverable error while initializing synthetic users")
+		return err
+	}
+
 	c.controlErrGroup.Go(func() error {
 		return c.scheduler.Serve(ctx, c.config.Controller.Scheduler.UpdateInterval)
 	})
@@ -134,5 +155,5 @@ func (c *Controller) initScheduler(ctx context.Context) error {
 	c.scheduler = NewScheduler(&c.roster, c.profile)
 	c.scheduler.SetLogger(*zerolog.Ctx(ctx))
 
-	return c.scheduler.InitSyntheticUsers(ctx)
+	return nil
 }

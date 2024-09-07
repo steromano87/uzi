@@ -6,6 +6,7 @@ import (
 	"github.com/rs/xid"
 	"github.com/spf13/cobra"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"net"
 	"os"
@@ -55,10 +56,19 @@ func runAgent(cmd *cobra.Command, _ []string) {
 	grpcServerOpts := make([]grpc.ServerOption, 0)
 	grpcServer := grpc.NewServer(grpcServerOpts...)
 
-	agent := injector.NewRemoteAgent(agentId, logger, grpcServer, tcpListener)
+	agent := injector.NewAgent(agentId, logger, grpcServer)
+	errGroup := errgroup.Group{}
+	errGroup.Go(func() error {
+		return grpcServer.Serve(tcpListener)
+	})
+	errGroup.Go(func() error {
+		err := agent.Serve(mainCtx)
+		grpcServer.GracefulStop()
+		return err
+	})
 
 	logger.Info().Msg("Remote injector started, press Ctrl+C to stop it")
-	cobra.CheckErr(agent.ServeRemote(mainCtx))
+	cobra.CheckErr(errGroup.Wait())
 
 	logger.Info().Msg("Agent stopped")
 }

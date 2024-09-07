@@ -174,6 +174,16 @@ func (w *Workspace) Delete() error {
 	return nil
 }
 
+func (w *Workspace) CompressToArchive(algorithm CompressionAlgorithm) ([]byte, error) {
+	switch algorithm {
+	case CompressionAlgorithm_ZIP:
+		archiver := ZipArchive{}
+		return archiver.Archive(w.location)
+	default:
+		return nil, errors.New("unknown compression algorithm: " + algorithm.String())
+	}
+}
+
 func (w *Workspace) ExtractFromArchive(archiveContent []byte, algorithm CompressionAlgorithm) error {
 	switch algorithm {
 	case CompressionAlgorithm_ZIP:

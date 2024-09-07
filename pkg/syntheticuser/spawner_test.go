@@ -66,7 +66,9 @@ func (s *SpawnerTestSuite) TestSpawnerStartedWithZeroRunningUsers() {
 	spawner.SetPipeline(s.pip)
 	_ = spawner.SetMaxSynthUserQuota(5)
 	spawner.SetLogger(s.logger)
-	spawner.Serve(s.ctx)
+	go func() {
+		spawner.Serve(s.ctx)
+	}()
 
 	if assert.Zero(s.T(), spawner.ActiveUsers()) {
 		assert.EqualValues(s.T(), 5, spawner.Counters().Ready)
@@ -77,7 +79,7 @@ func (s *SpawnerTestSuite) TestSpawnerStartedWithZeroRunningUsers() {
 	}
 
 	s.cancelFunc(nil)
-	err := spawner.Wait()
+	err := spawner.WaitForUsersShutdown()
 	assert.NoError(s.T(), err)
 }
 
@@ -86,7 +88,9 @@ func (s *SpawnerTestSuite) TestScaleUpToOneUser() {
 	spawner.SetPipeline(s.pip)
 	_ = spawner.SetMaxSynthUserQuota(5)
 	spawner.SetLogger(s.logger)
-	spawner.Serve(s.ctx)
+	go func() {
+		spawner.Serve(s.ctx)
+	}()
 
 	err := spawner.ReconcileActiveUsers(1)
 	time.Sleep(100 * time.Millisecond)
@@ -96,7 +100,7 @@ func (s *SpawnerTestSuite) TestScaleUpToOneUser() {
 	}
 
 	s.cancelFunc(nil)
-	err = spawner.Wait()
+	err = spawner.WaitForUsersShutdown()
 	assert.ErrorIs(s.T(), err, context.Canceled)
 }
 
@@ -105,7 +109,9 @@ func (s *SpawnerTestSuite) TestScaleDownFromOneUser() {
 	spawner.SetPipeline(s.pip)
 	_ = spawner.SetMaxSynthUserQuota(5)
 	spawner.SetLogger(s.logger)
-	spawner.Serve(s.ctx)
+	go func() {
+		spawner.Serve(s.ctx)
+	}()
 
 	err := spawner.ReconcileActiveUsers(1)
 	time.Sleep(100 * time.Millisecond)
@@ -117,14 +123,14 @@ func (s *SpawnerTestSuite) TestScaleDownFromOneUser() {
 	err = spawner.ReconcileActiveUsers(0)
 
 	if assert.NoError(s.T(), err) {
-		assert.NoError(s.T(), spawner.Wait())
+		assert.NoError(s.T(), spawner.WaitForUsersShutdown())
 		assert.EqualValues(s.T(), 0, spawner.ActiveUsers())
 		assert.EqualValues(s.T(), 4, spawner.Counters().Ready)
 		assert.EqualValues(s.T(), 1, spawner.Counters().Stopped)
 	}
 
 	s.cancelFunc(nil)
-	err = spawner.Wait()
+	err = spawner.WaitForUsersShutdown()
 	assert.NoError(s.T(), err)
 }
 
@@ -133,7 +139,9 @@ func (s *SpawnerTestSuite) TestScaleUpAndDownUpToTwoUsers() {
 	spawner.SetPipeline(s.pip)
 	_ = spawner.SetMaxSynthUserQuota(5)
 	spawner.SetLogger(s.logger)
-	spawner.Serve(s.ctx)
+	go func() {
+		spawner.Serve(s.ctx)
+	}()
 
 	err := spawner.ReconcileActiveUsers(2)
 	time.Sleep(100 * time.Millisecond)
@@ -151,7 +159,7 @@ func (s *SpawnerTestSuite) TestScaleUpAndDownUpToTwoUsers() {
 	}
 
 	s.cancelFunc(nil)
-	err = spawner.Wait()
+	err = spawner.WaitForUsersShutdown()
 	assert.ErrorIs(s.T(), err, context.Canceled)
 }
 
@@ -159,8 +167,9 @@ func (s *SpawnerTestSuite) TestScaleUpBeyondMaxQuota() {
 	spawner := syntheticuser.NewSpawner()
 	spawner.SetPipeline(s.pip)
 	_ = spawner.SetMaxSynthUserQuota(5)
-	spawner.Serve(s.ctx)
-	defer s.cancelFunc(nil)
+	go func() {
+		spawner.Serve(s.ctx)
+	}()
 
 	err := spawner.ReconcileActiveUsers(6)
 

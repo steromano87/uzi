@@ -42,12 +42,12 @@ func (s *ServerTestSuite) TearDownTest() {
 }
 
 func (s *ServerTestSuite) TestNewServer() {
-	server := telemetry.NewServer(s.ctx, s.configuration)
+	server := telemetry.NewServer()
 	assert.IsType(s.T(), &telemetry.Server{}, server)
 }
 
 func (s *ServerTestSuite) TestStoreSample_NoError() {
-	server := telemetry.NewServer(s.ctx, s.configuration)
+	server := telemetry.NewServer()
 	sample := &telemetry.Sample{
 		Timestamp:       timestamppb.Now(),
 		SyntheticUserId: "test",
@@ -64,7 +64,9 @@ func (s *ServerTestSuite) TestStoreSample_NoError() {
 
 func (s *ServerTestSuite) TestStoreSample_Error() {
 	s.configuration.Telemetry.LoadMetrics.BufferCapacity = 1
-	server := telemetry.NewServer(s.ctx, s.configuration)
+	server := telemetry.NewServer()
+	server.Reconfigure(s.configuration)
+
 	sample := &telemetry.Sample{
 		Timestamp:       timestamppb.Now(),
 		SyntheticUserId: "test",
@@ -85,7 +87,7 @@ func (s *ServerTestSuite) TestStoreSample_Error() {
 }
 
 func (s *ServerTestSuite) TestStoreSample_Retrieve() {
-	server := telemetry.NewServer(s.ctx, s.configuration)
+	server := telemetry.NewServer()
 	sample := &telemetry.Sample{
 		Timestamp:       timestamppb.Now(),
 		SyntheticUserId: "test",
@@ -98,6 +100,9 @@ func (s *ServerTestSuite) TestStoreSample_Retrieve() {
 	}
 
 	// GRPC setup
+	go func() {
+		server.Serve(s.ctx)
+	}()
 	grpcChannel := &inprocgrpc.Channel{}
 	telemetry.RegisterMetricsServer(grpcChannel, server)
 	metricsClient := telemetry.NewMetricsClient(grpcChannel)
@@ -133,7 +138,7 @@ func (s *ServerTestSuite) TestStoreSample_Retrieve() {
 }
 
 func (s *ServerTestSuite) TestStoreTransaction_NoError() {
-	server := telemetry.NewServer(s.ctx, s.configuration)
+	server := telemetry.NewServer()
 	transaction := &telemetry.Transaction{}
 	err := server.StoreTransaction(transaction)
 	assert.NoError(s.T(), err)
@@ -141,7 +146,9 @@ func (s *ServerTestSuite) TestStoreTransaction_NoError() {
 
 func (s *ServerTestSuite) TestStoreTransaction_Error() {
 	s.configuration.Telemetry.LoadMetrics.BufferCapacity = 1
-	server := telemetry.NewServer(s.ctx, s.configuration)
+	server := telemetry.NewServer()
+	server.Reconfigure(s.configuration)
+
 	transaction := &telemetry.Transaction{}
 	if assert.NoError(s.T(), server.StoreTransaction(transaction)) {
 		err := server.StoreTransaction(transaction)
@@ -152,10 +159,13 @@ func (s *ServerTestSuite) TestStoreTransaction_Error() {
 }
 
 func (s *ServerTestSuite) TestStoreTransaction_Retrieve() {
-	server := telemetry.NewServer(s.ctx, s.configuration)
+	server := telemetry.NewServer()
 	transaction := &telemetry.Transaction{}
 
 	// GRPC setup
+	go func() {
+		server.Serve(s.ctx)
+	}()
 	grpcChannel := &inprocgrpc.Channel{}
 	telemetry.RegisterMetricsServer(grpcChannel, server)
 	metricsClient := telemetry.NewMetricsClient(grpcChannel)
@@ -191,7 +201,7 @@ func (s *ServerTestSuite) TestStoreTransaction_Retrieve() {
 }
 
 func (s *ServerTestSuite) TestStoreIterationCounters_NoError() {
-	server := telemetry.NewServer(s.ctx, s.configuration)
+	server := telemetry.NewServer()
 	counters := &telemetry.IterationCounters{}
 	err := server.StoreIterationCounters(counters)
 	assert.NoError(s.T(), err)
@@ -199,7 +209,9 @@ func (s *ServerTestSuite) TestStoreIterationCounters_NoError() {
 
 func (s *ServerTestSuite) TestStoreIterationCounters_Error() {
 	s.configuration.Telemetry.LoadMetrics.BufferCapacity = 1
-	server := telemetry.NewServer(s.ctx, s.configuration)
+	server := telemetry.NewServer()
+	server.Reconfigure(s.configuration)
+
 	counters := &telemetry.IterationCounters{}
 	if assert.NoError(s.T(), server.StoreIterationCounters(counters)) {
 		err := server.StoreIterationCounters(counters)
@@ -210,10 +222,13 @@ func (s *ServerTestSuite) TestStoreIterationCounters_Error() {
 }
 
 func (s *ServerTestSuite) TestStoreIterationCounters_Retrieve() {
-	server := telemetry.NewServer(s.ctx, s.configuration)
+	server := telemetry.NewServer()
 	counters := &telemetry.IterationCounters{}
 
 	// GRPC setup
+	go func() {
+		server.Serve(s.ctx)
+	}()
 	grpcChannel := &inprocgrpc.Channel{}
 	telemetry.RegisterMetricsServer(grpcChannel, server)
 	metricsClient := telemetry.NewMetricsClient(grpcChannel)
@@ -249,7 +264,7 @@ func (s *ServerTestSuite) TestStoreIterationCounters_Retrieve() {
 }
 
 func (s *ServerTestSuite) TestStoreHostMetrics_NoError() {
-	server := telemetry.NewServer(s.ctx, s.configuration)
+	server := telemetry.NewServer()
 	hostMetrics := &telemetry.HostMetrics{}
 	err := server.StoreHostMetrics(hostMetrics)
 	assert.NoError(s.T(), err)
@@ -257,7 +272,9 @@ func (s *ServerTestSuite) TestStoreHostMetrics_NoError() {
 
 func (s *ServerTestSuite) TestStoreHostMetrics_Error() {
 	s.configuration.Telemetry.HostMetrics.BufferCapacity = 1
-	server := telemetry.NewServer(s.ctx, s.configuration)
+	server := telemetry.NewServer()
+	server.Reconfigure(s.configuration)
+
 	hostMetrics := &telemetry.HostMetrics{}
 	if assert.NoError(s.T(), server.StoreHostMetrics(hostMetrics)) {
 		err := server.StoreHostMetrics(hostMetrics)
@@ -268,10 +285,13 @@ func (s *ServerTestSuite) TestStoreHostMetrics_Error() {
 }
 
 func (s *ServerTestSuite) TestStoreHostMetrics_Retrieve() {
-	server := telemetry.NewServer(s.ctx, s.configuration)
+	server := telemetry.NewServer()
 	hostMetrics := &telemetry.HostMetrics{}
 
 	// GRPC setup
+	go func() {
+		server.Serve(s.ctx)
+	}()
 	grpcChannel := &inprocgrpc.Channel{}
 	telemetry.RegisterMetricsServer(grpcChannel, server)
 	metricsClient := telemetry.NewMetricsClient(grpcChannel)
@@ -307,7 +327,7 @@ func (s *ServerTestSuite) TestStoreHostMetrics_Retrieve() {
 }
 
 func (s *ServerTestSuite) TestStoreLogEntry_NoError() {
-	server := telemetry.NewServer(s.ctx, s.configuration)
+	server := telemetry.NewServer()
 	logEntry := &telemetry.LogEntry{}
 	err := server.StoreLogEntry(logEntry)
 	assert.NoError(s.T(), err)
@@ -315,7 +335,9 @@ func (s *ServerTestSuite) TestStoreLogEntry_NoError() {
 
 func (s *ServerTestSuite) TestStoreLogEntry_Error() {
 	s.configuration.Telemetry.Logs.BufferCapacity = 1
-	server := telemetry.NewServer(s.ctx, s.configuration)
+	server := telemetry.NewServer()
+	server.Reconfigure(s.configuration)
+
 	logEntry := &telemetry.LogEntry{}
 	if assert.NoError(s.T(), server.StoreLogEntry(logEntry)) {
 		err := server.StoreLogEntry(logEntry)
@@ -326,10 +348,13 @@ func (s *ServerTestSuite) TestStoreLogEntry_Error() {
 }
 
 func (s *ServerTestSuite) TestWriteLogsAndRetrieveEntries() {
-	server := telemetry.NewServer(s.ctx, s.configuration)
+	server := telemetry.NewServer()
 	logger := zerolog.New(server)
 
 	// GRPC setup
+	go func() {
+		server.Serve(s.ctx)
+	}()
 	grpcChannel := &inprocgrpc.Channel{}
 	telemetry.RegisterLogsServer(grpcChannel, server)
 	logsClient := telemetry.NewLogsClient(grpcChannel)
@@ -365,7 +390,8 @@ func (s *ServerTestSuite) TestWriteLogsAndRetrieveEntries() {
 
 func (s *ServerTestSuite) TestWriteLogsWithError() {
 	s.configuration.Telemetry.Logs.BufferCapacity = 1
-	server := telemetry.NewServer(s.ctx, s.configuration)
+	server := telemetry.NewServer()
+	server.Reconfigure(s.configuration)
 
 	// Logger setup with custom hook to capture log events, thanks to https://stackoverflow.com/a/76851955
 	logger := zerolog.New(server)

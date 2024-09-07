@@ -20,14 +20,12 @@ type Context struct {
 
 func NewContext(ctx context.Context) (Context, context.CancelCauseFunc) {
 	derivedCtx, cancelFunc := context.WithCancelCause(ctx)
-	config := configuration.MustNewDefault()
 
-	// TODO: add injection of variable holder and telemetry server from outside
 	return Context{
 		Context:           derivedCtx,
 		Logger:            zerolog.Ctx(ctx),
 		Vars:              variables.NewHolder(),
 		Config:            configuration.MustNewDefault(),
-		LoadMetricsStorer: telemetry.NewServer(ctx, config),
+		LoadMetricsStorer: nil,
 	}, cancelFunc
 }
