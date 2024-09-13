@@ -17,13 +17,12 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"net"
 	"sync"
+	"sync/atomic"
 )
 
 type Agent struct {
 	UnimplementedAgentServer
-	workspace.UnimplementedWorkspaceServer
 
 	id     string
 	logger zerolog.Logger
@@ -32,16 +31,14 @@ type Agent struct {
 	spawner   *syntheticuser.Spawner
 	workspace workspace.Workspace
 
+	activeSession atomic.Bool
+
 	selfControlCtx             context.Context
 	selfControlCancelCauseFunc context.CancelCauseFunc
 	goroutinesErrorGroup       errgroup.Group
 
 	status   Status
 	statusMu sync.RWMutex
-
-	grpcServer   *grpc.Server
-	grpcServerWG sync.WaitGroup
-	grpcListener net.Listener
 }
 
 func NewAgent(id string, logger zerolog.Logger, registrar grpc.ServiceRegistrar) *Agent {
@@ -49,7 +46,7 @@ func NewAgent(id string, logger zerolog.Logger, registrar grpc.ServiceRegistrar)
 	agent.id = id
 	agent.vars = variables.NewHolder()
 
-	agent.spawner = syntheticuser.NewSpawner()
+	agent.spawner = syntheticuser.NewSpawner(logger)
 	agent.workspace = workspace.NewTemp()
 
 	agent.setLogger(logger)
@@ -69,7 +66,7 @@ func (a *Agent) Workspace() workspace.Workspace {
 
 func (a *Agent) setLogger(logger zerolog.Logger) {
 	baseLogger := logger.With().Str(log.AgentId, a.id).Logger()
-	a.logger = baseLogger.With().Str(log.ComponentKey, "agentClient").Logger()
+	a.logger = baseLogger.With().Str(log.ComponentKey, "agent").Logger()
 
 	a.workspace.SetLogger(baseLogger)
 	a.spawner.SetLogger(baseLogger)
@@ -123,12 +120,6 @@ func (a *Agent) handleAgentShutdown(cleanWorkspaceOnShutdown bool) {
 			a.logger.Info().Msg("spawnerClient gracefully shut down")
 		}
 
-		// If the agentClient is a local one, no GRPC server is defined
-		if a.grpcServer != nil {
-			a.grpcServer.GracefulStop()
-			a.logger.Info().Msg("GRPC server gracefully shut down")
-		}
-
 		if cleanWorkspaceOnShutdown {
 			if err := a.workspace.Delete(); err != nil {
 				a.logger.Error().Err(err).Msg("Cannot delete temporary workspaceClient")
@@ -136,8 +127,6 @@ func (a *Agent) handleAgentShutdown(cleanWorkspaceOnShutdown bool) {
 				a.logger.Info().Msg("Temporary workspaceClient deleted")
 			}
 		}
-
-		a.grpcServerWG.Done()
 	}
 }
 
@@ -145,38 +134,19 @@ func (a *Agent) forcedShutdown() {
 	a.logger.Fatal().Msg("Forced shutdown requested, stopping immediately")
 }
 
-func (a *Agent) Wait() {
-	a.grpcServerWG.Wait()
-}
-
-func (a *Agent) InitializeFromArchive(archiveContent []byte, compressionAlgorithm workspace.CompressionAlgorithm) error {
-	if err := a.workspace.ExtractFromArchive(archiveContent, compressionAlgorithm); err != nil {
+func (a *Agent) InitializeFromArchive(archiveContent []byte) error {
+	if err := a.workspace.ExtractFromArchive(archiveContent); err != nil {
 		return err
 	}
 
-	return a.InitializeFromWorkspace()
-}
-
-func (a *Agent) InitializeFromWorkspace() error {
-	rawPipelineContent, pipelinePath, err := a.workspace.Pipeline()
-	if err != nil {
-		return err
-	}
-
-	decodedPipeline, err := pipeline.Decode(rawPipelineContent, pipelinePath)
-	if err != nil {
-		return err
-	}
-
-	a.spawner.SetPipeline(decodedPipeline)
 	return nil
 }
 
 func (a *Agent) CleanUp() error {
 	a.logger.Info().Msg("Cleanup started")
 
-	// Clean workspaceClient
-	if err := a.workspace.Delete(); err != nil {
+	// Clean workspace
+	if err := a.workspace.DeleteContent(); err != nil {
 		a.logger.Error().Err(err).Msg("Failed to cleanup workspaceClient")
 		return err
 	}
@@ -192,34 +162,11 @@ func (a *Agent) CleanUp() error {
 func (a *Agent) register(registrar grpc.ServiceRegistrar) {
 	RegisterAgentServer(registrar, a)
 	a.spawner.Register(registrar)
-	workspace.RegisterWorkspaceServer(registrar, a)
 }
 
-// workspaceClient service facade
-
-func (a *Agent) Initialize(_ context.Context, request *workspace.InitializationRequest) (*workspace.InitializationResponse, error) {
-	if err := a.InitializeFromArchive(request.GetArchive(), request.GetCompressionAlgorithm()); err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	return &workspace.InitializationResponse{
-		RemoteWorkingFolder: a.workspace.Location(),
-	}, nil
-}
-
-func (a *Agent) Reset(_ context.Context, _ *emptypb.Empty) (*emptypb.Empty, error) {
-	if err := a.workspace.DeleteContent(); err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	return &emptypb.Empty{}, nil
-}
-
-// agentClient own service
-
-func (a *Agent) Connect(_ context.Context, request *ConnectRequest) (*ConnectResponse, error) {
+func (a *Agent) Handshake(_ context.Context, hello *Hello) (*Welcome, error) {
 	thisVersion := version.Version
-	otherVersion := request.GetControllerVersion()
+	otherVersion := hello.GetControllerVersion()
 
 	if !version.IsCompatible(thisVersion, otherVersion) {
 		return nil, status.Error(
@@ -227,10 +174,61 @@ func (a *Agent) Connect(_ context.Context, request *ConnectRequest) (*ConnectRes
 				"injector version (%s) and controller version (%s) mismatch", thisVersion, otherVersion))
 	}
 
-	return &ConnectResponse{
+	return &Welcome{
 		InjectorId:      a.id,
 		InjectorVersion: thisVersion,
 	}, nil
+}
+
+func (a *Agent) BeginSession(_ context.Context, request *BeginSessionRequest) (*emptypb.Empty, error) {
+	if a.activeSession.Load() {
+		return nil, harkErrors.SessionAlreadyInProgress
+	}
+
+	if err := a.InitializeFromArchive(request.GetArchive().GetContent()); err != nil {
+		return nil, err
+	}
+
+	rawPipelineContent, pipelinePath, err := a.workspace.Pipeline()
+	if err != nil {
+		return nil, err
+	}
+
+	decodedPipeline, err := pipeline.Decode(rawPipelineContent, pipelinePath)
+	if err != nil {
+		return nil, err
+	}
+
+	config, err := a.workspace.Configuration()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := a.spawner.BeginSession(decodedPipeline, request.GetUserQuota(), config); err != nil {
+		return nil, err
+	}
+
+	a.activeSession.Store(true)
+
+	return &emptypb.Empty{}, nil
+}
+
+func (a *Agent) EndSession(_ context.Context, _ *EndSessionRequest) (*emptypb.Empty, error) {
+	if !a.activeSession.Load() {
+		return nil, harkErrors.SessionAlreadyInProgress
+	}
+
+	if err := a.spawner.EndSession(); err != nil {
+		return nil, err
+	}
+
+	if err := a.workspace.DeleteContent(); err != nil {
+		a.logger.Error().Err(err).Msg("Failed to cleanup workspace")
+		return nil, err
+	}
+
+	a.activeSession.Store(false)
+	return &emptypb.Empty{}, nil
 }
 
 func (a *Agent) Shutdown(requestCtx context.Context, request *ShutdownRequest) (*emptypb.Empty, error) {
@@ -246,10 +244,9 @@ func (a *Agent) Shutdown(requestCtx context.Context, request *ShutdownRequest) (
 	defer shutdownCancelFunc()
 	a.selfControlCancelCauseFunc(harkErrors.GracefulShutdownRequested)
 
-	waitChan := make(chan struct{})
+	waitChan := make(chan error)
 	go func() {
-		a.Wait()
-		waitChan <- struct{}{}
+		waitChan <- a.goroutinesErrorGroup.Wait()
 	}()
 
 	select {
@@ -257,8 +254,8 @@ func (a *Agent) Shutdown(requestCtx context.Context, request *ShutdownRequest) (
 		a.logger.Warn().Msg("Shutdown request context canceled, passing to forced shutdown")
 		defer a.forcedShutdown()
 
-	case <-waitChan:
-		a.logger.Info().Msg("Remote shutdown completed")
+	case err := <-waitChan:
+		a.logger.Info().AnErr("Goroutines error", err).Msg("Remote shutdown completed")
 
 	case <-shutdownCtx.Done():
 		a.logger.Warn().Msg("Shutdown timeout exceeded, passing to forced shutdown")

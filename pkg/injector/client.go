@@ -2,14 +2,12 @@ package injector
 
 import (
 	"github.com/steromano87/harkonnen/v1/pkg/syntheticuser"
-	"github.com/steromano87/harkonnen/v1/pkg/workspace"
 	"google.golang.org/grpc"
 )
 
 type Client struct {
 	AgentClient
 	syntheticuser.SpawnerClient
-	workspace.WorkspaceClient
 }
 
 func NewRemoteClient(target string, opts ...grpc.DialOption) (Client, error) {
@@ -27,8 +25,7 @@ func NewLocalClient(cc grpc.ClientConnInterface) Client {
 
 func newClient(cc grpc.ClientConnInterface) Client {
 	return Client{
-		AgentClient:     NewAgentClient(cc),
-		SpawnerClient:   syntheticuser.NewSpawnerClient(cc),
-		WorkspaceClient: workspace.NewWorkspaceClient(cc),
+		AgentClient:   NewAgentClient(cc),
+		SpawnerClient: syntheticuser.NewSpawnerClient(cc),
 	}
 }

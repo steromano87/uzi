@@ -33,42 +33,99 @@ type Holder struct {
 type Spawner struct {
 	UnimplementedSpawnerServer
 
+	activeSession           atomic.Bool
+	activeSessionCtx        context.Context
+	activeSessionCancelFunc context.CancelFunc
+
 	syntheticUsers          []Holder
-	syntheticUserErrGroup   *errgroup.Group
-	syntheticUserCtx        atomic.Pointer[context.Context]
+	syntheticUserErrGroup   errgroup.Group
+	syntheticUserCtx        context.Context
 	syntheticUserCancelFunc context.CancelFunc
-
-	reconcileMu          sync.Mutex
-	lastStartedUserIndex atomic.Int64
-	lastStoppedUserIndex atomic.Int64
-	pipelineToRun        *pipeline.Pipeline
+	reconcileMu             sync.Mutex
+	lastStartedUserIndex    atomic.Int64
+	lastStoppedUserIndex    atomic.Int64
+	pipelineToRun           *pipeline.Pipeline
 	*CountersHolder
-
-	mainLogger           zerolog.Logger
-	syntheticUsersLogger zerolog.Logger
 
 	telemetryServer           *telemetry.Server
 	telemetryServerErrGroup   errgroup.Group
 	telemetryServerCancelFunc context.CancelFunc
 
+	mainLogger           zerolog.Logger
+	syntheticUsersLogger zerolog.Logger
+
 	Vars   *variables.Holder
 	config *configuration.Manifest
 }
 
-func NewSpawner() *Spawner {
+func NewSpawner(logger zerolog.Logger) *Spawner {
 	spawner := new(Spawner)
-	spawner.pipelineToRun = pipeline.Nop()
-	spawner.CountersHolder = NewCountersHolder(0)
-	spawner.syntheticUserErrGroup = new(errgroup.Group)
-	var ctx context.Context
-	ctx, spawner.syntheticUserCancelFunc = context.WithCancel(context.Background())
-	spawner.syntheticUserCtx.Store(&ctx)
+	spawner.SetLogger(logger)
 	spawner.telemetryServer = telemetry.NewServer()
 
-	spawner.SetLogger(zerolog.Nop())
+	spawner.CountersHolder = NewCountersHolder(0)
 	spawner.Vars = variables.NewHolder()
 	spawner.config = configuration.MustNewDefault()
 	return spawner
+}
+
+func (s *Spawner) BeginSession(pip *pipeline.Pipeline, maxUserQuota uint64, config *configuration.Manifest) error {
+	if s.activeSession.Load() {
+		return harkErrors.SessionAlreadyInProgress
+	}
+
+	s.pipelineToRun = pip
+	s.config = config
+	s.CountersHolder = NewCountersHolder(maxUserQuota)
+	s.telemetryServer.Reconfigure(config)
+
+	// All inner contexts are derived from the session one
+	s.activeSessionCtx, s.activeSessionCancelFunc = context.WithCancel(context.Background())
+	s.syntheticUserCtx, s.syntheticUserCancelFunc = context.WithCancel(s.activeSessionCtx)
+	if err := s.initializeSynthUsers(maxUserQuota); err != nil {
+		s.mainLogger.Error().Err(err).Msg("Encountered an error while initializing synthetic users")
+		return err
+	}
+
+	telemetryServerCtx, cancelFunc := context.WithCancel(s.activeSessionCtx)
+	s.telemetryServerCancelFunc = cancelFunc
+
+	s.telemetryServerErrGroup.Go(func() error {
+		s.telemetryServer.ServeSession(telemetryServerCtx)
+		return nil
+	})
+	s.activeSession.Store(true)
+	return nil
+}
+
+func (s *Spawner) EndSession() error {
+	defer func() {
+		s.syntheticUserCancelFunc()
+		s.activeSessionCancelFunc()
+	}()
+
+	if !s.activeSession.Load() {
+		return harkErrors.NoSessionsInProgress
+	}
+
+	if err := s.ReconcileActiveUsers(0); err != nil {
+		s.mainLogger.Error().Err(err).Msg("Encountered an error while shutting down users")
+		return err
+	}
+
+	if err := s.syntheticUserErrGroup.Wait(); err != nil {
+		s.mainLogger.Info().AnErr("userErrors", err).Msg("All synthetic users have been stopped")
+	}
+
+	s.telemetryServerCancelFunc()
+	if err := s.telemetryServerErrGroup.Wait(); err != nil {
+		s.mainLogger.Error().Err(err).Msg("Encountered an error while shutting down telemetry server")
+	}
+
+	s.config = configuration.MustNewDefault()
+	s.telemetryServer.Reconfigure(s.config)
+	s.activeSession.Store(false)
+	return nil
 }
 
 func (s *Spawner) SetConfig(config *configuration.Manifest) {
@@ -76,11 +133,7 @@ func (s *Spawner) SetConfig(config *configuration.Manifest) {
 	s.telemetryServer.Reconfigure(config)
 }
 
-func (s *Spawner) SetPipeline(pip *pipeline.Pipeline) {
-	s.pipelineToRun = pip
-}
-
-func (s *Spawner) SetMaxSynthUserQuota(maxSynthUserQuota uint64) error {
+func (s *Spawner) initializeSynthUsers(maxSynthUserQuota uint64) error {
 	if s.NonStoppedUsers() > 0 {
 		return errors.New(
 			fmt.Sprintf(
@@ -94,8 +147,11 @@ func (s *Spawner) SetMaxSynthUserQuota(maxSynthUserQuota uint64) error {
 	for i := range s.syntheticUsers {
 		synthUser := New(s.pipelineToRun.Clone())
 		synthUser.SetId(strconv.Itoa(i))
-		synthUser.RegisterStatusChangeFunc(s.OnStatusChangeCallback)
-		s.syntheticUsers[i] = Holder{user: synthUser}
+		synthUser.RegisterStatusChangeFunc(s.CountersHolder.OnStatusChangeCallback)
+
+		s.syntheticUsers[i] = Holder{
+			user: synthUser,
+		}
 		s.Counters().Ready++
 	}
 
@@ -117,45 +173,39 @@ func (s *Spawner) Register(registrar grpc.ServiceRegistrar) {
 }
 
 func (s *Spawner) Serve(ctx context.Context) error {
-	telemetryServerCtx, cancelFunc := context.WithCancel(ctx)
-	s.telemetryServerCancelFunc = cancelFunc
-	defer s.telemetryServerCancelFunc()
-
-	s.telemetryServerErrGroup.Go(func() error {
-		s.telemetryServer.Serve(telemetryServerCtx)
-		return nil
-	})
-
 	select {
 	case <-ctx.Done():
-		if s.ActiveUsers() == 0 {
-			s.mainLogger.Info().Msg("No active users running, exiting...")
+		if !s.activeSession.Load() {
+			s.mainLogger.Info().Msg("No active session, exiting...")
 			break
 		}
 
 		switch {
 		case errors.Is(context.Cause(ctx), harkErrors.GracefulShutdownRequested):
-			s.mainLogger.Info().Msg("Graceful shutdown requested, scaling all synthetic users to zero")
-			if err := s.ReconcileActiveUsers(0); err != nil {
-				s.mainLogger.Error().Err(err).Msg("Error while scaling all synthetic users to zero")
+			s.mainLogger.Info().Msg("Graceful shutdown requested, ending current session")
+			if err := s.EndSession(); err != nil {
+				s.mainLogger.Error().Err(err).Msg("Error while ending session")
 			}
 
 		case errors.Is(context.Cause(ctx), context.Canceled), errors.Is(context.Cause(ctx), harkErrors.ForcedShutdownRequested):
 			s.mainLogger.Warn().AnErr("reason", context.Cause(ctx)).Msg("Forced shutdown requested, stopping all running synthetic users")
-			s.syntheticUserCancelFunc()
+			s.activeSessionCancelFunc()
 		}
 
 		err := s.syntheticUserErrGroup.Wait()
 		s.mainLogger.Info().AnErr("userErrors", err).Msg("All synthetic users have been stopped")
-
-		break
 	}
 
 	s.telemetryServerCancelFunc()
+	s.activeSessionCancelFunc()
 	return s.telemetryServerErrGroup.Wait()
 }
 
 func (s *Spawner) ReconcileActiveUsers(requestedUsers uint64) error {
+	if !s.activeSession.Load() {
+		return harkErrors.NoSessionsInProgress
+	}
+
 	// If the lock cannot be acquired, return early with dedicated error
 	if reconcileStatus := s.reconcileMu.TryLock(); !reconcileStatus {
 		return ErrOtherActiveUsersReconcileInProgress
@@ -194,8 +244,8 @@ func (s *Spawner) scaleUpActiveUsers(requestedUsers uint64) error {
 		s.lastStartedUserIndex.Add(1)
 
 		// Create a new DSL context for every user
-		mainCtx := s.syntheticUserCtx.Load()
-		ctx, cancelFunc := dsl.NewContext(*mainCtx)
+		mainCtx := s.syntheticUserCtx
+		ctx, cancelFunc := dsl.NewContext(mainCtx)
 		ctx.Logger = &s.syntheticUsersLogger
 		ctx.LoadMetricsStorer = s.telemetryServer
 		ctx.Vars = s.Vars
@@ -247,14 +297,6 @@ func (s *Spawner) GetSyntheticUserCounters(_ context.Context, _ *emptypb.Empty) 
 	return s.Counters(), nil
 }
 
-func (s *Spawner) SetMaxSyntheticUsersQuota(_ context.Context, request *MaxSyntheticUsersQuotaRequest) (*emptypb.Empty, error) {
-	if err := s.SetMaxSynthUserQuota(request.GetNewQuota()); err != nil {
-		return nil, status.Error(codes.FailedPrecondition, err.Error())
-	}
-
-	return &emptypb.Empty{}, nil
-}
-
 func (s *Spawner) SetActiveSyntheticUsers(_ context.Context, request *ActiveSyntheticUsersRequest) (*ActiveSyntheticUsersResponse, error) {
 	previouslyActiveUsers := s.ActiveUsers()
 	if err := s.ReconcileActiveUsers(request.GetDesiredActiveSyntheticUsers()); err != nil {
@@ -265,15 +307,4 @@ func (s *Spawner) SetActiveSyntheticUsers(_ context.Context, request *ActiveSynt
 		PreviouslyActiveSyntheticUsers: previouslyActiveUsers,
 		CurrentlyActiveSyntheticUsers:  request.GetDesiredActiveSyntheticUsers(),
 	}, nil
-}
-
-func (s *Spawner) Shutdown(context.Context, *ShutdownRequest) (*emptypb.Empty, error) {
-	// First scale users to zero
-	if err := s.ReconcileActiveUsers(0); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	// Then, stop the telemetry server
-	s.telemetryServerCancelFunc()
-	return nil, s.telemetryServerErrGroup.Wait()
 }

@@ -2,7 +2,6 @@ package workspace
 
 import (
 	"context"
-	"errors"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/log"
 	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
@@ -159,7 +158,7 @@ func (w *Workspace) DeleteContent() error {
 		}
 	}
 
-	w.logger.Info().Str("location", w.Location()).Msg("workspace content cleaned")
+	w.logger.Info().Str("location", w.Location()).Msg("Workspace content cleaned")
 
 	return nil
 }
@@ -170,28 +169,18 @@ func (w *Workspace) Delete() error {
 		return err
 	}
 	w.location = ""
-	w.logger.Info().Str("location", oldLocation).Msg("workspace deleted")
+	w.logger.Info().Str("location", oldLocation).Msg("Workspace deleted")
 	return nil
 }
 
-func (w *Workspace) CompressToArchive(algorithm CompressionAlgorithm) ([]byte, error) {
-	switch algorithm {
-	case CompressionAlgorithm_ZIP:
-		archiver := ZipArchive{}
-		return archiver.Archive(w.location)
-	default:
-		return nil, errors.New("unknown compression algorithm: " + algorithm.String())
-	}
+func (w *Workspace) CompressToArchive() ([]byte, error) {
+	archiver := ZipArchive{}
+	return archiver.Archive(w.location)
 }
 
-func (w *Workspace) ExtractFromArchive(archiveContent []byte, algorithm CompressionAlgorithm) error {
-	switch algorithm {
-	case CompressionAlgorithm_ZIP:
-		extractor := ZipArchive{}
-		return extractor.Extract(archiveContent, w.location)
-	default:
-		return errors.New("unknown compression algorithm: " + algorithm.String())
-	}
+func (w *Workspace) ExtractFromArchive(archiveContent []byte) error {
+	extractor := ZipArchive{}
+	return extractor.Extract(archiveContent, w.location)
 }
 
 func (w *Workspace) Location() string {

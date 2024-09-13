@@ -6,7 +6,6 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/log"
 	"github.com/steromano87/harkonnen/v1/pkg/syntheticuser"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
-	"github.com/steromano87/harkonnen/v1/pkg/workspace"
 	"google.golang.org/grpc"
 	"io"
 )
@@ -14,21 +13,19 @@ import (
 type RosterEntry struct {
 	weight uint
 
-	agentClient     AgentClient
-	spawnerClient   syntheticuser.SpawnerClient
-	workspaceClient workspace.WorkspaceClient
-	metricsClient   telemetry.MetricsClient
-	logsClient      telemetry.LogsClient
+	agentClient   AgentClient
+	spawnerClient syntheticuser.SpawnerClient
+	metricsClient telemetry.MetricsClient
+	logsClient    telemetry.LogsClient
 }
 
 func NewRosterEntry(weight uint, cc grpc.ClientConnInterface) RosterEntry {
 	return RosterEntry{
-		weight:          weight,
-		agentClient:     NewAgentClient(cc),
-		spawnerClient:   syntheticuser.NewSpawnerClient(cc),
-		workspaceClient: workspace.NewWorkspaceClient(cc),
-		metricsClient:   telemetry.NewMetricsClient(cc),
-		logsClient:      telemetry.NewLogsClient(cc),
+		weight:        weight,
+		agentClient:   NewAgentClient(cc),
+		spawnerClient: syntheticuser.NewSpawnerClient(cc),
+		metricsClient: telemetry.NewMetricsClient(cc),
+		logsClient:    telemetry.NewLogsClient(cc),
 	}
 }
 
@@ -42,10 +39,6 @@ func (re RosterEntry) AgentClient() AgentClient {
 
 func (re RosterEntry) SpawnerClient() syntheticuser.SpawnerClient {
 	return re.spawnerClient
-}
-
-func (re RosterEntry) WorkspaceClient() workspace.WorkspaceClient {
-	return re.workspaceClient
 }
 
 func (re RosterEntry) MetricsClient() telemetry.MetricsClient {

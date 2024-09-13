@@ -6,22 +6,43 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/duration.proto";
 
 service Agent {
-  rpc Connect(ConnectRequest) returns (ConnectResponse) {}
+  rpc Handshake(Hello) returns (Welcome) {}
+  rpc BeginSession(BeginSessionRequest) returns (google.protobuf.Empty) {}
+  rpc EndSession(EndSessionRequest) returns (google.protobuf.Empty) {}
   rpc Shutdown(ShutdownRequest) returns (google.protobuf.Empty) {}
   rpc Status(google.protobuf.Empty) returns (StatusResponse) {}
 }
 
 //////////////////////////////////////////
 
-message ConnectRequest {
+message Hello {
   string controller_version = 1;
-  uint32 controller_port = 2;
 }
 
-message ConnectResponse {
+message Welcome {
   string injector_id = 1;
   string injector_version = 2;
 }
+
+//////////////////////////////////////////
+
+message BeginSessionRequest {
+  uint64 user_quota = 1;
+  WorkspaceArchive archive = 2;
+}
+
+message WorkspaceArchive {
+  bytes content = 1;
+  CompressionAlgorithm compression_algorithm = 2;
+}
+
+enum CompressionAlgorithm {
+  ZIP = 0;
+}
+
+//////////////////////////////////////////
+
+message EndSessionRequest {}
 
 //////////////////////////////////////////
 

@@ -2,6 +2,8 @@ package injector
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/injector/schedule"
 	"github.com/steromano87/harkonnen/v1/pkg/log"
@@ -24,7 +26,9 @@ type Controller struct {
 	scheduler Scheduler
 	profile   schedule.Profile
 
-	controlErrGroup errgroup.Group
+	schedulerErrGroup          errgroup.Group
+	metricsCollectorsErrGroup  errgroup.Group
+	metricsCollectorCancelFunc context.CancelFunc
 }
 
 func NewController(workdir string, logger zerolog.Logger) *Controller {
@@ -57,45 +61,24 @@ func (c *Controller) Serve(ctx context.Context) error {
 		return err
 	}
 
-	ctxWithLogger := c.logger.WithContext(ctx)
-	if err := c.initScheduler(ctxWithLogger); err != nil {
+	if err := c.initScheduler(); err != nil {
 		return err
 	}
 
-	// Start one goroutine to collect metricsClient for every roster entry
-	c.roster.Each(func(key string, entry RosterEntry) {
-		c.controlErrGroup.Go(func() error {
-			return entry.ReadSamples(ctxWithLogger)
-		})
-	})
-
-	workspaceArchive, err := c.workspace.CompressToArchive(workspace.CompressionAlgorithm_ZIP)
-	if err != nil {
-		c.logger.Error().Err(err).Msg("Unrecoverable error while compressing workspace")
+	if err := c.startSession(ctx); err != nil {
 		return err
 	}
 
-	c.roster.Each(func(key string, entry RosterEntry) {
-		_, err := entry.WorkspaceClient().Initialize(ctx, &workspace.InitializationRequest{
-			Archive:              workspaceArchive,
-			CompressionAlgorithm: workspace.CompressionAlgorithm_ZIP,
-		})
-		if err != nil {
-			c.logger.Error().Err(err).Str("agentId", key).Msg("Unrecoverable error while initializing agent")
-		}
-	})
+	// Start one goroutine to collect metrics for every roster entry
+	c.startMetricsCollectors(ctx)
 
-	if err := c.scheduler.InitSyntheticUsers(ctx); err != nil {
-		c.logger.Error().Err(err).Msg("Unrecoverable error while initializing synthetic users")
-		return err
-	}
-
-	c.controlErrGroup.Go(func() error {
+	// Start scheduler
+	c.schedulerErrGroup.Go(func() error {
 		return c.scheduler.Serve(ctx, c.config.Controller.Scheduler.UpdateInterval)
 	})
 
 	// Wait for scheduler shutdown before starting the teardown phase
-	if err := c.controlErrGroup.Wait(); err != nil {
+	if err := c.schedulerErrGroup.Wait(); err != nil {
 		c.logger.Error().Err(err).Msg("Encountered an error during runtime")
 		return err
 	}
@@ -104,6 +87,16 @@ func (c *Controller) Serve(ctx context.Context) error {
 	// is immediately aborted because parent context has already been canceled
 	tearDownCtx, tearDownCancelFunc := context.WithTimeout(context.TODO(), c.config.Controller.ShutdownTimeout)
 	defer tearDownCancelFunc()
+	if err := c.endSession(tearDownCtx); err != nil {
+		c.logger.Error().Err(err).Msg("Encountered an error while ending agent session")
+	}
+
+	// Stop metrics collectors before starting the teardown phase
+	// TODO: add timer to invoke cancel func after a timeout
+	//c.metricsCollectorCancelFunc()
+	if err := c.metricsCollectorsErrGroup.Wait(); err != nil {
+		c.logger.Error().Err(err).Msg("Encountered an error while shutting down metrics collectors")
+	}
 
 	if err := c.provider.TearDown(tearDownCtx); err != nil {
 		c.logger.Error().Err(err).Msg("Encountered an error during provider teardown phase")
@@ -133,7 +126,7 @@ func (c *Controller) initProvider(ctx context.Context) error {
 	}
 
 	c.provider = provider
-	ctxWithLogger := c.logger.WithContext(ctx)
+	ctxWithLogger := c.childLogger.WithContext(ctx)
 
 	rawInjectorSpec := c.config.RawInjectorSpec()
 	rawInjectorSpec.Set("workspace", c.workspace.Location())
@@ -145,7 +138,7 @@ func (c *Controller) initProvider(ctx context.Context) error {
 	return nil
 }
 
-func (c *Controller) initScheduler(ctx context.Context) error {
+func (c *Controller) initScheduler() error {
 	profile, err := schedule.Parse(c.config.Load.Profile.Kind, c.config.RawLoadProfileSpec())
 	if err != nil {
 		return err
@@ -153,7 +146,58 @@ func (c *Controller) initScheduler(ctx context.Context) error {
 	c.profile = profile
 
 	c.scheduler = NewScheduler(&c.roster, c.profile)
-	c.scheduler.SetLogger(*zerolog.Ctx(ctx))
+	c.scheduler.SetLogger(c.childLogger)
+
+	return nil
+}
+
+func (c *Controller) startSession(ctx context.Context) error {
+	workspaceArchive, err := c.workspace.CompressToArchive()
+	if err != nil {
+		c.logger.Error().Err(err).Msg("Unrecoverable error while compressing workspace")
+		return err
+	}
+
+	userQuotasByAgent := c.roster.SplitQuotasByWeight(c.profile.MaxSyntheticUsers())
+	for agentId, quota := range userQuotasByAgent {
+		c.logger.Info().Str(log.AgentId, agentId).Msg("Starting session")
+		currentAgent, ok := c.roster.Get(agentId)
+		if !ok {
+			return errors.New("cannot find agent with ID " + agentId)
+		}
+		request := &BeginSessionRequest{
+			UserQuota: quota,
+			Archive: &WorkspaceArchive{
+				Content: workspaceArchive,
+			},
+		}
+
+		if _, err := currentAgent.agentClient.BeginSession(ctx, request); err != nil {
+			return errors.New(fmt.Sprintf("cannot start session for agent %s: %s", agentId, err.Error()))
+		}
+	}
+
+	return nil
+}
+
+func (c *Controller) startMetricsCollectors(ctx context.Context) {
+	metricsCollectorCtx, metricsCollectorCancelFunc := context.WithCancel(ctx)
+	c.metricsCollectorCancelFunc = metricsCollectorCancelFunc
+	c.roster.Each(func(key string, entry RosterEntry) {
+		c.metricsCollectorsErrGroup.Go(func() error {
+			return entry.ReadSamples(metricsCollectorCtx)
+		})
+	})
+}
+
+func (c *Controller) endSession(ctx context.Context) error {
+	c.roster.Each(func(agentId string, rosterEntry RosterEntry) {
+		c.logger.Info().Str(log.AgentId, agentId).Msg("Stopping session")
+
+		if _, err := rosterEntry.AgentClient().EndSession(ctx, &EndSessionRequest{}); err != nil {
+			c.logger.Error().Err(err).Str(log.AgentId, agentId).Msg("Encountered an error while ending session")
+		}
+	})
 
 	return nil
 }

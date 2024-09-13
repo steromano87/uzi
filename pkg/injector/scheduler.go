@@ -37,23 +37,6 @@ func (s *Scheduler) SetLogger(logger zerolog.Logger) {
 	s.logger = logger.With().Str(log.ComponentKey, "Scheduler").Logger()
 }
 
-func (s *Scheduler) InitSyntheticUsers(ctx context.Context) error {
-	maxUsersQuotas := s.roster.SplitQuotasByWeight(s.profile.MaxSyntheticUsers())
-	for agentId, quota := range maxUsersQuotas {
-		currentUser, ok := s.roster.Get(agentId)
-		if !ok {
-			return errors.New("cannot find agentClient with ID " + agentId)
-		}
-		request := &syntheticuser.MaxSyntheticUsersQuotaRequest{NewQuota: quota}
-		_, err := currentUser.spawnerClient.SetMaxSyntheticUsersQuota(ctx, request)
-		if err != nil {
-			return errors.New(fmt.Sprintf("cannot initialize synthetic users for agentClient %s: %s", agentId, err.Error()))
-		}
-	}
-
-	return nil
-}
-
 func (s *Scheduler) Serve(ctx context.Context, updateInterval time.Duration) error {
 	s.start = time.Now()
 	s.ticker = time.NewTicker(updateInterval)
@@ -66,8 +49,15 @@ func (s *Scheduler) Serve(ctx context.Context, updateInterval time.Duration) err
 				s.logger.Info().Dur(
 					"totalDuration",
 					s.profile.TotalDuration(),
-				).Dur("currentDuration", elapsedTime).Msg("Load profile end reached, exiting")
-				return s.waitForUsersShutdown(ctx)
+				).Dur("currentDuration", elapsedTime).Msg("Load profile end reached")
+				s.ticker.Stop()
+
+				if err := s.stopAllUsers(ctx); err != nil {
+					s.logger.Error().Err(err).Msg("Encountered an error while stopping all users")
+					return err
+				}
+
+				return nil
 			}
 
 			s.logger.Debug().Dur("elapsedTime", elapsedTime).Msg("Updating total expected running users")
@@ -86,7 +76,8 @@ func (s *Scheduler) Serve(ctx context.Context, updateInterval time.Duration) err
 				s.logger.Warn().Msg("Forced shutdown requested, stopping all active users")
 			}
 
-			return s.waitForUsersShutdown(context.TODO())
+			s.ticker.Stop()
+			return s.stopAllUsers(context.TODO())
 		}
 	}
 }
@@ -95,13 +86,13 @@ func (s *Scheduler) updateActiveUsers(ctx context.Context, quotas map[string]uin
 	for agentId, quota := range quotas {
 		currentUser, ok := s.roster.Get(agentId)
 		if !ok {
-			return errors.New("cannot find agentClient with ID " + agentId)
+			return errors.New("cannot find agent with ID " + agentId)
 		}
 
 		request := &syntheticuser.ActiveSyntheticUsersRequest{DesiredActiveSyntheticUsers: quota}
 		response, err := currentUser.spawnerClient.SetActiveSyntheticUsers(ctx, request)
 		if err != nil {
-			return errors.New(fmt.Sprintf("error while updating running users for agentClient %s: %s", agentId, err.Error()))
+			return errors.New(fmt.Sprintf("error while updating running users for agent %s: %s", agentId, err.Error()))
 		}
 
 		s.logger.Debug().Uint64(
@@ -114,26 +105,35 @@ func (s *Scheduler) updateActiveUsers(ctx context.Context, quotas map[string]uin
 	return nil
 }
 
-func (s *Scheduler) waitForUsersShutdown(ctx context.Context) error {
-	s.logger.Info().Msg("Waiting for all active users to shutdown")
+func (s *Scheduler) stopAllUsers(ctx context.Context) error {
+	s.logger.Info().Msg("Sending request to stop all users...")
+	var scaleErrors error
 
-	var updateErr error
 	s.roster.Each(func(agentId string, rosterEntry RosterEntry) {
-		if _, err := rosterEntry.SpawnerClient().Shutdown(ctx, &syntheticuser.ShutdownRequest{}); err != nil {
-			s.logger.Error().Err(err).Str("agentId", agentId).Msg("Cannot scale active users to zero")
-			updateErr = errors.Join(updateErr, err)
+		request := &syntheticuser.ActiveSyntheticUsersRequest{DesiredActiveSyntheticUsers: 0}
+		_, err := rosterEntry.spawnerClient.SetActiveSyntheticUsers(ctx, request)
+		if err != nil {
+			s.logger.Error().Err(err).Str(log.AgentId, agentId).Msg("Error while stopping all users")
+			errors.Join(scaleErrors, err)
 		}
 	})
 
-	if updateErr != nil {
-		return updateErr
+	if scaleErrors != nil {
+		return scaleErrors
 	}
 
+	s.logger.Info().Msg("All stop requests sent")
+	return s.waitForUsersStop(ctx)
+}
+
+func (s *Scheduler) waitForUsersStop(ctx context.Context) error {
+	s.logger.Info().Msg("Waiting for all users to stop...")
 	timeoutCtx, cancelFunc := context.WithTimeout(ctx, s.shutDownTimeout)
 
 	for {
 		select {
 		case <-timeoutCtx.Done():
+			s.logger.Warn().Msg("Timed out waiting for all users to stop")
 			cancelFunc()
 			return nil
 
@@ -142,7 +142,7 @@ func (s *Scheduler) waitForUsersShutdown(ctx context.Context) error {
 			s.roster.Each(func(agentId string, entry RosterEntry) {
 				activeUsersResponse, err := entry.SpawnerClient().GetSyntheticUserCounters(ctx, &emptypb.Empty{})
 				if err != nil {
-					s.logger.Error().Err(err).Str("agentId", agentId).Msg("cannot get synthetic user counters, skipping to next agentClient")
+					s.logger.Error().Err(err).Str(log.AgentId, agentId).Msg("cannot get synthetic user counters, skipping to next agent")
 				}
 				totalNonStoppedUsers += activeUsersResponse.GetSetupInProgress() +
 					activeUsersResponse.GetRunning() +
@@ -153,12 +153,12 @@ func (s *Scheduler) waitForUsersShutdown(ctx context.Context) error {
 			s.logger.Debug().Uint64("activeUsers", totalNonStoppedUsers).Msg("Users status counters updated")
 
 			if totalNonStoppedUsers == 0 {
+				s.logger.Info().Msg("All users stopped")
 				cancelFunc()
 				return nil
 			}
 
 			time.Sleep(1 * time.Second)
 		}
-
 	}
 }

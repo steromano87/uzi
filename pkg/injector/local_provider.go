@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 	"github.com/steromano87/harkonnen/v1/pkg/log"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"time"
@@ -28,6 +29,7 @@ type LocalProvider struct {
 	localRosterEntry     RosterEntry
 	localAgentCtx        context.Context
 	localAgentCancelFunc context.CancelFunc
+	localAgentErrGroup   errgroup.Group
 	localLogger          zerolog.Logger
 
 	spec LocalProviderSpec
@@ -54,17 +56,12 @@ func (l *LocalProvider) Init(ctx context.Context, spec *viper.Viper) (Roster, er
 	l.localAgentCtx, l.localAgentCancelFunc = context.WithCancel(context.WithoutCancel(ctx))
 	l.localAgent = NewAgent("local", *logger, grpcChannel)
 
-	/*if err := l.localAgent.InitializeFromWorkspace(); err != nil {
-		return Roster{}, err
-	}*/
-
 	l.localRosterEntry = NewRosterEntry(1, grpcChannel)
 	roster := NewRoster()
 	roster.Put("local", l.localRosterEntry)
-
-	go func() {
-		_ = l.localAgent.Serve(l.localAgentCtx)
-	}()
+	l.localAgentErrGroup.Go(func() error {
+		return l.localAgent.Serve(l.localAgentCtx)
+	})
 
 	// Poll local agentClient until it is in READY status
 	localAgentStatus := Status_STARTING
@@ -76,12 +73,12 @@ func (l *LocalProvider) Init(ctx context.Context, spec *viper.Viper) (Roster, er
 
 		select {
 		case <-statusPollCtx.Done():
-			return Roster{}, errors.New("timed out waiting for local agentClient to start")
+			return Roster{}, errors.New("timed out waiting for local agent to start")
 
 		default:
 			statusResponse, err := l.localRosterEntry.agentClient.Status(statusPollCtx, &emptypb.Empty{})
 			if err != nil {
-				l.localLogger.Error().Err(err).Msg("Encountered an error while retrieving the status of the local agentClient, retrying...")
+				l.localLogger.Error().Err(err).Msg("Encountered an error while retrieving the status of the local agent, retrying...")
 			}
 			localAgentStatus = statusResponse.GetStatus()
 			if localAgentStatus == Status_BUSY {
@@ -91,7 +88,7 @@ func (l *LocalProvider) Init(ctx context.Context, spec *viper.Viper) (Roster, er
 
 	}
 
-	l.localLogger.Info().Msg("Local agentClient started")
+	l.localLogger.Info().Msg("Local agent started")
 
 	return roster, nil
 
@@ -100,7 +97,7 @@ func (l *LocalProvider) Init(ctx context.Context, spec *viper.Viper) (Roster, er
 func (l *LocalProvider) TearDown(ctx context.Context) error {
 	defer l.localAgentCancelFunc()
 
-	l.localLogger.Info().Msg("Shutting down local agentClient")
+	l.localLogger.Info().Msg("Shutting down local agent")
 	request := ShutdownRequest{
 		Forced:  false,
 		Timeout: durationpb.New(l.spec.ShutdownTimeout),
@@ -110,8 +107,11 @@ func (l *LocalProvider) TearDown(ctx context.Context) error {
 		l.localLogger.Error().Err(err).Msg("Shutdown request failed")
 		return err
 	}
-	l.localLogger.Info().Msg("Waiting for local agentClient shutdown...")
-	l.localAgent.Wait()
-	l.localLogger.Info().Msg("Local agentClient shutdown completed")
+	l.localLogger.Info().Msg("Waiting for local agent shutdown...")
+	if err := l.localAgentErrGroup.Wait(); err != nil {
+		l.localLogger.Error().Err(err).Msg("Agent client shutdown failed")
+		return err
+	}
+	l.localLogger.Info().Msg("Local agent shutdown completed")
 	return nil
 }

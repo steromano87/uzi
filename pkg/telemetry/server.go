@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"github.com/rs/zerolog"
+	harkErrors "github.com/steromano87/harkonnen/v1/pkg/errors"
 	"github.com/steromano87/harkonnen/v1/pkg/log"
 	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
 	"google.golang.org/grpc"
 	"sync"
+	"sync/atomic"
 )
 
 var ErrFullBuffer = errors.New("full buffer")
@@ -15,6 +17,8 @@ var ErrFullBuffer = errors.New("full buffer")
 type Server struct {
 	UnimplementedMetricsServer
 	UnimplementedLogsServer
+
+	activeSession atomic.Bool
 
 	samplesBuffer           chan *Sample
 	transactionsBuffer      chan *Transaction
@@ -51,10 +55,13 @@ func (s *Server) Reconfigure(config *configuration.Manifest) {
 	s.hostMetricsBuffer = make(chan *HostMetrics, config.Telemetry.HostMetrics.BufferCapacity)
 }
 
-func (s *Server) Serve(ctx context.Context) {
+func (s *Server) ServeSession(ctx context.Context) {
 	s.setLogger(zerolog.Ctx(ctx))
 	s.controlCtx = ctx
+
+	s.activeSession.Store(true)
 	<-s.controlCtx.Done()
+	s.activeSession.Store(false)
 	s.streamWG.Wait()
 }
 
@@ -68,6 +75,10 @@ func (s *Server) setLogger(logger *zerolog.Logger) {
 ///////////////////////////
 
 func (s *Server) StoreSample(sample *Sample) error {
+	if !s.activeSession.Load() {
+		return harkErrors.NoSessionsInProgress
+	}
+
 	select {
 	case s.samplesBuffer <- sample:
 		s.logger.Trace().Msg("Saved sample")
@@ -78,6 +89,10 @@ func (s *Server) StoreSample(sample *Sample) error {
 }
 
 func (s *Server) StoreTransaction(transaction *Transaction) error {
+	if !s.activeSession.Load() {
+		return harkErrors.NoSessionsInProgress
+	}
+
 	select {
 	case s.transactionsBuffer <- transaction:
 		s.logger.Trace().Msg("Saved transaction")
@@ -88,6 +103,10 @@ func (s *Server) StoreTransaction(transaction *Transaction) error {
 }
 
 func (s *Server) StoreIterationCounters(counters *IterationCounters) error {
+	if !s.activeSession.Load() {
+		return harkErrors.NoSessionsInProgress
+	}
+
 	select {
 	case s.iterationCountersBuffer <- counters:
 		s.logger.Trace().Msg("Saved iteration counters")
@@ -98,6 +117,10 @@ func (s *Server) StoreIterationCounters(counters *IterationCounters) error {
 }
 
 func (s *Server) StoreHostMetrics(agentMetrics *HostMetrics) error {
+	if !s.activeSession.Load() {
+		return harkErrors.NoSessionsInProgress
+	}
+
 	select {
 	case s.hostMetricsBuffer <- agentMetrics:
 		s.logger.Trace().Msg("Saved host metrics")
@@ -108,6 +131,10 @@ func (s *Server) StoreHostMetrics(agentMetrics *HostMetrics) error {
 }
 
 func (s *Server) StoreLogEntry(entry *LogEntry) error {
+	if !s.activeSession.Load() {
+		return harkErrors.NoSessionsInProgress
+	}
+
 	select {
 	case s.logsBuffer <- entry:
 		s.logger.Trace().Msg("Saved log entry")
@@ -118,6 +145,10 @@ func (s *Server) StoreLogEntry(entry *LogEntry) error {
 }
 
 func (s *Server) Write(p []byte) (n int, err error) {
+	if !s.activeSession.Load() {
+		return 0, harkErrors.NoSessionsInProgress
+	}
+
 	entry := &LogEntry{
 		RawData: p,
 	}
@@ -133,6 +164,10 @@ func (s *Server) Write(p []byte) (n int, err error) {
 /////////////////////////
 
 func (s *Server) GetSamples(_ *SampleStreamRequest, g grpc.ServerStreamingServer[Sample]) error {
+	if !s.activeSession.Load() {
+		return harkErrors.NoSessionsInProgress
+	}
+
 	s.streamWG.Add(1)
 	defer s.streamWG.Done()
 
@@ -153,6 +188,10 @@ func (s *Server) GetSamples(_ *SampleStreamRequest, g grpc.ServerStreamingServer
 }
 
 func (s *Server) GetTransactions(_ *TransactionStreamRequest, g grpc.ServerStreamingServer[Transaction]) error {
+	if !s.activeSession.Load() {
+		return harkErrors.NoSessionsInProgress
+	}
+
 	s.streamWG.Add(1)
 	defer s.streamWG.Done()
 
@@ -173,6 +212,10 @@ func (s *Server) GetTransactions(_ *TransactionStreamRequest, g grpc.ServerStrea
 }
 
 func (s *Server) GetIterationCounters(_ *IterationCountersStreamRequest, g grpc.ServerStreamingServer[IterationCounters]) error {
+	if !s.activeSession.Load() {
+		return harkErrors.NoSessionsInProgress
+	}
+
 	s.streamWG.Add(1)
 	defer s.streamWG.Done()
 
@@ -193,6 +236,10 @@ func (s *Server) GetIterationCounters(_ *IterationCountersStreamRequest, g grpc.
 }
 
 func (s *Server) GetHostMetrics(_ *HostMetricsStreamRequest, g grpc.ServerStreamingServer[HostMetrics]) error {
+	if !s.activeSession.Load() {
+		return harkErrors.NoSessionsInProgress
+	}
+
 	s.streamWG.Add(1)
 	defer s.streamWG.Done()
 
@@ -213,6 +260,10 @@ func (s *Server) GetHostMetrics(_ *HostMetricsStreamRequest, g grpc.ServerStream
 }
 
 func (s *Server) GetLogEntries(_ *LogEntriesStreamRequest, g grpc.ServerStreamingServer[LogEntry]) error {
+	if !s.activeSession.Load() {
+		return harkErrors.NoSessionsInProgress
+	}
+
 	s.streamWG.Add(1)
 	defer s.streamWG.Done()
 
