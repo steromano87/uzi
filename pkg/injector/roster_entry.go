@@ -1,13 +1,9 @@
 package injector
 
 import (
-	"context"
-	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/log"
 	"github.com/steromano87/harkonnen/v1/pkg/syntheticuser"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"google.golang.org/grpc"
-	"io"
 )
 
 type RosterEntry struct {
@@ -47,24 +43,4 @@ func (re RosterEntry) MetricsClient() telemetry.MetricsClient {
 
 func (re RosterEntry) LogsClient() telemetry.LogsClient {
 	return re.logsClient
-}
-
-func (re RosterEntry) ReadSamples(ctx context.Context) error {
-	logger := zerolog.Ctx(ctx).With().Str(log.ComponentKey, "metricsClient reader").Logger()
-	serverStream, err := re.MetricsClient().GetSamples(ctx, &telemetry.SampleStreamRequest{})
-	if err != nil {
-		return err
-	}
-
-	for {
-		sample, err := serverStream.Recv()
-		if err == io.EOF {
-			return nil
-		}
-
-		if err != nil {
-			return err
-		}
-		logger.Debug().Str("name", sample.GetName()).Str("kind", sample.GetKind()).Msg("Received sample")
-	}
 }

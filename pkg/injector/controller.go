@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/injector/schedule"
 	"github.com/steromano87/harkonnen/v1/pkg/log"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 	"github.com/steromano87/harkonnen/v1/pkg/workspace"
 	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
 	"golang.org/x/sync/errgroup"
+	"time"
 )
 
 type Controller struct {
@@ -26,9 +28,9 @@ type Controller struct {
 	scheduler Scheduler
 	profile   schedule.Profile
 
-	schedulerErrGroup          errgroup.Group
-	metricsCollectorsErrGroup  errgroup.Group
-	metricsCollectorCancelFunc context.CancelFunc
+	schedulerErrGroup   errgroup.Group
+	persistorErrGroup   *errgroup.Group
+	persistorCancelFunc context.CancelFunc
 }
 
 func NewController(workdir string, logger zerolog.Logger) *Controller {
@@ -69,9 +71,6 @@ func (c *Controller) Serve(ctx context.Context) error {
 		return err
 	}
 
-	// Start one goroutine to collect metrics for every roster entry
-	c.startMetricsCollectors(ctx)
-
 	// Start scheduler
 	c.schedulerErrGroup.Go(func() error {
 		return c.scheduler.Serve(ctx, c.config.Controller.Scheduler.UpdateInterval)
@@ -93,8 +92,8 @@ func (c *Controller) Serve(ctx context.Context) error {
 
 	// Stop metrics collectors before starting the teardown phase
 	// TODO: add timer to invoke cancel func after a timeout
-	//c.metricsCollectorCancelFunc()
-	if err := c.metricsCollectorsErrGroup.Wait(); err != nil {
+	//c.persistorCancelFunc()
+	if err := c.persistorErrGroup.Wait(); err != nil {
 		c.logger.Error().Err(err).Msg("Encountered an error while shutting down metrics collectors")
 	}
 
@@ -158,6 +157,17 @@ func (c *Controller) startSession(ctx context.Context) error {
 		return err
 	}
 
+	persistorCtx, persistorCancelFunc := context.WithCancel(ctx)
+	c.persistorCancelFunc = persistorCancelFunc
+	c.persistorErrGroup, _ = errgroup.WithContext(persistorCtx)
+
+	// Start a new run
+	runName := time.Now().Format(time.RFC3339)
+	if err := c.workspace.CreateRun(ctx, runName); err != nil {
+		c.logger.Error().Err(err).Str("runName", runName).Msg("Encountered an error while creating run")
+		return err
+	}
+
 	userQuotasByAgent := c.roster.SplitQuotasByWeight(c.profile.MaxSyntheticUsers())
 	for agentId, quota := range userQuotasByAgent {
 		c.logger.Info().Str(log.AgentId, agentId).Msg("Starting session")
@@ -175,19 +185,16 @@ func (c *Controller) startSession(ctx context.Context) error {
 		if _, err := currentAgent.agentClient.BeginSession(ctx, request); err != nil {
 			return errors.New(fmt.Sprintf("cannot start session for agent %s: %s", agentId, err.Error()))
 		}
+
+		// Start one persistor for each agent
+		c.persistorErrGroup.Go(func() error {
+			DB := c.workspace.CurrentRun().DB()
+			persistor := db.NewPersistor(DB)
+			return persistor.Serve(persistorCtx, agentId, currentAgent.MetricsClient(), currentAgent.LogsClient())
+		})
 	}
 
 	return nil
-}
-
-func (c *Controller) startMetricsCollectors(ctx context.Context) {
-	metricsCollectorCtx, metricsCollectorCancelFunc := context.WithCancel(ctx)
-	c.metricsCollectorCancelFunc = metricsCollectorCancelFunc
-	c.roster.Each(func(key string, entry RosterEntry) {
-		c.metricsCollectorsErrGroup.Go(func() error {
-			return entry.ReadSamples(metricsCollectorCtx)
-		})
-	})
 }
 
 func (c *Controller) endSession(ctx context.Context) error {
