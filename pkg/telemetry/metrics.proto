@@ -22,12 +22,12 @@ message SampleStreamRequest {
 message Sample {
   google.protobuf.Timestamp timestamp = 1;
   string synthetic_user_id = 2;
-  google.protobuf.Duration duration = 3;
 
-  string name = 4;
-  uint64 sent_bytes = 5;
-  uint64 received_bytes = 6;
-  string kind = 7;
+  string name = 3;
+  string kind = 4;
+  google.protobuf.Duration duration = 5;
+  uint64 sent_bytes = 6;
+  uint64 received_bytes = 7;
 
   oneof sample_data {
     Rest rest = 100;
