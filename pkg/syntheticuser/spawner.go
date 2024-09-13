@@ -51,8 +51,8 @@ type Spawner struct {
 	telemetryServerErrGroup   errgroup.Group
 	telemetryServerCancelFunc context.CancelFunc
 
-	mainLogger           zerolog.Logger
-	syntheticUsersLogger zerolog.Logger
+	mainLogger  zerolog.Logger
+	childLogger zerolog.Logger
 
 	Vars   *variables.Holder
 	config *configuration.Manifest
@@ -80,7 +80,7 @@ func (s *Spawner) BeginSession(pip *pipeline.Pipeline, maxUserQuota uint64, conf
 	s.telemetryServer.Reconfigure(config)
 
 	// All inner contexts are derived from the session one
-	s.activeSessionCtx, s.activeSessionCancelFunc = context.WithCancel(context.Background())
+	s.activeSessionCtx, s.activeSessionCancelFunc = context.WithCancel(s.childLogger.WithContext(context.Background()))
 	s.syntheticUserCtx, s.syntheticUserCancelFunc = context.WithCancel(s.activeSessionCtx)
 	if err := s.initializeSynthUsers(maxUserQuota); err != nil {
 		s.mainLogger.Error().Err(err).Msg("Encountered an error while initializing synthetic users")
@@ -162,7 +162,7 @@ func (s *Spawner) initializeSynthUsers(maxSynthUserQuota uint64) error {
 }
 
 func (s *Spawner) SetLogger(logger zerolog.Logger) {
-	s.syntheticUsersLogger = logger
+	s.childLogger = logger
 	s.mainLogger = logger.With().Str(log.ComponentKey, "spawner").Logger()
 }
 
@@ -246,7 +246,7 @@ func (s *Spawner) scaleUpActiveUsers(requestedUsers uint64) error {
 		// Create a new DSL context for every user
 		mainCtx := s.syntheticUserCtx
 		ctx, cancelFunc := dsl.NewContext(mainCtx)
-		ctx.Logger = &s.syntheticUsersLogger
+		ctx.Logger = &s.childLogger
 		ctx.LoadMetricsStorer = s.telemetryServer
 		ctx.Vars = s.Vars
 		ctx.Config = s.config
