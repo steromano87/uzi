@@ -57,12 +57,14 @@ func (s *Server) Reconfigure(config *configuration.Manifest) {
 
 func (s *Server) ServeSession(ctx context.Context) {
 	s.setLogger(zerolog.Ctx(ctx))
+	s.logger.Info().Msg("Telemetry server started")
 	s.controlCtx = ctx
 
 	s.activeSession.Store(true)
 	<-s.controlCtx.Done()
 	s.activeSession.Store(false)
 	s.streamWG.Wait()
+	s.logger.Info().Msg("Telemetry server stopped")
 }
 
 func (s *Server) setLogger(logger *zerolog.Logger) {
@@ -165,11 +167,14 @@ func (s *Server) Write(p []byte) (n int, err error) {
 
 func (s *Server) GetSamples(_ *SampleStreamRequest, g grpc.ServerStreamingServer[Sample]) error {
 	if !s.activeSession.Load() {
+		s.logger.Error().Msg("Cannot start sample streaming, no sessions in progress")
 		return harkErrors.NoSessionsInProgress
 	}
 
 	s.streamWG.Add(1)
 	defer s.streamWG.Done()
+
+	s.logger.Info().Msg("Start sample streaming")
 
 	for {
 		select {
@@ -189,11 +194,14 @@ func (s *Server) GetSamples(_ *SampleStreamRequest, g grpc.ServerStreamingServer
 
 func (s *Server) GetTransactions(_ *TransactionStreamRequest, g grpc.ServerStreamingServer[Transaction]) error {
 	if !s.activeSession.Load() {
+		s.logger.Error().Msg("Cannot start transaction streaming, no sessions in progress")
 		return harkErrors.NoSessionsInProgress
 	}
 
 	s.streamWG.Add(1)
 	defer s.streamWG.Done()
+
+	s.logger.Info().Msg("Start transaction streaming")
 
 	for {
 		select {
@@ -213,11 +221,14 @@ func (s *Server) GetTransactions(_ *TransactionStreamRequest, g grpc.ServerStrea
 
 func (s *Server) GetIterationCounters(_ *IterationCountersStreamRequest, g grpc.ServerStreamingServer[IterationCounters]) error {
 	if !s.activeSession.Load() {
+		s.logger.Error().Msg("Cannot start iteration counters streaming, no sessions in progress")
 		return harkErrors.NoSessionsInProgress
 	}
 
 	s.streamWG.Add(1)
 	defer s.streamWG.Done()
+
+	s.logger.Info().Msg("Start iteration counters streaming")
 
 	for {
 		select {
@@ -237,11 +248,14 @@ func (s *Server) GetIterationCounters(_ *IterationCountersStreamRequest, g grpc.
 
 func (s *Server) GetHostMetrics(_ *HostMetricsStreamRequest, g grpc.ServerStreamingServer[HostMetrics]) error {
 	if !s.activeSession.Load() {
+		s.logger.Error().Msg("Cannot start host metrics streaming, no sessions in progress")
 		return harkErrors.NoSessionsInProgress
 	}
 
 	s.streamWG.Add(1)
 	defer s.streamWG.Done()
+
+	s.logger.Info().Msg("Start host metrics streaming")
 
 	for {
 		select {
@@ -261,11 +275,14 @@ func (s *Server) GetHostMetrics(_ *HostMetricsStreamRequest, g grpc.ServerStream
 
 func (s *Server) GetLogEntries(_ *LogEntriesStreamRequest, g grpc.ServerStreamingServer[LogEntry]) error {
 	if !s.activeSession.Load() {
+		s.logger.Error().Msg("Cannot start logs streaming, no sessions in progress")
 		return harkErrors.NoSessionsInProgress
 	}
 
 	s.streamWG.Add(1)
 	defer s.streamWG.Done()
+
+	s.logger.Info().Msg("Start logs streaming")
 
 	for {
 		select {
