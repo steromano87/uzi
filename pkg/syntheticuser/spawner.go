@@ -69,6 +69,10 @@ func NewSpawner(logger zerolog.Logger) *Spawner {
 	return spawner
 }
 
+func (s *Spawner) TelemetryServer() *telemetry.Server {
+	return s.telemetryServer
+}
+
 func (s *Spawner) BeginSession(pip *pipeline.Pipeline, maxUserQuota uint64, config *configuration.Manifest) error {
 	if s.activeSession.Load() {
 		return harkErrors.SessionAlreadyInProgress

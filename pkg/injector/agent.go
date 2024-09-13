@@ -9,6 +9,7 @@ import (
 	harkErrors "github.com/steromano87/harkonnen/v1/pkg/errors"
 	"github.com/steromano87/harkonnen/v1/pkg/log"
 	"github.com/steromano87/harkonnen/v1/pkg/syntheticuser"
+	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 	"github.com/steromano87/harkonnen/v1/pkg/version"
 	"github.com/steromano87/harkonnen/v1/pkg/workspace"
@@ -28,8 +29,9 @@ type Agent struct {
 	logger zerolog.Logger
 	vars   *variables.Holder
 
-	spawner   *syntheticuser.Spawner
-	workspace workspace.Workspace
+	spawner          *syntheticuser.Spawner
+	hostMetricsProbe *telemetry.HostMetricsProbe
+	workspace        workspace.Workspace
 
 	activeSession atomic.Bool
 
@@ -48,6 +50,7 @@ func NewAgent(id string, logger zerolog.Logger, registrar grpc.ServiceRegistrar)
 
 	agent.spawner = syntheticuser.NewSpawner(logger)
 	agent.workspace = workspace.NewTemp()
+	agent.hostMetricsProbe = telemetry.NewHostMetricsProbe(agent.spawner.TelemetryServer())
 
 	agent.setLogger(logger)
 	agent.setStatus(Status_STARTING)
@@ -208,6 +211,13 @@ func (a *Agent) BeginSession(_ context.Context, request *BeginSessionRequest) (*
 		return nil, err
 	}
 
+	a.goroutinesErrorGroup.Go(func() error {
+		a.hostMetricsProbe.Serve(
+			a.selfControlCtx,
+			config.Telemetry.HostMetrics.PollInterval,
+			config.Telemetry.HostMetrics.MeasureInterval)
+		return nil
+	})
 	a.activeSession.Store(true)
 
 	return &emptypb.Empty{}, nil
