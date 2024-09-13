@@ -46,9 +46,9 @@ func setupDefaultLogger() zerolog.Logger {
 		logLevel = zerolog.InfoLevel
 	}
 
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMicro
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixNano
 	consoleWriter := zerolog.NewConsoleWriter()
-	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000"
+	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000000"
 	return zerolog.New(consoleWriter).Level(logLevel).With().Timestamp().Logger()
 }
 
