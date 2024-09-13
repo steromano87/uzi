@@ -14,11 +14,11 @@ func init() {
 
 type Sample struct {
 	Id              uint           `gorm:"primaryKey;autoincrement"`
-	Timestamp       datatypes.Date `gorm:"index"`
+	Timestamp       datatypes.Date `gorm:"index:idx_sample_timestamp"`
 	AgentId         string         `gorm:"index:idx_sample_agent_user"`
 	SyntheticUserId string         `gorm:"index:idx_sample_agent_user"`
 	Name            string         `gorm:"index:idx_sample_name"`
-	Kind            string
+	Kind            string         `gorm:"index:idx_sample_kind"`
 	Duration        time.Duration
 	SentBytes       uint64
 	ReceivedBytes   uint64

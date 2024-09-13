@@ -7,8 +7,9 @@ func init() {
 }
 
 type HostMetric struct {
-	Origin    string         `gorm:"primaryKey"`
-	Timestamp datatypes.Date `gorm:"primaryKey"`
+	Id        uint           `gorm:"primaryKey;autoincrement"`
+	AgentId   string         `gorm:"index:idx_host_metrics_agent"`
+	Timestamp datatypes.Date `gorm:"index:idx_host_metrics_timestamp"`
 
 	CPU    float64
 	Memory struct {

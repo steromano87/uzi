@@ -9,11 +9,8 @@ func init() {
 }
 
 type Log struct {
-	ID        uint           `gorm:"primaryKey;autoincrement"`
-	Timestamp datatypes.Date `gorm:"index"`
-	HostID    string         `gorm:"index"`
-	Level     string         `gorm:"index"`
-	Component string
-	Message   string
-	Data      datatypes.JSON
+	Id        uint           `gorm:"primaryKey;autoincrement"`
+	AgentId   string         `gorm:"index:idx_logs_agent"`
+	Timestamp datatypes.Date `gorm:"index:idx_logs_timestamp"`
+	RawData   datatypes.JSON
 }
