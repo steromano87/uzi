@@ -22,11 +22,16 @@ func NewRun(ctx context.Context, name string, parentFolder string) (*Run, error)
 	run := new(Run)
 	run.name = name
 	run.parentFolder = parentFolder
-	if err := os.MkdirAll(path.Join(parentFolder, name), FolderPerms); err != nil {
+	if err := os.MkdirAll(path.Join(parentFolder, RunsFolder, name), FolderPerms); err != nil {
 		return nil, err
 	}
 
-	run.dbAdapter = db.NewAdapter(path.Join(parentFolder, name, DBDataFile))
+	run.dbAdapter = db.NewAdapter(path.Join(parentFolder, RunsFolder, name, DBDataFile))
+
+	if err := run.dbAdapter.Connect(); err != nil {
+		return nil, err
+	}
+
 	if err := run.dbAdapter.MigrateAll(ctx); err != nil {
 		return nil, err
 	}
@@ -38,7 +43,7 @@ func LoadRun(name string, parentFolder string) *Run {
 	run := new(Run)
 	run.name = name
 	run.parentFolder = parentFolder
-	run.dbAdapter = db.NewAdapter(path.Join(parentFolder, name, DBDataFile))
+	run.dbAdapter = db.NewAdapter(path.Join(parentFolder, RunsFolder, name, DBDataFile))
 
 	return run
 }

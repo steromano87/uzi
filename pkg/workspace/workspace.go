@@ -259,3 +259,7 @@ func (w *Workspace) DeleteRun(name string) error {
 	}
 	return os.RemoveAll(path.Join(w.location, name))
 }
+
+func (w *Workspace) CurrentRun() *Run {
+	return w.currentRun
+}
