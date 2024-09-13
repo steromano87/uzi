@@ -7,10 +7,12 @@ import (
 	harkErrors "github.com/steromano87/harkonnen/v1/pkg/errors"
 	"github.com/steromano87/harkonnen/v1/pkg/log"
 	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
-	"sync"
 	"sync/atomic"
 )
+
+const semaphoreWeight = 5
 
 var ErrFullBuffer = errors.New("full buffer")
 
@@ -28,8 +30,8 @@ type Server struct {
 
 	logger *zerolog.Logger
 
-	controlCtx context.Context
-	streamWG   sync.WaitGroup
+	controlCtx      context.Context
+	streamSemaphore *semaphore.Weighted
 }
 
 func NewServer() *Server {
@@ -40,6 +42,7 @@ func NewServer() *Server {
 	server.iterationCountersBuffer = make(chan *IterationCounters, config.Telemetry.LoadMetrics.BufferCapacity)
 	server.logsBuffer = make(chan *LogEntry, config.Telemetry.Logs.BufferCapacity)
 	server.hostMetricsBuffer = make(chan *HostMetrics, config.Telemetry.HostMetrics.BufferCapacity)
+	server.streamSemaphore = semaphore.NewWeighted(semaphoreWeight)
 
 	logger := zerolog.Nop()
 	server.setLogger(&logger)
@@ -55,16 +58,17 @@ func (s *Server) Reconfigure(config *configuration.Manifest) {
 	s.hostMetricsBuffer = make(chan *HostMetrics, config.Telemetry.HostMetrics.BufferCapacity)
 }
 
-func (s *Server) ServeSession(ctx context.Context) {
+func (s *Server) ServeSession(ctx context.Context) error {
 	s.setLogger(zerolog.Ctx(ctx))
 	s.logger.Info().Msg("Telemetry server started")
+	defer s.logger.Info().Msg("Telemetry server stopped")
 	s.controlCtx = ctx
 
 	s.activeSession.Store(true)
+	defer s.activeSession.Store(false)
+
 	<-s.controlCtx.Done()
-	s.activeSession.Store(false)
-	s.streamWG.Wait()
-	s.logger.Info().Msg("Telemetry server stopped")
+	return s.streamSemaphore.Acquire(context.Background(), semaphoreWeight)
 }
 
 func (s *Server) setLogger(logger *zerolog.Logger) {
@@ -167,12 +171,15 @@ func (s *Server) Write(p []byte) (n int, err error) {
 
 func (s *Server) GetSamples(_ *SampleStreamRequest, g grpc.ServerStreamingServer[Sample]) error {
 	if !s.activeSession.Load() {
-		s.logger.Error().Msg("Cannot start sample streaming, no sessions in progress")
+		s.logger.Error().Err(harkErrors.NoSessionsInProgress).Msg("Cannot start sample streaming")
 		return harkErrors.NoSessionsInProgress
 	}
 
-	s.streamWG.Add(1)
-	defer s.streamWG.Done()
+	if err := s.streamSemaphore.Acquire(s.controlCtx, 1); err != nil {
+		s.logger.Error().Err(err).Msg("Cannot start sample streaming")
+		return err
+	}
+	defer s.streamSemaphore.Release(1)
 
 	s.logger.Info().Msg("Start sample streaming")
 
@@ -194,12 +201,15 @@ func (s *Server) GetSamples(_ *SampleStreamRequest, g grpc.ServerStreamingServer
 
 func (s *Server) GetTransactions(_ *TransactionStreamRequest, g grpc.ServerStreamingServer[Transaction]) error {
 	if !s.activeSession.Load() {
-		s.logger.Error().Msg("Cannot start transaction streaming, no sessions in progress")
+		s.logger.Error().Err(harkErrors.NoSessionsInProgress).Msg("Cannot start transaction streaming")
 		return harkErrors.NoSessionsInProgress
 	}
 
-	s.streamWG.Add(1)
-	defer s.streamWG.Done()
+	if err := s.streamSemaphore.Acquire(s.controlCtx, 1); err != nil {
+		s.logger.Error().Err(err).Msg("Cannot start transaction streaming")
+		return err
+	}
+	defer s.streamSemaphore.Release(1)
 
 	s.logger.Info().Msg("Start transaction streaming")
 
@@ -221,12 +231,15 @@ func (s *Server) GetTransactions(_ *TransactionStreamRequest, g grpc.ServerStrea
 
 func (s *Server) GetIterationCounters(_ *IterationCountersStreamRequest, g grpc.ServerStreamingServer[IterationCounters]) error {
 	if !s.activeSession.Load() {
-		s.logger.Error().Msg("Cannot start iteration counters streaming, no sessions in progress")
+		s.logger.Error().Err(harkErrors.NoSessionsInProgress).Msg("Cannot start iteration counters streaming")
 		return harkErrors.NoSessionsInProgress
 	}
 
-	s.streamWG.Add(1)
-	defer s.streamWG.Done()
+	if err := s.streamSemaphore.Acquire(s.controlCtx, 1); err != nil {
+		s.logger.Error().Err(err).Msg("Cannot start iteration counters streaming")
+		return err
+	}
+	defer s.streamSemaphore.Release(1)
 
 	s.logger.Info().Msg("Start iteration counters streaming")
 
@@ -248,12 +261,15 @@ func (s *Server) GetIterationCounters(_ *IterationCountersStreamRequest, g grpc.
 
 func (s *Server) GetHostMetrics(_ *HostMetricsStreamRequest, g grpc.ServerStreamingServer[HostMetrics]) error {
 	if !s.activeSession.Load() {
-		s.logger.Error().Msg("Cannot start host metrics streaming, no sessions in progress")
+		s.logger.Error().Err(harkErrors.NoSessionsInProgress).Msg("Cannot start host metrics streaming")
 		return harkErrors.NoSessionsInProgress
 	}
 
-	s.streamWG.Add(1)
-	defer s.streamWG.Done()
+	if err := s.streamSemaphore.Acquire(s.controlCtx, 1); err != nil {
+		s.logger.Error().Err(err).Msg("Cannot start host metrics streaming")
+		return err
+	}
+	defer s.streamSemaphore.Release(1)
 
 	s.logger.Info().Msg("Start host metrics streaming")
 
@@ -275,12 +291,15 @@ func (s *Server) GetHostMetrics(_ *HostMetricsStreamRequest, g grpc.ServerStream
 
 func (s *Server) GetLogEntries(_ *LogEntriesStreamRequest, g grpc.ServerStreamingServer[LogEntry]) error {
 	if !s.activeSession.Load() {
-		s.logger.Error().Msg("Cannot start logs streaming, no sessions in progress")
+		s.logger.Error().Err(harkErrors.NoSessionsInProgress).Msg("Cannot start logs streaming")
 		return harkErrors.NoSessionsInProgress
 	}
 
-	s.streamWG.Add(1)
-	defer s.streamWG.Done()
+	if err := s.streamSemaphore.Acquire(s.controlCtx, 1); err != nil {
+		s.logger.Error().Err(err).Msg("Cannot start logs streaming")
+		return err
+	}
+	defer s.streamSemaphore.Release(1)
 
 	s.logger.Info().Msg("Start logs streaming")
 

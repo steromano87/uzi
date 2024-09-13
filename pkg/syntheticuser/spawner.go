@@ -91,8 +91,7 @@ func (s *Spawner) BeginSession(pip *pipeline.Pipeline, maxUserQuota uint64, conf
 	s.telemetryServerCancelFunc = cancelFunc
 
 	s.telemetryServerErrGroup.Go(func() error {
-		s.telemetryServer.ServeSession(telemetryServerCtx)
-		return nil
+		return s.telemetryServer.ServeSession(telemetryServerCtx)
 	})
 	s.activeSession.Store(true)
 	return nil
