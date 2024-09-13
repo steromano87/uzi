@@ -49,7 +49,7 @@ func (s *ServerTestSuite) TestNewServer() {
 func (s *ServerTestSuite) TestStoreSample_NoError() {
 	server := telemetry.NewServer()
 	go func() {
-		server.ServeSession(s.ctx)
+		_ = server.ServeSession(s.ctx)
 	}()
 	time.Sleep(100 * time.Millisecond)
 	sample := &telemetry.Sample{
@@ -69,11 +69,11 @@ func (s *ServerTestSuite) TestStoreSample_NoError() {
 func (s *ServerTestSuite) TestStoreSample_Error() {
 	s.configuration.Telemetry.LoadMetrics.BufferCapacity = 1
 	server := telemetry.NewServer()
+	assert.NoError(s.T(), server.Reconfigure(s.configuration))
 	go func() {
-		server.ServeSession(s.ctx)
+		_ = server.ServeSession(s.ctx)
 	}()
 	time.Sleep(100 * time.Millisecond)
-	server.Reconfigure(s.configuration)
 
 	sample := &telemetry.Sample{
 		Timestamp:       timestamppb.Now(),
@@ -109,7 +109,7 @@ func (s *ServerTestSuite) TestStoreSample_Retrieve() {
 
 	// GRPC setup
 	go func() {
-		server.ServeSession(s.ctx)
+		_ = server.ServeSession(s.ctx)
 	}()
 	time.Sleep(100 * time.Millisecond)
 	grpcChannel := &inprocgrpc.Channel{}
@@ -149,7 +149,7 @@ func (s *ServerTestSuite) TestStoreSample_Retrieve() {
 func (s *ServerTestSuite) TestStoreTransaction_NoError() {
 	server := telemetry.NewServer()
 	go func() {
-		server.ServeSession(s.ctx)
+		_ = server.ServeSession(s.ctx)
 	}()
 	time.Sleep(100 * time.Millisecond)
 	transaction := &telemetry.Transaction{}
@@ -160,11 +160,11 @@ func (s *ServerTestSuite) TestStoreTransaction_NoError() {
 func (s *ServerTestSuite) TestStoreTransaction_Error() {
 	s.configuration.Telemetry.LoadMetrics.BufferCapacity = 1
 	server := telemetry.NewServer()
+	assert.NoError(s.T(), server.Reconfigure(s.configuration))
 	go func() {
-		server.ServeSession(s.ctx)
+		_ = server.ServeSession(s.ctx)
 	}()
 	time.Sleep(100 * time.Millisecond)
-	server.Reconfigure(s.configuration)
 
 	transaction := &telemetry.Transaction{}
 	if assert.NoError(s.T(), server.StoreTransaction(transaction)) {
@@ -181,7 +181,7 @@ func (s *ServerTestSuite) TestStoreTransaction_Retrieve() {
 
 	// GRPC setup
 	go func() {
-		server.ServeSession(s.ctx)
+		_ = server.ServeSession(s.ctx)
 	}()
 	time.Sleep(100 * time.Millisecond)
 	grpcChannel := &inprocgrpc.Channel{}
@@ -221,7 +221,7 @@ func (s *ServerTestSuite) TestStoreTransaction_Retrieve() {
 func (s *ServerTestSuite) TestStoreIterationCounters_NoError() {
 	server := telemetry.NewServer()
 	go func() {
-		server.ServeSession(s.ctx)
+		_ = server.ServeSession(s.ctx)
 	}()
 	time.Sleep(100 * time.Millisecond)
 	counters := &telemetry.IterationCounters{}
@@ -232,11 +232,11 @@ func (s *ServerTestSuite) TestStoreIterationCounters_NoError() {
 func (s *ServerTestSuite) TestStoreIterationCounters_Error() {
 	s.configuration.Telemetry.LoadMetrics.BufferCapacity = 1
 	server := telemetry.NewServer()
+	assert.NoError(s.T(), server.Reconfigure(s.configuration))
 	go func() {
-		server.ServeSession(s.ctx)
+		_ = server.ServeSession(s.ctx)
 	}()
 	time.Sleep(100 * time.Millisecond)
-	server.Reconfigure(s.configuration)
 
 	counters := &telemetry.IterationCounters{}
 	if assert.NoError(s.T(), server.StoreIterationCounters(counters)) {
@@ -253,7 +253,7 @@ func (s *ServerTestSuite) TestStoreIterationCounters_Retrieve() {
 
 	// GRPC setup
 	go func() {
-		server.ServeSession(s.ctx)
+		_ = server.ServeSession(s.ctx)
 	}()
 	time.Sleep(100 * time.Millisecond)
 	grpcChannel := &inprocgrpc.Channel{}
@@ -293,7 +293,7 @@ func (s *ServerTestSuite) TestStoreIterationCounters_Retrieve() {
 func (s *ServerTestSuite) TestStoreHostMetrics_NoError() {
 	server := telemetry.NewServer()
 	go func() {
-		server.ServeSession(s.ctx)
+		_ = server.ServeSession(s.ctx)
 	}()
 	time.Sleep(100 * time.Millisecond)
 	hostMetrics := &telemetry.HostMetrics{}
@@ -304,11 +304,11 @@ func (s *ServerTestSuite) TestStoreHostMetrics_NoError() {
 func (s *ServerTestSuite) TestStoreHostMetrics_Error() {
 	s.configuration.Telemetry.HostMetrics.BufferCapacity = 1
 	server := telemetry.NewServer()
+	assert.NoError(s.T(), server.Reconfigure(s.configuration))
 	go func() {
-		server.ServeSession(s.ctx)
+		_ = server.ServeSession(s.ctx)
 	}()
 	time.Sleep(100 * time.Millisecond)
-	server.Reconfigure(s.configuration)
 
 	hostMetrics := &telemetry.HostMetrics{}
 	if assert.NoError(s.T(), server.StoreHostMetrics(hostMetrics)) {
@@ -325,7 +325,7 @@ func (s *ServerTestSuite) TestStoreHostMetrics_Retrieve() {
 
 	// GRPC setup
 	go func() {
-		server.ServeSession(s.ctx)
+		_ = server.ServeSession(s.ctx)
 	}()
 	time.Sleep(100 * time.Millisecond)
 	grpcChannel := &inprocgrpc.Channel{}
@@ -365,7 +365,7 @@ func (s *ServerTestSuite) TestStoreHostMetrics_Retrieve() {
 func (s *ServerTestSuite) TestStoreLogEntry_NoError() {
 	server := telemetry.NewServer()
 	go func() {
-		server.ServeSession(s.ctx)
+		_ = server.ServeSession(s.ctx)
 	}()
 	time.Sleep(100 * time.Millisecond)
 	logEntry := &telemetry.LogEntry{}
@@ -376,11 +376,11 @@ func (s *ServerTestSuite) TestStoreLogEntry_NoError() {
 func (s *ServerTestSuite) TestStoreLogEntry_Error() {
 	s.configuration.Telemetry.Logs.BufferCapacity = 1
 	server := telemetry.NewServer()
+	assert.NoError(s.T(), server.Reconfigure(s.configuration))
 	go func() {
-		server.ServeSession(s.ctx)
+		_ = server.ServeSession(s.ctx)
 	}()
 	time.Sleep(100 * time.Millisecond)
-	server.Reconfigure(s.configuration)
 
 	logEntry := &telemetry.LogEntry{}
 	if assert.NoError(s.T(), server.StoreLogEntry(logEntry)) {
@@ -397,7 +397,7 @@ func (s *ServerTestSuite) TestWriteLogsAndRetrieveEntries() {
 
 	// GRPC setup
 	go func() {
-		server.ServeSession(s.ctx)
+		_ = server.ServeSession(s.ctx)
 	}()
 	time.Sleep(100 * time.Millisecond)
 	grpcChannel := &inprocgrpc.Channel{}
@@ -436,11 +436,11 @@ func (s *ServerTestSuite) TestWriteLogsAndRetrieveEntries() {
 func (s *ServerTestSuite) TestWriteLogsWithError() {
 	s.configuration.Telemetry.Logs.BufferCapacity = 1
 	server := telemetry.NewServer()
+	assert.NoError(s.T(), server.Reconfigure(s.configuration))
 	go func() {
-		server.ServeSession(s.ctx)
+		_ = server.ServeSession(s.ctx)
 	}()
 	time.Sleep(100 * time.Millisecond)
-	server.Reconfigure(s.configuration)
 
 	// Logger setup with custom hook to capture log events, thanks to https://stackoverflow.com/a/76851955
 	logger := zerolog.New(server)

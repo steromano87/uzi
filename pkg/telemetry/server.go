@@ -9,6 +9,7 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
+	"sync"
 	"sync/atomic"
 )
 
@@ -27,6 +28,7 @@ type Server struct {
 	iterationCountersBuffer chan *IterationCounters
 	logsBuffer              chan *LogEntry
 	hostMetricsBuffer       chan *HostMetrics
+	buffersMu               sync.RWMutex
 
 	logger *zerolog.Logger
 
@@ -50,12 +52,20 @@ func NewServer() *Server {
 	return server
 }
 
-func (s *Server) Reconfigure(config *configuration.Manifest) {
+func (s *Server) Reconfigure(config *configuration.Manifest) error {
+	if s.activeSession.Load() {
+		return harkErrors.SessionAlreadyInProgress
+	}
+
+	s.buffersMu.Lock()
+	defer s.buffersMu.Unlock()
 	s.samplesBuffer = make(chan *Sample, config.Telemetry.LoadMetrics.BufferCapacity)
 	s.transactionsBuffer = make(chan *Transaction, config.Telemetry.LoadMetrics.BufferCapacity)
 	s.iterationCountersBuffer = make(chan *IterationCounters, config.Telemetry.LoadMetrics.BufferCapacity)
 	s.logsBuffer = make(chan *LogEntry, config.Telemetry.Logs.BufferCapacity)
 	s.hostMetricsBuffer = make(chan *HostMetrics, config.Telemetry.HostMetrics.BufferCapacity)
+
+	return nil
 }
 
 func (s *Server) ServeSession(ctx context.Context) error {
@@ -85,6 +95,9 @@ func (s *Server) StoreSample(sample *Sample) error {
 		return harkErrors.NoSessionsInProgress
 	}
 
+	s.buffersMu.RLock()
+	defer s.buffersMu.RUnlock()
+
 	select {
 	case s.samplesBuffer <- sample:
 		s.logger.Trace().Msg("Saved sample")
@@ -98,6 +111,9 @@ func (s *Server) StoreTransaction(transaction *Transaction) error {
 	if !s.activeSession.Load() {
 		return harkErrors.NoSessionsInProgress
 	}
+
+	s.buffersMu.RLock()
+	defer s.buffersMu.RUnlock()
 
 	select {
 	case s.transactionsBuffer <- transaction:
@@ -113,6 +129,9 @@ func (s *Server) StoreIterationCounters(counters *IterationCounters) error {
 		return harkErrors.NoSessionsInProgress
 	}
 
+	s.buffersMu.RLock()
+	defer s.buffersMu.RUnlock()
+
 	select {
 	case s.iterationCountersBuffer <- counters:
 		s.logger.Trace().Msg("Saved iteration counters")
@@ -127,6 +146,9 @@ func (s *Server) StoreHostMetrics(agentMetrics *HostMetrics) error {
 		return harkErrors.NoSessionsInProgress
 	}
 
+	s.buffersMu.RLock()
+	defer s.buffersMu.RUnlock()
+
 	select {
 	case s.hostMetricsBuffer <- agentMetrics:
 		s.logger.Trace().Msg("Saved host metrics")
@@ -140,6 +162,9 @@ func (s *Server) StoreLogEntry(entry *LogEntry) error {
 	if !s.activeSession.Load() {
 		return harkErrors.NoSessionsInProgress
 	}
+
+	s.buffersMu.RLock()
+	defer s.buffersMu.RUnlock()
 
 	select {
 	case s.logsBuffer <- entry:
@@ -181,7 +206,7 @@ func (s *Server) GetSamples(_ *SampleStreamRequest, g grpc.ServerStreamingServer
 	}
 	defer s.streamSemaphore.Release(1)
 
-	s.logger.Info().Msg("Start sample streaming")
+	s.logger.Info().Msg("Serve sample streaming")
 
 	for {
 		select {
@@ -211,7 +236,7 @@ func (s *Server) GetTransactions(_ *TransactionStreamRequest, g grpc.ServerStrea
 	}
 	defer s.streamSemaphore.Release(1)
 
-	s.logger.Info().Msg("Start transaction streaming")
+	s.logger.Info().Msg("Serve transaction streaming")
 
 	for {
 		select {
@@ -241,7 +266,7 @@ func (s *Server) GetIterationCounters(_ *IterationCountersStreamRequest, g grpc.
 	}
 	defer s.streamSemaphore.Release(1)
 
-	s.logger.Info().Msg("Start iteration counters streaming")
+	s.logger.Info().Msg("Serve iteration counters streaming")
 
 	for {
 		select {
@@ -271,7 +296,7 @@ func (s *Server) GetHostMetrics(_ *HostMetricsStreamRequest, g grpc.ServerStream
 	}
 	defer s.streamSemaphore.Release(1)
 
-	s.logger.Info().Msg("Start host metrics streaming")
+	s.logger.Info().Msg("Serve host metrics streaming")
 
 	for {
 		select {
@@ -301,7 +326,7 @@ func (s *Server) GetLogEntries(_ *LogEntriesStreamRequest, g grpc.ServerStreamin
 	}
 	defer s.streamSemaphore.Release(1)
 
-	s.logger.Info().Msg("Start logs streaming")
+	s.logger.Info().Msg("Serve logs streaming")
 
 	for {
 		select {
