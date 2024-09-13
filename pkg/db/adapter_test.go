@@ -56,7 +56,7 @@ func (s *AdapterTestSuite) TestAutoMigrate() {
 			if assert.NoError(s.T(), err) {
 				assert.Len(s.T(), tables, 5)
 				assert.Contains(s.T(), tables, "host_metrics")
-				assert.Contains(s.T(), tables, "logs")
+				assert.Contains(s.T(), tables, "raw_logs")
 				assert.Contains(s.T(), tables, "samples")
 				assert.Contains(s.T(), tables, "transactions")
 				assert.Contains(s.T(), tables, "iteration_counters")

@@ -1,6 +1,7 @@
 package db
 
 import (
+	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"gorm.io/datatypes"
 	"time"
 )
@@ -18,4 +19,15 @@ type Transaction struct {
 	End             datatypes.Date
 	Duration        time.Duration
 	Successful      bool `gorm:"index"`
+}
+
+func NewTransactionFromGrpc(transaction *telemetry.Transaction) Transaction {
+	return Transaction{
+		SyntheticUserId: transaction.GetSyntheticUserId(),
+		Name:            transaction.GetName(),
+		Start:           datatypes.Date(transaction.GetStart().AsTime()),
+		End:             datatypes.Date(transaction.GetEnd().AsTime()),
+		Duration:        transaction.GetDuration().AsDuration(),
+		Successful:      transaction.GetSuccessful(),
+	}
 }

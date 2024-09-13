@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/mitchellh/hashstructure/v2"
 	"github.com/mitchellh/mapstructure"
+	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"gorm.io/datatypes"
 	"time"
 )
@@ -23,6 +24,19 @@ type Sample struct {
 	SentBytes       uint64
 	ReceivedBytes   uint64
 	Data            any `gorm:"serializer:json"`
+}
+
+func NewSampleFromGrpc(sample *telemetry.Sample) Sample {
+	return Sample{
+		Timestamp:       datatypes.Date(sample.GetTimestamp().AsTime()),
+		SyntheticUserId: sample.GetSyntheticUserId(),
+		Name:            sample.GetName(),
+		Kind:            sample.GetKind(),
+		Duration:        sample.GetDuration().AsDuration(),
+		SentBytes:       sample.GetSentBytes(),
+		ReceivedBytes:   sample.GetReceivedBytes(),
+		Data:            sample.GetSampleData(),
+	}
 }
 
 func (s Sample) Hash() (uint64, error) {
