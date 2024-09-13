@@ -18,7 +18,7 @@ type HostMetricsProbe struct {
 	measureInterval time.Duration
 
 	storer HostMetricsStorer
-	logger *zerolog.Logger
+	logger zerolog.Logger
 }
 
 func NewHostMetricsProbe(storer HostMetricsStorer) *HostMetricsProbe {
@@ -58,8 +58,7 @@ func (p *HostMetricsProbe) Serve(ctx context.Context, pollInterval time.Duration
 }
 
 func (p *HostMetricsProbe) setLogger(logger *zerolog.Logger) {
-	mainLogger := logger.With().Str(log.ComponentKey, "Host metrics probe").Logger()
-	p.logger = &mainLogger
+	p.logger = logger.With().Str(log.ComponentKey, "Host metrics probe").Logger()
 }
 
 func (p *HostMetricsProbe) gatherMetrics(ctx context.Context) error {
