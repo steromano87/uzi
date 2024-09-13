@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	DBDataFile = "data.dbAdapter"
+	DBDataFile = "data.db"
 )
 
 type Run struct {
@@ -26,7 +26,7 @@ func NewRun(ctx context.Context, name string, parentFolder string) (*Run, error)
 		return nil, err
 	}
 
-	run.dbAdapter = db.NewAdapter(db.SQLite, path.Join(parentFolder, name, DBDataFile))
+	run.dbAdapter = db.NewAdapter(path.Join(parentFolder, name, DBDataFile))
 	if err := run.dbAdapter.MigrateAll(ctx); err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func LoadRun(name string, parentFolder string) *Run {
 	run := new(Run)
 	run.name = name
 	run.parentFolder = parentFolder
-	run.dbAdapter = db.NewAdapter(db.SQLite, path.Join(parentFolder, name, DBDataFile))
+	run.dbAdapter = db.NewAdapter(path.Join(parentFolder, name, DBDataFile))
 
 	return run
 }

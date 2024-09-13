@@ -2,9 +2,7 @@ package db
 
 import (
 	"context"
-	"errors"
 	"github.com/glebarez/sqlite"
-	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
@@ -21,25 +19,20 @@ type Adapter struct {
 	*gorm.DB
 }
 
-func NewAdapter(dbType string, dsn string) *Adapter {
+func NewAdapter(dsn string) *Adapter {
 	adapter := new(Adapter)
-	adapter.dbType = dbType
 	adapter.dsn = dsn
 
 	return adapter
 }
 
 func (a *Adapter) Connect() error {
-	dialector, err := a.getDialector()
+	DB, err := gorm.Open(sqlite.Open(a.dsn), &gorm.Config{PrepareStmt: true})
 	if err != nil {
 		return err
 	}
 
-	a.DB, err = gorm.Open(dialector, &gorm.Config{PrepareStmt: true})
-	if err != nil {
-		return err
-	}
-
+	a.DB = DB
 	return nil
 }
 
@@ -50,19 +43,6 @@ func (a *Adapter) Close() error {
 	}
 
 	return rawDB.Close()
-}
-
-func (a *Adapter) getDialector() (gorm.Dialector, error) {
-	switch a.dbType {
-	case SQLite:
-		return sqlite.Open(a.dsn), nil
-
-	case MySQL:
-		return mysql.Open(a.dsn), nil
-
-	default:
-		return gorm.Config{}, errors.New("unknown database type: " + a.dbType)
-	}
 }
 
 func (a *Adapter) MigrateAll(ctx context.Context) error {
