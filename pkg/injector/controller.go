@@ -167,6 +167,7 @@ func (c *Controller) startSession(ctx context.Context) error {
 		c.logger.Error().Err(err).Str("runName", runName).Msg("Encountered an error while creating run")
 		return err
 	}
+	c.logger.Info().Str("runName", runName).Msg("New run created")
 
 	userQuotasByAgent := c.roster.SplitQuotasByWeight(c.profile.MaxSyntheticUsers())
 	for agentId, quota := range userQuotasByAgent {
