@@ -22,6 +22,7 @@ type Sample struct {
 	Duration        time.Duration
 	SentBytes       uint64
 	ReceivedBytes   uint64
+	IsWait          bool
 	Data            any `gorm:"serializer:json"`
 }
 
@@ -34,6 +35,7 @@ func NewSampleFromGrpc(sample *telemetry.Sample) Sample {
 		Duration:        sample.GetDuration().AsDuration(),
 		SentBytes:       sample.GetSentBytes(),
 		ReceivedBytes:   sample.GetReceivedBytes(),
+		IsWait:          sample.GetIsWait(),
 		Data:            sample.GetSampleData(),
 	}
 }

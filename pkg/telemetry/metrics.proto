@@ -29,6 +29,8 @@ message Sample {
   uint64 sent_bytes = 6;
   uint64 received_bytes = 7;
 
+  bool is_wait = 8;
+
   oneof sample_data {
     Rest rest = 100;
   }
