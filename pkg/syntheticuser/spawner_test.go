@@ -75,11 +75,11 @@ func (s *SpawnerTestSuite) TestSpawnerStartedWithZeroRunningUsers() {
 	_ = spawner.BeginSession(s.pip, 5, s.config)
 
 	if assert.Zero(s.T(), spawner.ActiveUsers()) {
-		assert.EqualValues(s.T(), 5, spawner.Counters().Ready)
-		assert.Zero(s.T(), spawner.Counters().GracefullyShuttingDown)
-		assert.Zero(s.T(), spawner.Counters().TeardownInProgress)
-		assert.Zero(s.T(), spawner.Counters().Stopped)
-		assert.Zero(s.T(), spawner.Counters().Error)
+		assert.EqualValues(s.T(), 5, spawner.AsGrpcCounters().GetReady())
+		assert.Zero(s.T(), spawner.AsGrpcCounters().GetGracefullyShuttingDown())
+		assert.Zero(s.T(), spawner.AsGrpcCounters().GetTeardownInProgress())
+		assert.Zero(s.T(), spawner.AsGrpcCounters().GetStopped())
+		assert.Zero(s.T(), spawner.AsGrpcCounters().GetError())
 	}
 
 	s.cancelFunc(nil)
@@ -98,7 +98,7 @@ func (s *SpawnerTestSuite) TestScaleUpToOneUser() {
 	time.Sleep(100 * time.Millisecond)
 	if assert.NoError(s.T(), err) {
 		assert.EqualValues(s.T(), 1, spawner.ActiveUsers())
-		assert.EqualValues(s.T(), 4, spawner.Counters().Ready)
+		assert.EqualValues(s.T(), 4, spawner.AsGrpcCounters().GetReady())
 	}
 
 	s.cancelFunc(nil)
@@ -117,7 +117,7 @@ func (s *SpawnerTestSuite) TestScaleDownFromOneUser() {
 	time.Sleep(100 * time.Millisecond)
 	if assert.NoError(s.T(), err) {
 		assert.EqualValues(s.T(), 1, spawner.ActiveUsers())
-		assert.EqualValues(s.T(), 4, spawner.Counters().Ready)
+		assert.EqualValues(s.T(), 4, spawner.AsGrpcCounters().GetReady())
 	}
 
 	err = spawner.ReconcileActiveUsers(0)
@@ -125,8 +125,8 @@ func (s *SpawnerTestSuite) TestScaleDownFromOneUser() {
 	if assert.NoError(s.T(), err) {
 		assert.NoError(s.T(), spawner.WaitForUsersShutdown())
 		assert.EqualValues(s.T(), 0, spawner.ActiveUsers())
-		assert.EqualValues(s.T(), 4, spawner.Counters().Ready)
-		assert.EqualValues(s.T(), 1, spawner.Counters().Stopped)
+		assert.EqualValues(s.T(), 4, spawner.AsGrpcCounters().GetReady())
+		assert.EqualValues(s.T(), 1, spawner.AsGrpcCounters().GetStopped())
 	}
 
 	s.cancelFunc(nil)
@@ -145,15 +145,15 @@ func (s *SpawnerTestSuite) TestScaleUpAndDownUpToTwoUsers() {
 	time.Sleep(100 * time.Millisecond)
 	if assert.NoError(s.T(), err) {
 		assert.EqualValues(s.T(), 2, spawner.ActiveUsers())
-		assert.EqualValues(s.T(), 3, spawner.Counters().Ready)
+		assert.EqualValues(s.T(), 3, spawner.AsGrpcCounters().GetReady())
 	}
 
 	err = spawner.ReconcileActiveUsers(1)
 	time.Sleep(100 * time.Millisecond)
 	if assert.NoError(s.T(), err) {
 		assert.EqualValues(s.T(), 1, spawner.ActiveUsers())
-		assert.EqualValues(s.T(), 3, spawner.Counters().Ready)
-		assert.EqualValues(s.T(), 1, spawner.Counters().Stopped)
+		assert.EqualValues(s.T(), 3, spawner.AsGrpcCounters().GetReady())
+		assert.EqualValues(s.T(), 1, spawner.AsGrpcCounters().GetStopped())
 	}
 
 	s.cancelFunc(nil)

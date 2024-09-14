@@ -149,7 +149,6 @@ func (s *Spawner) initializeSynthUsers(maxSynthUserQuota uint64) error {
 				s.NonStoppedUsers()))
 	}
 
-	s.CountersHolder = NewCountersHolder(maxSynthUserQuota)
 	s.syntheticUsers = make([]Holder, maxSynthUserQuota)
 
 	for i := range s.syntheticUsers {
@@ -160,7 +159,7 @@ func (s *Spawner) initializeSynthUsers(maxSynthUserQuota uint64) error {
 		s.syntheticUsers[i] = Holder{
 			user: synthUser,
 		}
-		s.Counters().Ready++
+		s.AddReady()
 	}
 
 	s.lastStartedUserIndex.Store(-1)
@@ -265,7 +264,7 @@ func (s *Spawner) WaitForUsersShutdown() error {
 // TODO: add context-aware methods to allow cancellation
 
 func (s *Spawner) GetSyntheticUserCounters(_ context.Context, _ *emptypb.Empty) (*Counters, error) {
-	return s.Counters(), nil
+	return s.AsGrpcCounters(), nil
 }
 
 func (s *Spawner) SetActiveSyntheticUsers(_ context.Context, request *ActiveSyntheticUsersRequest) (*ActiveSyntheticUsersResponse, error) {
