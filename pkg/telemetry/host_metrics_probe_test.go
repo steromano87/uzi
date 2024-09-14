@@ -41,7 +41,7 @@ func (s *HostMetricsProbeTestSuite) TestMetricsCollection() {
 	ctx, cancelFunc := context.WithCancel(context.TODO())
 
 	go func() {
-		collector.Serve(ctx, pollingInterval, measuringInterval)
+		_ = collector.Serve(ctx, pollingInterval, measuringInterval)
 	}()
 
 	time.Sleep(2 * pollingInterval)

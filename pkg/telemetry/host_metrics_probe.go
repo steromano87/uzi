@@ -26,7 +26,7 @@ type HostMetricsProbe struct {
 func NewHostMetricsProbe(storer HostMetricsStorer) *HostMetricsProbe {
 	hmp := new(HostMetricsProbe)
 	hmp.storer = storer
-	hmp.readyChan = make(chan struct{})
+	hmp.readyChan = make(chan struct{}, 1)
 
 	return hmp
 }
