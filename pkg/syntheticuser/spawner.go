@@ -229,6 +229,7 @@ func (s *Spawner) scaleUpActiveUsers(requestedUsers uint64) error {
 		ctx.LoadMetricsStorer = s.loadMetricsStorer
 		ctx.Vars = s.Vars
 		ctx.Config = s.config
+		ctx.SynthUserId = s.syntheticUsers[s.lastStartedUserIndex.Load()].user.Id()
 
 		s.syntheticUsers[s.lastStartedUserIndex.Load()].cancelFunc = cancelFunc
 		s.syntheticUserErrGroup.Go(

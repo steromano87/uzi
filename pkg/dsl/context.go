@@ -25,9 +25,10 @@ func (n nopLoadMetricsStorer) StoreIterationCounters(_ *telemetry.IterationCount
 type Context struct {
 	context.Context
 
-	Logger *zerolog.Logger
-	Vars   *variables.Holder
-	Config *configuration.Manifest
+	SynthUserId string
+	Logger      *zerolog.Logger
+	Vars        *variables.Holder
+	Config      *configuration.Manifest
 
 	telemetry.LoadMetricsStorer
 }
