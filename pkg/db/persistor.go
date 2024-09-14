@@ -4,24 +4,31 @@ import (
 	"context"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/log"
+	"github.com/steromano87/harkonnen/v1/pkg/syntheticuser"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"gorm.io/gorm"
 	"io"
+	"time"
 )
 
+const syntheticUserPollInterval = 5 * time.Second
+
 type Persistor struct {
-	db     *gorm.DB
-	logger zerolog.Logger
+	db              *gorm.DB
+	logger          zerolog.Logger
+	terminationChan chan struct{}
 }
 
 func NewPersistor(db *gorm.DB) *Persistor {
 	persistor := new(Persistor)
 	persistor.db = db
+	persistor.terminationChan = make(chan struct{})
 	return persistor
 }
 
-func (p *Persistor) Serve(ctx context.Context, agentId string, metricsClient telemetry.MetricsClient, logsClient telemetry.LogsClient) error {
+func (p *Persistor) Serve(ctx context.Context, agentId string, metricsClient telemetry.MetricsClient, logsClient telemetry.LogsClient, spawnerClient syntheticuser.SpawnerClient) error {
 	p.setLogger(zerolog.Ctx(ctx))
 
 	clientErrGroup, _ := errgroup.WithContext(ctx)
@@ -40,6 +47,9 @@ func (p *Persistor) Serve(ctx context.Context, agentId string, metricsClient tel
 	clientErrGroup.Go(func() error {
 		return p.readRawLogs(ctx, agentId, logsClient)
 	})
+	clientErrGroup.Go(func() error {
+		return p.readSyntheticUserCounters(ctx, agentId, spawnerClient)
+	})
 
 	return clientErrGroup.Wait()
 }
@@ -49,6 +59,7 @@ func (p *Persistor) setLogger(logger *zerolog.Logger) {
 }
 
 func (p *Persistor) readSamples(ctx context.Context, agentId string, metricsClient telemetry.MetricsClient) error {
+	defer p.sendTermination()
 	serverStream, err := metricsClient.GetSamples(ctx, &telemetry.SampleStreamRequest{})
 	if err != nil {
 		return err
@@ -74,6 +85,7 @@ func (p *Persistor) readSamples(ctx context.Context, agentId string, metricsClie
 }
 
 func (p *Persistor) readTransactions(ctx context.Context, agentId string, metricsClient telemetry.MetricsClient) error {
+	defer p.sendTermination()
 	serverStream, err := metricsClient.GetTransactions(ctx, &telemetry.TransactionStreamRequest{})
 	if err != nil {
 		return err
@@ -99,6 +111,7 @@ func (p *Persistor) readTransactions(ctx context.Context, agentId string, metric
 }
 
 func (p *Persistor) readIterationCounters(ctx context.Context, agentId string, metricsClient telemetry.MetricsClient) error {
+	defer p.sendTermination()
 	serverStream, err := metricsClient.GetIterationCounters(ctx, &telemetry.IterationCountersStreamRequest{})
 	if err != nil {
 		return err
@@ -124,6 +137,7 @@ func (p *Persistor) readIterationCounters(ctx context.Context, agentId string, m
 }
 
 func (p *Persistor) readHostMetrics(ctx context.Context, agentId string, metricsClient telemetry.MetricsClient) error {
+	defer p.sendTermination()
 	serverStream, err := metricsClient.GetHostMetrics(ctx, &telemetry.HostMetricsStreamRequest{})
 	if err != nil {
 		return err
@@ -149,6 +163,7 @@ func (p *Persistor) readHostMetrics(ctx context.Context, agentId string, metrics
 }
 
 func (p *Persistor) readRawLogs(ctx context.Context, agentId string, logsClient telemetry.LogsClient) error {
+	defer p.sendTermination()
 	serverStream, err := logsClient.GetLogEntries(ctx, &telemetry.LogEntriesStreamRequest{})
 	if err != nil {
 		return err
@@ -170,5 +185,42 @@ func (p *Persistor) readRawLogs(ctx context.Context, agentId string, logsClient 
 		if result := p.db.Save(&dbLog); result.Error != nil {
 			p.logger.Error().Err(result.Error).Msg("Failed to persist raw log")
 		}
+	}
+}
+
+func (p *Persistor) readSyntheticUserCounters(ctx context.Context, agentId string, spawnerClient syntheticuser.SpawnerClient) error {
+	ticker := time.NewTicker(syntheticUserPollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-p.terminationChan:
+			p.logger.Debug().Msg("Received termination signal, stopping synthetic user counters gathering")
+			return nil
+
+		case <-ctx.Done():
+			p.logger.Debug().Msg("Context canceled, stopping synthetic user counters gathering")
+			return nil
+
+		case now := <-ticker.C:
+			syntheticUserCounters, err := spawnerClient.GetSyntheticUserCounters(ctx, &emptypb.Empty{})
+			if err != nil {
+				p.logger.Error().Err(err).Msg("Failed to read synthetic user counters")
+				return err
+			}
+			dbCounters := NewSyntheticUserCountersFromGrpc(syntheticUserCounters)
+			dbCounters.AgentId = agentId
+			dbCounters.Timestamp = now
+			if result := p.db.Save(&dbCounters); result.Error != nil {
+				p.logger.Error().Err(result.Error).Msg("Failed to persist synthetic user counters")
+			}
+		}
+	}
+}
+
+func (p *Persistor) sendTermination() {
+	select {
+	case p.terminationChan <- struct{}{}:
+	default:
 	}
 }

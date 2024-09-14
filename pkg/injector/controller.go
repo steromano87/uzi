@@ -191,7 +191,7 @@ func (c *Controller) startSession(ctx context.Context) error {
 		c.persistorErrGroup.Go(func() error {
 			DB := c.workspace.CurrentRun().DB()
 			persistor := db.NewPersistor(DB)
-			return persistor.Serve(persistorCtx, agentId, currentAgent.MetricsClient(), currentAgent.LogsClient())
+			return persistor.Serve(persistorCtx, agentId, currentAgent.MetricsClient(), currentAgent.LogsClient(), currentAgent.SpawnerClient())
 		})
 	}
 

@@ -81,7 +81,9 @@ func (s *Spawner) BeginSession(pip *pipeline.Pipeline, maxUserQuota uint64, conf
 	s.pipelineToRun = pip
 	s.config = config
 	s.CountersHolder = NewCountersHolder(maxUserQuota)
-	s.telemetryServer.Reconfigure(config)
+	if err := s.telemetryServer.Reconfigure(config); err != nil {
+		s.mainLogger.Error().Err(err).Msg("Encountered an error while reconfiguring telemetry server")
+	}
 
 	// All inner contexts are derived from the session one
 	s.activeSessionCtx, s.activeSessionCancelFunc = context.WithCancel(s.childLogger.WithContext(context.Background()))
@@ -97,6 +99,9 @@ func (s *Spawner) BeginSession(pip *pipeline.Pipeline, maxUserQuota uint64, conf
 	s.telemetryServerErrGroup.Go(func() error {
 		return s.telemetryServer.ServeSession(telemetryServerCtx)
 	})
+
+	// Add a sleep to ensure that the telemetry server has started before returning
+	time.Sleep(100 * time.Millisecond)
 	s.activeSession.Store(true)
 	return nil
 }

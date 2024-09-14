@@ -54,12 +54,13 @@ func (s *AdapterTestSuite) TestAutoMigrate() {
 				"name not like ?", "sqlite_%").Where(
 				"name not like ?", "idx_%").Pluck("name", &tables).Error
 			if assert.NoError(s.T(), err) {
-				assert.Len(s.T(), tables, 5)
+				assert.Len(s.T(), tables, 6)
 				assert.Contains(s.T(), tables, "host_metrics")
 				assert.Contains(s.T(), tables, "raw_logs")
 				assert.Contains(s.T(), tables, "samples")
 				assert.Contains(s.T(), tables, "transactions")
 				assert.Contains(s.T(), tables, "iteration_counters")
+				assert.Contains(s.T(), tables, "synthetic_user_counters")
 			}
 		}
 	}

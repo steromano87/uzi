@@ -20,6 +20,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type Agent struct {
@@ -218,6 +219,9 @@ func (a *Agent) BeginSession(_ context.Context, request *BeginSessionRequest) (*
 			config.Telemetry.HostMetrics.MeasureInterval)
 		return nil
 	})
+
+	// Add a sleep to ensure that the host metrics probe has started before returning
+	time.Sleep(100 * time.Millisecond)
 	a.activeSession.Store(true)
 
 	return &emptypb.Empty{}, nil
