@@ -2,7 +2,7 @@ package db
 
 import (
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
-	"gorm.io/datatypes"
+	"time"
 )
 
 func init() {
@@ -10,9 +10,9 @@ func init() {
 }
 
 type HostMetric struct {
-	Id        uint           `gorm:"primaryKey;autoincrement"`
-	AgentId   string         `gorm:"index:idx_host_metrics_agent"`
-	Timestamp datatypes.Date `gorm:"index:idx_host_metrics_timestamp"`
+	Id        uint      `gorm:"primaryKey;autoincrement"`
+	AgentId   string    `gorm:"index:idx_host_metrics_agent"`
+	Timestamp time.Time `gorm:"index:idx_host_metrics_timestamp"`
 
 	CPU     float64
 	Memory  memory  `gorm:"embedded;embeddedPrefix:memory_"`
@@ -37,7 +37,7 @@ type network struct {
 
 func NewHostMetricFromGrpc(metric *telemetry.HostMetrics) HostMetric {
 	return HostMetric{
-		Timestamp: datatypes.Date(metric.GetTimestamp().AsTime()),
+		Timestamp: metric.GetTimestamp().AsTime(),
 		CPU:       metric.GetCpu(),
 		Memory: memory{
 			Total: metric.GetMemory().GetTotal(),

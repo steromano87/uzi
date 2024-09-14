@@ -5,7 +5,6 @@ import (
 	"github.com/mitchellh/hashstructure/v2"
 	"github.com/mitchellh/mapstructure"
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
-	"gorm.io/datatypes"
 	"time"
 )
 
@@ -14,12 +13,12 @@ func init() {
 }
 
 type Sample struct {
-	Id              uint           `gorm:"primaryKey;autoincrement"`
-	Timestamp       datatypes.Date `gorm:"index:idx_sample_timestamp"`
-	AgentId         string         `gorm:"index:idx_sample_agent_user"`
-	SyntheticUserId string         `gorm:"index:idx_sample_agent_user"`
-	Name            string         `gorm:"index:idx_sample_name"`
-	Kind            string         `gorm:"index:idx_sample_kind"`
+	Id              uint      `gorm:"primaryKey;autoincrement"`
+	Timestamp       time.Time `gorm:"index:idx_sample_timestamp"`
+	AgentId         string    `gorm:"index:idx_sample_agent_user"`
+	SyntheticUserId string    `gorm:"index:idx_sample_agent_user"`
+	Name            string    `gorm:"index:idx_sample_name"`
+	Kind            string    `gorm:"index:idx_sample_kind"`
 	Duration        time.Duration
 	SentBytes       uint64
 	ReceivedBytes   uint64
@@ -28,7 +27,7 @@ type Sample struct {
 
 func NewSampleFromGrpc(sample *telemetry.Sample) Sample {
 	return Sample{
-		Timestamp:       datatypes.Date(sample.GetTimestamp().AsTime()),
+		Timestamp:       sample.GetTimestamp().AsTime(),
 		SyntheticUserId: sample.GetSyntheticUserId(),
 		Name:            sample.GetName(),
 		Kind:            sample.GetKind(),
