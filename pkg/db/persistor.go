@@ -129,7 +129,7 @@ func (p *Persistor) readIterationCounters(ctx context.Context, agentId string, m
 
 		dbCounters := NewIterationCountersFromGrpc(counters)
 		dbCounters.AgentId = agentId
-		p.logger.Trace().Str(log.AgentId, dbCounters.AgentId).Msg("Persisting iteration counter")
+		p.logger.Trace().Str(log.AgentIdKey, dbCounters.AgentId).Msg("Persisting iteration counter")
 		if result := p.db.Save(&dbCounters); result.Error != nil {
 			p.logger.Error().Err(result.Error).Msg("Failed to persist iteration counter")
 		}
@@ -155,7 +155,7 @@ func (p *Persistor) readHostMetrics(ctx context.Context, agentId string, metrics
 
 		dbMetrics := NewHostMetricFromGrpc(metrics)
 		dbMetrics.AgentId = agentId
-		p.logger.Trace().Str(log.AgentId, dbMetrics.AgentId).Msg("Persisting host metrics")
+		p.logger.Trace().Str(log.AgentIdKey, dbMetrics.AgentId).Msg("Persisting host metrics")
 		if result := p.db.Save(&dbMetrics); result.Error != nil {
 			p.logger.Error().Err(result.Error).Msg("Failed to persist host metrics")
 		}
@@ -181,7 +181,7 @@ func (p *Persistor) readRawLogs(ctx context.Context, agentId string, logsClient 
 
 		dbLog := NewLogFromGrpc(logEntry)
 		dbLog.AgentId = agentId
-		p.logger.Trace().Str(log.AgentId, dbLog.AgentId).Msg("Persisting raw log")
+		p.logger.Trace().Str(log.AgentIdKey, dbLog.AgentId).Msg("Persisting raw log")
 		if result := p.db.Save(&dbLog); result.Error != nil {
 			p.logger.Error().Err(result.Error).Msg("Failed to persist raw log")
 		}

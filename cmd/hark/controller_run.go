@@ -27,7 +27,7 @@ func runControllerRunCmd(_ *cobra.Command, _ []string) {
 	sigtermCount := 0
 	signal.Notify(sigtermChan, os.Interrupt, syscall.SIGTERM)
 
-	logger := setupDefaultLogger().With().Str(log.Root, "controller").Logger()
+	logger := setupDefaultLogger().With().Str(log.RootKey, "controller").Logger()
 	mainCtx, cancelFunc := context.WithCancelCause(logger.WithContext(context.Background()))
 	defer cancelFunc(nil)
 

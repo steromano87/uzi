@@ -27,8 +27,9 @@ message Welcome {
 //////////////////////////////////////////
 
 message BeginSessionRequest {
-  uint64 user_quota = 1;
-  WorkspaceArchive archive = 2;
+  string name = 1;
+  uint64 user_quota = 2;
+  WorkspaceArchive archive = 3;
 }
 
 message WorkspaceArchive {
@@ -42,7 +43,9 @@ enum CompressionAlgorithm {
 
 //////////////////////////////////////////
 
-message EndSessionRequest {}
+message EndSessionRequest {
+  string name = 1;
+}
 
 //////////////////////////////////////////
 

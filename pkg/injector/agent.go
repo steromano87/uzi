@@ -177,6 +177,7 @@ func (a *Agent) Handshake(_ context.Context, hello *Hello) (*Welcome, error) {
 }
 
 func (a *Agent) BeginSession(_ context.Context, request *BeginSessionRequest) (*emptypb.Empty, error) {
+	a.logger.Info().Str(log.SessionNameKey, request.GetName()).Msg("Starting session")
 	if a.activeSession.Load() {
 		return nil, harkErrors.SessionAlreadyInProgress
 	}
@@ -203,6 +204,8 @@ func (a *Agent) BeginSession(_ context.Context, request *BeginSessionRequest) (*
 	if err := a.telemetryServer.Reconfigure(config); err != nil {
 		return nil, err
 	}
+
+	a.spawner.SetConfig(config)
 
 	activeSessionCtx, activeSessionCancelFunc := context.WithCancel(a.selfControlCtx)
 	a.activeSessionCancelFunc = activeSessionCancelFunc
@@ -231,11 +234,13 @@ func (a *Agent) BeginSession(_ context.Context, request *BeginSessionRequest) (*
 	// Add a sleep to ensure that the host metrics probe has started before returning
 	time.Sleep(100 * time.Millisecond)
 	a.activeSession.Store(true)
+	a.logger.Info().Str(log.SessionNameKey, request.GetName()).Msg("Session started")
 
 	return &emptypb.Empty{}, nil
 }
 
-func (a *Agent) EndSession(_ context.Context, _ *EndSessionRequest) (*emptypb.Empty, error) {
+func (a *Agent) EndSession(_ context.Context, request *EndSessionRequest) (*emptypb.Empty, error) {
+	a.logger.Info().Str(log.SessionNameKey, request.GetName()).Msg("Ending session")
 	if !a.activeSession.Load() {
 		return nil, harkErrors.NoSessionsInProgress
 	}
@@ -258,7 +263,10 @@ func (a *Agent) EndSession(_ context.Context, _ *EndSessionRequest) (*emptypb.Em
 	if err := a.telemetryServer.Reconfigure(config); err != nil {
 		return nil, err
 	}
+
 	a.activeSession.Store(false)
+	a.logger.Info().Str(log.SessionNameKey, request.GetName()).Msg("Session ended")
+
 	return &emptypb.Empty{}, nil
 }
 

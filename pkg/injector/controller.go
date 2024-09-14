@@ -172,12 +172,13 @@ func (c *Controller) startSession(ctx context.Context) error {
 
 	userQuotasByAgent := c.roster.SplitQuotasByWeight(c.profile.MaxSyntheticUsers())
 	for agentId, quota := range userQuotasByAgent {
-		c.logger.Info().Str(log.AgentId, agentId).Msg("Starting session")
+		c.logger.Info().Str(log.AgentIdKey, agentId).Msg("Starting session")
 		currentAgent, ok := c.roster.Get(agentId)
 		if !ok {
 			return errors.New("cannot find agent with ID " + agentId)
 		}
 		request := &BeginSessionRequest{
+			Name:      runName,
 			UserQuota: quota,
 			Archive: &WorkspaceArchive{
 				Content: workspaceArchive,
@@ -201,10 +202,10 @@ func (c *Controller) startSession(ctx context.Context) error {
 
 func (c *Controller) endSession(ctx context.Context) error {
 	c.roster.Each(func(agentId string, rosterEntry RosterEntry) {
-		c.logger.Info().Str(log.AgentId, agentId).Msg("Stopping session")
+		c.logger.Info().Str(log.AgentIdKey, agentId).Msg("Stopping session")
 
 		if _, err := rosterEntry.AgentClient().EndSession(ctx, &EndSessionRequest{}); err != nil {
-			c.logger.Error().Err(err).Str(log.AgentId, agentId).Msg("Encountered an error while ending session")
+			c.logger.Error().Err(err).Str(log.AgentIdKey, agentId).Msg("Encountered an error while ending session")
 		}
 	})
 

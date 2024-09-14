@@ -38,7 +38,7 @@ type LocalProvider struct {
 func (l *LocalProvider) Init(ctx context.Context, spec *viper.Viper) (Roster, error) {
 	logger := zerolog.Ctx(ctx)
 	l.localLogger = logger.With().Str(log.ComponentKey, "Local provider").Logger()
-	localAgentLogger := logger.With().Str(log.Root, "agent").Str(log.AgentId, "local").Logger()
+	localAgentLogger := logger.With().Str(log.RootKey, "agent").Str(log.AgentIdKey, "local").Logger()
 
 	spec.SetDefault("startTimeout", 10*time.Second)
 	spec.SetDefault("shutdownTimeout", 30*time.Second)

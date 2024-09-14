@@ -95,7 +95,7 @@ func (s *Scheduler) updateActiveUsers(ctx context.Context, quotas map[string]uin
 			"previouslyActiveUsers", response.GetPreviouslyActiveSyntheticUsers(),
 		).Uint64(
 			"actualRunningUsers", response.GetCurrentlyActiveSyntheticUsers(),
-		).Str(log.AgentId, agentId).Msg("Updated running users")
+		).Str(log.AgentIdKey, agentId).Msg("Updated running users")
 	}
 
 	return nil
@@ -109,7 +109,7 @@ func (s *Scheduler) stopAllUsers(ctx context.Context) error {
 		request := &syntheticuser.ActiveSyntheticUsersRequest{DesiredActiveSyntheticUsers: 0}
 		_, err := rosterEntry.spawnerClient.SetActiveSyntheticUsers(ctx, request)
 		if err != nil {
-			s.logger.Error().Err(err).Str(log.AgentId, agentId).Msg("Error while stopping all users")
+			s.logger.Error().Err(err).Str(log.AgentIdKey, agentId).Msg("Error while stopping all users")
 			errors.Join(scaleErrors, err)
 		}
 	})
@@ -138,7 +138,7 @@ func (s *Scheduler) waitForUsersStop(ctx context.Context) error {
 			s.roster.Each(func(agentId string, entry RosterEntry) {
 				activeUsersResponse, err := entry.SpawnerClient().GetSyntheticUserCounters(ctx, &emptypb.Empty{})
 				if err != nil {
-					s.logger.Error().Err(err).Str(log.AgentId, agentId).Msg("cannot get synthetic user counters, skipping to next agent")
+					s.logger.Error().Err(err).Str(log.AgentIdKey, agentId).Msg("cannot get synthetic user counters, skipping to next agent")
 				}
 				totalNonStoppedUsers += activeUsersResponse.GetSetupInProgress() +
 					activeUsersResponse.GetRunning() +
