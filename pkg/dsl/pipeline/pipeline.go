@@ -4,7 +4,11 @@ import (
 	"context"
 	"errors"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl"
+	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
+	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"sync/atomic"
+	"time"
 )
 
 type Pipeline struct {
@@ -25,7 +29,27 @@ func Nop() *Pipeline {
 }
 
 func (p *Pipeline) RunSetup(ctx dsl.Context) error {
-	return p.Setup.Run(ctx)
+	start := time.Now()
+	err := p.Setup.Run(ctx)
+	end := time.Now()
+
+	transaction := &telemetry.Transaction{
+		SyntheticUserId: ctx.SynthUserId,
+		Name:            "Setup",
+		Start:           timestamppb.New(start),
+		End:             timestamppb.New(end),
+		Duration:        durationpb.New(end.Sub(start)),
+		Global:          true,
+		Successful:      err == nil,
+	}
+
+	defer func() {
+		if err := ctx.StoreTransaction(transaction); err != nil {
+			ctx.Logger.Error().Err(err).Msg("Encountered an error while saving setup transaction")
+		}
+	}()
+
+	return err
 }
 
 func (p *Pipeline) RunMain(ctx dsl.Context) error {
@@ -52,11 +76,51 @@ func (p *Pipeline) RunMain(ctx dsl.Context) error {
 }
 
 func (p *Pipeline) RunMainOnce(ctx dsl.Context) error {
-	return p.Main.Run(ctx)
+	start := time.Now()
+	err := p.Main.Run(ctx)
+	end := time.Now()
+
+	transaction := &telemetry.Transaction{
+		SyntheticUserId: ctx.SynthUserId,
+		Name:            "Main",
+		Start:           timestamppb.New(start),
+		End:             timestamppb.New(end),
+		Duration:        durationpb.New(end.Sub(start)),
+		Global:          true,
+		Successful:      err == nil,
+	}
+
+	defer func() {
+		if err := ctx.StoreTransaction(transaction); err != nil {
+			ctx.Logger.Error().Err(err).Msg("Encountered an error while saving setup transaction")
+		}
+	}()
+
+	return err
 }
 
 func (p *Pipeline) RunTeardown(ctx dsl.Context) error {
-	return p.Teardown.Run(ctx)
+	start := time.Now()
+	err := p.Teardown.Run(ctx)
+	end := time.Now()
+
+	transaction := &telemetry.Transaction{
+		SyntheticUserId: ctx.SynthUserId,
+		Name:            "Teardown",
+		Start:           timestamppb.New(start),
+		End:             timestamppb.New(end),
+		Duration:        durationpb.New(end.Sub(start)),
+		Global:          true,
+		Successful:      err == nil,
+	}
+
+	defer func() {
+		if err := ctx.StoreTransaction(transaction); err != nil {
+			ctx.Logger.Error().Err(err).Msg("Encountered an error while saving teardown transaction")
+		}
+	}()
+
+	return err
 }
 
 func (p *Pipeline) RequestGracefulShutdown() {
