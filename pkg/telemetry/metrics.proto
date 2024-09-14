@@ -58,6 +58,7 @@ message Transaction {
   google.protobuf.Timestamp end = 4;
   google.protobuf.Duration duration = 5;
   bool successful = 6;
+  bool global = 7;
 }
 
 //////////////////////////////////////////

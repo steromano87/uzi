@@ -17,7 +17,8 @@ type Transaction struct {
 	Start           time.Time `gorm:"index:idx_transaction_start"`
 	End             time.Time
 	Duration        time.Duration
-	Successful      bool `gorm:"index"`
+	Successful      bool `gorm:"index:idx_transaction_successful"`
+	Global          bool `gorm:"index:idx_transaction_global"`
 }
 
 func NewTransactionFromGrpc(transaction *telemetry.Transaction) Transaction {
@@ -28,5 +29,6 @@ func NewTransactionFromGrpc(transaction *telemetry.Transaction) Transaction {
 		End:             transaction.GetEnd().AsTime(),
 		Duration:        transaction.GetDuration().AsDuration(),
 		Successful:      transaction.GetSuccessful(),
+		Global:          transaction.GetGlobal(),
 	}
 }
