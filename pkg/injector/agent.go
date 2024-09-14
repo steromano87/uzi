@@ -21,7 +21,6 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 type Agent struct {
@@ -214,11 +213,13 @@ func (a *Agent) BeginSession(_ context.Context, request *BeginSessionRequest) (*
 		return a.telemetryServer.ServeSession(activeSessionCtx)
 	})
 
+	a.telemetryServer.WaitUntilReady()
+
 	a.activeSessionErrGroup.Go(func() error {
 		return a.spawner.Serve(activeSessionCtx)
 	})
 
-	time.Sleep(500 * time.Millisecond)
+	a.spawner.WaitUntilReady()
 
 	if err := a.spawner.BeginSession(decodedPipeline, request.GetUserQuota(), config); err != nil {
 		return nil, err
@@ -231,8 +232,8 @@ func (a *Agent) BeginSession(_ context.Context, request *BeginSessionRequest) (*
 			config.Telemetry.HostMetrics.MeasureInterval)
 	})
 
-	// Add a sleep to ensure that the host metrics probe has started before returning
-	time.Sleep(100 * time.Millisecond)
+	a.hostMetricsProbe.WaitUntilReady()
+
 	a.activeSession.Store(true)
 	a.logger.Info().Str(log.SessionNameKey, request.GetName()).Msg("Session started")
 

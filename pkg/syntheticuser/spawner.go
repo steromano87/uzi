@@ -52,6 +52,8 @@ type Spawner struct {
 
 	Vars   *variables.Holder
 	config *configuration.Manifest
+
+	readyChan chan struct{}
 }
 
 func NewSpawner(telemetryServer *telemetry.Server) *Spawner {
@@ -61,12 +63,15 @@ func NewSpawner(telemetryServer *telemetry.Server) *Spawner {
 	spawner.CountersHolder = NewCountersHolder(0)
 	spawner.Vars = variables.NewHolder()
 	spawner.config = configuration.MustNewDefault()
+	spawner.readyChan = make(chan struct{}, 1)
 	return spawner
 }
 
 func (s *Spawner) Serve(ctx context.Context) error {
 	logger := zerolog.Ctx(ctx)
 	s.setLogger(*logger)
+
+	s.readyChan <- struct{}{}
 
 	select {
 	case <-ctx.Done():
@@ -93,6 +98,10 @@ func (s *Spawner) Serve(ctx context.Context) error {
 
 	s.activeSessionCancelFunc()
 	return nil
+}
+
+func (s *Spawner) WaitUntilReady() {
+	<-s.readyChan
 }
 
 func (s *Spawner) BeginSession(pip *pipeline.Pipeline, maxUserQuota uint64, config *configuration.Manifest) error {

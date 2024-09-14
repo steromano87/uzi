@@ -34,6 +34,8 @@ type Server struct {
 
 	controlCtx      context.Context
 	streamSemaphore *semaphore.Weighted
+
+	readyChan chan struct{}
 }
 
 func NewServer() *Server {
@@ -45,6 +47,8 @@ func NewServer() *Server {
 	server.logsBuffer = make(chan *LogEntry, config.Telemetry.Logs.BufferCapacity)
 	server.hostMetricsBuffer = make(chan *HostMetrics, config.Telemetry.HostMetrics.BufferCapacity)
 	server.streamSemaphore = semaphore.NewWeighted(semaphoreWeight)
+
+	server.readyChan = make(chan struct{}, 1)
 
 	server.setLogger(zerolog.Nop())
 
@@ -77,12 +81,18 @@ func (s *Server) ServeSession(ctx context.Context) error {
 	s.activeSession.Store(true)
 	defer s.activeSession.Store(false)
 
+	s.readyChan <- struct{}{}
+
 	<-s.controlCtx.Done()
 	return s.streamSemaphore.Acquire(context.Background(), semaphoreWeight)
 }
 
 func (s *Server) setLogger(logger zerolog.Logger) {
 	s.logger = logger.With().Str(log.ComponentKey, "Telemetry server").Logger()
+}
+
+func (s *Server) WaitUntilReady() {
+	<-s.readyChan
 }
 
 ///////////////////////////

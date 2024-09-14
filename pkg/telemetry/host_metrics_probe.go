@@ -19,13 +19,16 @@ type HostMetricsProbe struct {
 
 	storer HostMetricsStorer
 	logger zerolog.Logger
+
+	readyChan chan struct{}
 }
 
 func NewHostMetricsProbe(storer HostMetricsStorer) *HostMetricsProbe {
-	mc := new(HostMetricsProbe)
-	mc.storer = storer
+	hmp := new(HostMetricsProbe)
+	hmp.storer = storer
+	hmp.readyChan = make(chan struct{})
 
-	return mc
+	return hmp
 }
 
 func (p *HostMetricsProbe) Serve(ctx context.Context, pollInterval time.Duration, measureInterval time.Duration) error {
@@ -35,6 +38,8 @@ func (p *HostMetricsProbe) Serve(ctx context.Context, pollInterval time.Duration
 	p.logger.Info().Dur(
 		"pollInterval", p.pollInterval,
 	).Dur("measureInterval", p.measureInterval).Msg("Host metrics probe started")
+
+	p.readyChan <- struct{}{}
 
 	ticker := time.NewTicker(p.pollInterval)
 
@@ -59,6 +64,10 @@ func (p *HostMetricsProbe) Serve(ctx context.Context, pollInterval time.Duration
 
 func (p *HostMetricsProbe) setLogger(logger *zerolog.Logger) {
 	p.logger = logger.With().Str(log.ComponentKey, "Host metrics probe").Logger()
+}
+
+func (p *HostMetricsProbe) WaitUntilReady() {
+	<-p.readyChan
 }
 
 func (p *HostMetricsProbe) gatherMetrics(ctx context.Context) error {
