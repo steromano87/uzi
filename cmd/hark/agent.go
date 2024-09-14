@@ -56,7 +56,8 @@ func runAgent(cmd *cobra.Command, _ []string) {
 	grpcServerOpts := make([]grpc.ServerOption, 0)
 	grpcServer := grpc.NewServer(grpcServerOpts...)
 
-	agent := injector.NewAgent(agentId, logger, grpcServer)
+	agent := injector.NewAgent(agentId)
+	agent.Register(grpcServer)
 	errGroup := errgroup.Group{}
 	errGroup.Go(func() error {
 		return grpcServer.Serve(tcpListener)

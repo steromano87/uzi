@@ -28,7 +28,7 @@ func NewHostMetricsProbe(storer HostMetricsStorer) *HostMetricsProbe {
 	return mc
 }
 
-func (p *HostMetricsProbe) Serve(ctx context.Context, pollInterval time.Duration, measureInterval time.Duration) {
+func (p *HostMetricsProbe) Serve(ctx context.Context, pollInterval time.Duration, measureInterval time.Duration) error {
 	p.pollInterval = pollInterval
 	p.measureInterval = measureInterval
 	p.setLogger(zerolog.Ctx(ctx))
@@ -43,14 +43,14 @@ func (p *HostMetricsProbe) Serve(ctx context.Context, pollInterval time.Duration
 		case <-ctx.Done():
 			ticker.Stop()
 			p.logger.Info().Msg("Host metrics probe stopped")
-			return
+			return nil
 
 		case <-ticker.C:
 			p.logger.Trace().Msg("Gather metrics loop started")
 			err := p.gatherMetrics(ctx)
 			if err != nil {
-				p.logger.Warn().AnErr("metricsGatheringError", err).Msg("Encountered an error while gathering metrics, continuing...")
-				continue
+				p.logger.Error().Err(err).Msg("Encountered an error while gathering metrics")
+				return err
 			}
 			p.logger.Trace().Msg("Gather metrics loop ended")
 		}

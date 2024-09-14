@@ -30,7 +30,7 @@ type Server struct {
 	hostMetricsBuffer       chan *HostMetrics
 	buffersMu               sync.RWMutex
 
-	logger *zerolog.Logger
+	logger zerolog.Logger
 
 	controlCtx      context.Context
 	streamSemaphore *semaphore.Weighted
@@ -46,8 +46,7 @@ func NewServer() *Server {
 	server.hostMetricsBuffer = make(chan *HostMetrics, config.Telemetry.HostMetrics.BufferCapacity)
 	server.streamSemaphore = semaphore.NewWeighted(semaphoreWeight)
 
-	logger := zerolog.Nop()
-	server.setLogger(&logger)
+	server.setLogger(zerolog.Nop())
 
 	return server
 }
@@ -69,7 +68,8 @@ func (s *Server) Reconfigure(config *configuration.Manifest) error {
 }
 
 func (s *Server) ServeSession(ctx context.Context) error {
-	s.setLogger(zerolog.Ctx(ctx))
+	logger := zerolog.Ctx(ctx)
+	s.setLogger(*logger)
 	s.logger.Info().Msg("Telemetry server started")
 	defer s.logger.Info().Msg("Telemetry server stopped")
 	s.controlCtx = ctx
@@ -81,9 +81,8 @@ func (s *Server) ServeSession(ctx context.Context) error {
 	return s.streamSemaphore.Acquire(context.Background(), semaphoreWeight)
 }
 
-func (s *Server) setLogger(logger *zerolog.Logger) {
-	newLogger := logger.With().Str(log.ComponentKey, "Telemetry server").Logger()
-	s.logger = &newLogger
+func (s *Server) setLogger(logger zerolog.Logger) {
+	s.logger = logger.With().Str(log.ComponentKey, "Telemetry server").Logger()
 }
 
 ///////////////////////////

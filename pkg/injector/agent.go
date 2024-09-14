@@ -13,6 +13,7 @@ import (
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
 	"github.com/steromano87/harkonnen/v1/pkg/version"
 	"github.com/steromano87/harkonnen/v1/pkg/workspace"
+	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -31,49 +32,40 @@ type Agent struct {
 	vars   *variables.Holder
 
 	spawner          *syntheticuser.Spawner
+	telemetryServer  *telemetry.Server
 	hostMetricsProbe *telemetry.HostMetricsProbe
 	workspace        workspace.Workspace
 
-	activeSession atomic.Bool
+	activeSession           atomic.Bool
+	activeSessionCancelFunc context.CancelFunc
+	activeSessionErrGroup   errgroup.Group
 
 	selfControlCtx             context.Context
 	selfControlCancelCauseFunc context.CancelCauseFunc
-	goroutinesErrorGroup       errgroup.Group
 
 	status   Status
 	statusMu sync.RWMutex
 }
 
-func NewAgent(id string, logger zerolog.Logger, registrar grpc.ServiceRegistrar) *Agent {
+func NewAgent(id string) *Agent {
 	agent := new(Agent)
 	agent.id = id
 	agent.vars = variables.NewHolder()
 
-	agent.spawner = syntheticuser.NewSpawner(logger)
+	agent.telemetryServer = telemetry.NewServer()
+	agent.spawner = syntheticuser.NewSpawner(agent.telemetryServer)
 	agent.workspace = workspace.NewTemp()
-	agent.hostMetricsProbe = telemetry.NewHostMetricsProbe(agent.spawner.TelemetryServer())
+	agent.hostMetricsProbe = telemetry.NewHostMetricsProbe(agent.telemetryServer)
 
-	agent.setLogger(logger)
 	agent.setStatus(Status_STARTING)
-	agent.register(registrar)
 
 	return agent
 }
 
-func (a *Agent) ID() string {
-	return a.id
-}
-
-func (a *Agent) Workspace() workspace.Workspace {
-	return a.workspace
-}
-
 func (a *Agent) setLogger(logger zerolog.Logger) {
-	baseLogger := logger.With().Str(log.AgentId, a.id).Logger()
-	a.logger = baseLogger.With().Str(log.ComponentKey, "agent").Logger()
+	a.logger = logger.With().Str(log.ComponentKey, "agent").Logger()
 
-	a.workspace.SetLogger(baseLogger)
-	a.spawner.SetLogger(baseLogger)
+	a.workspace.SetLogger(logger)
 }
 
 func (a *Agent) setStatus(status Status) {
@@ -83,18 +75,22 @@ func (a *Agent) setStatus(status Status) {
 }
 
 func (a *Agent) Serve(ctx context.Context) error {
+	logger := zerolog.Ctx(ctx)
+	a.setLogger(*logger)
 	if err := a.workspace.EnsureWorkspace(); err != nil {
 		a.logger.Error().Err(err).Msg("Cannot start agent, error when setting up workspace")
 	}
 
-	a.selfControlCtx, a.selfControlCancelCauseFunc = context.WithCancelCause(a.logger.WithContext(ctx))
+	a.selfControlCtx, a.selfControlCancelCauseFunc = context.WithCancelCause(ctx)
 	defer a.selfControlCancelCauseFunc(nil)
-	a.startGoroutines(a.selfControlCtx)
+
 	a.setStatus(Status_READY)
 
-	goroutinesErr := a.goroutinesErrorGroup.Wait()
-	if goroutinesErr != nil {
-		a.logger.Error().Err(goroutinesErr).Msg("Encountered an error during shutdown")
+	// Block until either the self-control context of the parent context are canceled
+	<-a.selfControlCtx.Done()
+	errGroupErr := a.activeSessionErrGroup.Wait()
+	if errGroupErr != nil {
+		a.logger.Error().Err(errGroupErr).Msg("Encountered an error during shutdown")
 	}
 	a.setStatus(Status_STOPPING)
 
@@ -103,13 +99,7 @@ func (a *Agent) Serve(ctx context.Context) error {
 		a.logger.Error().Err(workspaceErr).Msg("Cannot delete temporary workspaceClient")
 	}
 
-	return errors.Join(goroutinesErr, workspaceErr)
-}
-
-func (a *Agent) startGoroutines(ctx context.Context) {
-	a.goroutinesErrorGroup.Go(func() error {
-		return a.spawner.Serve(ctx)
-	})
+	return errors.Join(errGroupErr, workspaceErr)
 }
 
 func (a *Agent) handleAgentShutdown(cleanWorkspaceOnShutdown bool) {
@@ -163,9 +153,11 @@ func (a *Agent) CleanUp() error {
 // GRPC implementation //
 /////////////////////////
 
-func (a *Agent) register(registrar grpc.ServiceRegistrar) {
+func (a *Agent) Register(registrar grpc.ServiceRegistrar) {
 	RegisterAgentServer(registrar, a)
-	a.spawner.Register(registrar)
+	syntheticuser.RegisterSpawnerServer(registrar, a.spawner)
+	telemetry.RegisterMetricsServer(registrar, a.telemetryServer)
+	telemetry.RegisterLogsServer(registrar, a.telemetryServer)
 }
 
 func (a *Agent) Handshake(_ context.Context, hello *Hello) (*Welcome, error) {
@@ -208,16 +200,32 @@ func (a *Agent) BeginSession(_ context.Context, request *BeginSessionRequest) (*
 		return nil, err
 	}
 
+	if err := a.telemetryServer.Reconfigure(config); err != nil {
+		return nil, err
+	}
+
+	activeSessionCtx, activeSessionCancelFunc := context.WithCancel(a.selfControlCtx)
+	a.activeSessionCancelFunc = activeSessionCancelFunc
+
+	a.activeSessionErrGroup.Go(func() error {
+		return a.telemetryServer.ServeSession(activeSessionCtx)
+	})
+
+	a.activeSessionErrGroup.Go(func() error {
+		return a.spawner.Serve(activeSessionCtx)
+	})
+
+	time.Sleep(500 * time.Millisecond)
+
 	if err := a.spawner.BeginSession(decodedPipeline, request.GetUserQuota(), config); err != nil {
 		return nil, err
 	}
 
-	a.goroutinesErrorGroup.Go(func() error {
-		a.hostMetricsProbe.Serve(
-			a.selfControlCtx,
+	a.activeSessionErrGroup.Go(func() error {
+		return a.hostMetricsProbe.Serve(
+			activeSessionCtx,
 			config.Telemetry.HostMetrics.PollInterval,
 			config.Telemetry.HostMetrics.MeasureInterval)
-		return nil
 	})
 
 	// Add a sleep to ensure that the host metrics probe has started before returning
@@ -229,7 +237,7 @@ func (a *Agent) BeginSession(_ context.Context, request *BeginSessionRequest) (*
 
 func (a *Agent) EndSession(_ context.Context, _ *EndSessionRequest) (*emptypb.Empty, error) {
 	if !a.activeSession.Load() {
-		return nil, harkErrors.SessionAlreadyInProgress
+		return nil, harkErrors.NoSessionsInProgress
 	}
 
 	if err := a.spawner.EndSession(); err != nil {
@@ -241,6 +249,15 @@ func (a *Agent) EndSession(_ context.Context, _ *EndSessionRequest) (*emptypb.Em
 		return nil, err
 	}
 
+	a.activeSessionCancelFunc()
+	if err := a.activeSessionErrGroup.Wait(); err != nil {
+		return nil, err
+	}
+
+	config := configuration.MustNewDefault()
+	if err := a.telemetryServer.Reconfigure(config); err != nil {
+		return nil, err
+	}
 	a.activeSession.Store(false)
 	return &emptypb.Empty{}, nil
 }
@@ -260,7 +277,7 @@ func (a *Agent) Shutdown(requestCtx context.Context, request *ShutdownRequest) (
 
 	waitChan := make(chan error)
 	go func() {
-		waitChan <- a.goroutinesErrorGroup.Wait()
+		waitChan <- a.activeSessionErrGroup.Wait()
 	}()
 
 	select {

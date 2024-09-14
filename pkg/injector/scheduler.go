@@ -29,15 +29,11 @@ func NewScheduler(roster *Roster, profile schedule.Profile) Scheduler {
 		profile:         profile,
 		shutDownTimeout: 1 * time.Minute,
 	}
-	scheduler.SetLogger(zerolog.Nop())
 	return scheduler
 }
 
-func (s *Scheduler) SetLogger(logger zerolog.Logger) {
-	s.logger = logger.With().Str(log.ComponentKey, "Scheduler").Logger()
-}
-
 func (s *Scheduler) Serve(ctx context.Context, updateInterval time.Duration) error {
+	s.logger = zerolog.Ctx(ctx).With().Str(log.ComponentKey, "Scheduler").Logger()
 	s.start = time.Now()
 	s.ticker = time.NewTicker(updateInterval)
 

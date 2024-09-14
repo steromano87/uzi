@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/dsl/pipeline"
 	"github.com/steromano87/harkonnen/v1/pkg/syntheticuser"
+	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
 	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -15,11 +16,12 @@ import (
 
 type SpawnerTestSuite struct {
 	suite.Suite
-	ctx        context.Context
-	cancelFunc context.CancelCauseFunc
-	pip        *pipeline.Pipeline
-	logger     zerolog.Logger
-	config     *configuration.Manifest
+	ctx             context.Context
+	cancelFunc      context.CancelCauseFunc
+	pip             *pipeline.Pipeline
+	logger          zerolog.Logger
+	config          *configuration.Manifest
+	telemetryServer *telemetry.Server
 }
 
 func (s *SpawnerTestSuite) SetupTest() {
@@ -28,6 +30,7 @@ func (s *SpawnerTestSuite) SetupTest() {
 	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000000"
 	s.logger = zerolog.New(consoleWriter).With().Timestamp().Logger()
 	s.config = configuration.MustNewDefault()
+	s.telemetryServer = telemetry.NewServer()
 
 	s.ctx, s.cancelFunc = context.WithCancelCause(context.TODO())
 
@@ -65,7 +68,7 @@ func (s *SpawnerTestSuite) TearDownTest() {
 }
 
 func (s *SpawnerTestSuite) TestSpawnerStartedWithZeroRunningUsers() {
-	spawner := syntheticuser.NewSpawner(s.logger)
+	spawner := syntheticuser.NewSpawner(s.telemetryServer)
 	go func() {
 		_ = spawner.Serve(s.ctx)
 	}()
@@ -85,7 +88,7 @@ func (s *SpawnerTestSuite) TestSpawnerStartedWithZeroRunningUsers() {
 }
 
 func (s *SpawnerTestSuite) TestScaleUpToOneUser() {
-	spawner := syntheticuser.NewSpawner(s.logger)
+	spawner := syntheticuser.NewSpawner(s.telemetryServer)
 	go func() {
 		_ = spawner.Serve(s.ctx)
 	}()
@@ -104,7 +107,7 @@ func (s *SpawnerTestSuite) TestScaleUpToOneUser() {
 }
 
 func (s *SpawnerTestSuite) TestScaleDownFromOneUser() {
-	spawner := syntheticuser.NewSpawner(s.logger)
+	spawner := syntheticuser.NewSpawner(s.telemetryServer)
 	go func() {
 		_ = spawner.Serve(s.ctx)
 	}()
@@ -132,7 +135,7 @@ func (s *SpawnerTestSuite) TestScaleDownFromOneUser() {
 }
 
 func (s *SpawnerTestSuite) TestScaleUpAndDownUpToTwoUsers() {
-	spawner := syntheticuser.NewSpawner(s.logger)
+	spawner := syntheticuser.NewSpawner(s.telemetryServer)
 	go func() {
 		_ = spawner.Serve(s.ctx)
 	}()
@@ -159,7 +162,7 @@ func (s *SpawnerTestSuite) TestScaleUpAndDownUpToTwoUsers() {
 }
 
 func (s *SpawnerTestSuite) TestScaleUpBeyondMaxQuota() {
-	spawner := syntheticuser.NewSpawner(s.logger)
+	spawner := syntheticuser.NewSpawner(s.telemetryServer)
 	go func() {
 		_ = spawner.Serve(s.ctx)
 	}()

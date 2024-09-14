@@ -38,6 +38,7 @@ type LocalProvider struct {
 func (l *LocalProvider) Init(ctx context.Context, spec *viper.Viper) (Roster, error) {
 	logger := zerolog.Ctx(ctx)
 	l.localLogger = logger.With().Str(log.ComponentKey, "Local provider").Logger()
+	localAgentLogger := logger.With().Str(log.Root, "agent").Str(log.AgentId, "local").Logger()
 
 	spec.SetDefault("startTimeout", 10*time.Second)
 	spec.SetDefault("shutdownTimeout", 30*time.Second)
@@ -52,9 +53,9 @@ func (l *LocalProvider) Init(ctx context.Context, spec *viper.Viper) (Roster, er
 
 	// Decouple the local agentClient's context from parent context to handle its graceful shutdown properly
 	l.localLogger.Info().Dur("startTimeout", l.spec.StartTimeout).Msg("Launching local agent")
-
-	l.localAgentCtx, l.localAgentCancelFunc = context.WithCancel(context.WithoutCancel(ctx))
-	l.localAgent = NewAgent("local", *logger, grpcChannel)
+	l.localAgentCtx, l.localAgentCancelFunc = context.WithCancel(context.WithoutCancel(localAgentLogger.WithContext(ctx)))
+	l.localAgent = NewAgent("local")
+	l.localAgent.Register(grpcChannel)
 
 	l.localRosterEntry = NewRosterEntry(1, grpcChannel)
 	roster := NewRoster()

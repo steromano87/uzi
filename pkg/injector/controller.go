@@ -33,21 +33,15 @@ type Controller struct {
 	persistorCancelFunc context.CancelFunc
 }
 
-func NewController(workdir string, logger zerolog.Logger) *Controller {
+func NewController(workdir string) *Controller {
 	controller := &Controller{
 		vars:      variables.NewHolder(),
 		workspace: workspace.New(workdir),
 		roster:    NewRoster(),
 		profile:   schedule.Nop(),
 	}
-	controller.SetLogger(logger)
 
 	return controller
-}
-
-func (c *Controller) SetLogger(logger zerolog.Logger) {
-	c.childLogger = logger
-	c.logger = logger.With().Str(log.ComponentKey, "controller").Logger()
 }
 
 func (c *Controller) SetLoadProfile(profile schedule.Profile) {
@@ -55,6 +49,9 @@ func (c *Controller) SetLoadProfile(profile schedule.Profile) {
 }
 
 func (c *Controller) Serve(ctx context.Context) error {
+	logger := zerolog.Ctx(ctx)
+	c.setLogger(*logger)
+
 	if err := c.initWorkspace(); err != nil {
 		return err
 	}
@@ -105,6 +102,11 @@ func (c *Controller) Serve(ctx context.Context) error {
 	return nil
 }
 
+func (c *Controller) setLogger(logger zerolog.Logger) {
+	c.childLogger = logger
+	c.logger = logger.With().Str(log.ComponentKey, "controller").Logger()
+}
+
 func (c *Controller) initWorkspace() error {
 	if err := c.workspace.EnsureWorkspace(); err != nil {
 		return err
@@ -145,7 +147,6 @@ func (c *Controller) initScheduler() error {
 	c.profile = profile
 
 	c.scheduler = NewScheduler(&c.roster, c.profile)
-	c.scheduler.SetLogger(c.childLogger)
 
 	return nil
 }
