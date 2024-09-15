@@ -51,12 +51,13 @@ func (c *Controller) SetLoadProfile(profile schedule.Profile) {
 func (c *Controller) Serve(ctx context.Context) error {
 	logger := zerolog.Ctx(ctx)
 	c.setLogger(*logger)
+	ctxWithLogger := c.childLogger.WithContext(ctx)
 
 	if err := c.initWorkspace(); err != nil {
 		return err
 	}
 
-	if err := c.initProvider(ctx); err != nil {
+	if err := c.initProvider(ctxWithLogger); err != nil {
 		return err
 	}
 
@@ -64,13 +65,13 @@ func (c *Controller) Serve(ctx context.Context) error {
 		return err
 	}
 
-	if err := c.startSession(ctx); err != nil {
+	if err := c.startSession(ctxWithLogger); err != nil {
 		return err
 	}
 
 	// Start scheduler
 	c.schedulerErrGroup.Go(func() error {
-		return c.scheduler.Serve(ctx, c.config.Controller.Scheduler.UpdateInterval)
+		return c.scheduler.Serve(ctxWithLogger, c.config.Controller.Scheduler.UpdateInterval)
 	})
 
 	// Wait for scheduler shutdown before starting the teardown phase
@@ -103,8 +104,8 @@ func (c *Controller) Serve(ctx context.Context) error {
 }
 
 func (c *Controller) setLogger(logger zerolog.Logger) {
-	c.childLogger = logger
-	c.logger = logger.With().Str(log.ComponentKey, "controller").Logger()
+	c.childLogger = logger.With().Str(log.RootKey, "controller").Logger()
+	c.logger = c.childLogger.With().Str(log.ComponentKey, "controller").Logger()
 }
 
 func (c *Controller) initWorkspace() error {

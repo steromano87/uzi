@@ -5,7 +5,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/steromano87/harkonnen/v1/pkg/errors"
 	"github.com/steromano87/harkonnen/v1/pkg/injector"
-	"github.com/steromano87/harkonnen/v1/pkg/log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -27,7 +26,7 @@ func runControllerRunCmd(_ *cobra.Command, _ []string) {
 	sigtermCount := 0
 	signal.Notify(sigtermChan, os.Interrupt, syscall.SIGTERM)
 
-	logger := setupDefaultLogger().With().Str(log.RootKey, "controller").Logger()
+	logger := setupDefaultLogger()
 	mainCtx, cancelFunc := context.WithCancelCause(logger.WithContext(context.Background()))
 	defer cancelFunc(nil)
 
