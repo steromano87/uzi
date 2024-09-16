@@ -368,8 +368,8 @@ func (s *ServerTestSuite) TestStoreLogEntry_NoError() {
 		_ = server.ServeSession(s.ctx)
 	}()
 	time.Sleep(100 * time.Millisecond)
-	logEntry := &telemetry.LogEntry{}
-	err := server.StoreLogEntry(logEntry)
+	logEntry := make([]byte, 0)
+	err := server.StoreRawLog(logEntry)
 	assert.NoError(s.T(), err)
 }
 
@@ -382,9 +382,9 @@ func (s *ServerTestSuite) TestStoreLogEntry_Error() {
 	}()
 	time.Sleep(100 * time.Millisecond)
 
-	logEntry := &telemetry.LogEntry{}
-	if assert.NoError(s.T(), server.StoreLogEntry(logEntry)) {
-		err := server.StoreLogEntry(logEntry)
+	logEntry := make([]byte, 0)
+	if assert.NoError(s.T(), server.StoreRawLog(logEntry)) {
+		err := server.StoreRawLog(logEntry)
 		if assert.Error(s.T(), err) {
 			assert.ErrorIs(s.T(), err, telemetry.ErrFullBuffer)
 		}
@@ -403,10 +403,10 @@ func (s *ServerTestSuite) TestWriteLogsAndRetrieveEntries() {
 	grpcChannel := &inprocgrpc.Channel{}
 	telemetry.RegisterLogsServer(grpcChannel, server)
 	logsClient := telemetry.NewLogsClient(grpcChannel)
-	retrievedLogEntries := make([]*telemetry.LogEntry, 0)
+	retrievedLogEntries := make([]*telemetry.RawLog, 0)
 
 	logger.Info().Msg("test message")
-	serverStream, err := logsClient.GetLogEntries(context.TODO(), &telemetry.LogEntriesStreamRequest{})
+	serverStream, err := logsClient.GetRawLogs(context.TODO(), &telemetry.LogEntriesStreamRequest{})
 	if assert.NoError(s.T(), err) {
 		// Cancel the current context after 500 ms
 		cancelFuncTimer := time.NewTimer(250 * time.Millisecond)
@@ -427,8 +427,8 @@ func (s *ServerTestSuite) TestWriteLogsAndRetrieveEntries() {
 		}
 
 		if assert.Len(s.T(), retrievedLogEntries, 1) {
-			assert.NotEmpty(s.T(), retrievedLogEntries[0].GetRawData())
-			assert.Contains(s.T(), string(retrievedLogEntries[0].GetRawData()), "test message")
+			assert.NotEmpty(s.T(), retrievedLogEntries[0].GetEntry())
+			assert.Contains(s.T(), string(retrievedLogEntries[0].GetEntry()), "test message")
 		}
 	}
 }
