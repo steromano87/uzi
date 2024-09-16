@@ -15,5 +15,5 @@ message LogEntriesStreamRequest {
 }
 
 message RawLog {
-  bytes entry = 1;
+  string entry = 1;
 }

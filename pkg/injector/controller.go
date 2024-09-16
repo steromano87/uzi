@@ -50,13 +50,14 @@ func (c *Controller) SetLoadProfile(profile schedule.Profile) {
 func (c *Controller) Serve(ctx context.Context) error {
 	logger := zerolog.Ctx(ctx)
 	c.setLogger(*logger)
-	ctxWithLogger := c.childLogger.WithContext(ctx)
+	ctxWithChildLogger := c.childLogger.WithContext(ctx)
+	ctxWithBaseLogger := logger.WithContext(ctx)
 
 	if err := c.initWorkspace(); err != nil {
 		return err
 	}
 
-	if err := c.initProvider(ctxWithLogger); err != nil {
+	if err := c.initProvider(ctxWithBaseLogger); err != nil {
 		return err
 	}
 
@@ -64,13 +65,13 @@ func (c *Controller) Serve(ctx context.Context) error {
 		return err
 	}
 
-	if err := c.startSession(ctxWithLogger); err != nil {
+	if err := c.startSession(ctxWithChildLogger); err != nil {
 		return err
 	}
 
 	// Start scheduler
 	c.schedulerErrGroup.Go(func() error {
-		return c.scheduler.Serve(ctxWithLogger, c.config.Controller.Scheduler.UpdateInterval)
+		return c.scheduler.Serve(ctxWithChildLogger, c.config.Controller.Scheduler.UpdateInterval)
 	})
 
 	// Wait for scheduler shutdown before starting the teardown phase
@@ -127,11 +128,10 @@ func (c *Controller) initProvider(ctx context.Context) error {
 	}
 
 	c.provider = provider
-	ctxWithLogger := c.childLogger.WithContext(ctx)
 
 	rawInjectorSpec := c.config.RawInjectorSpec()
 	rawInjectorSpec.Set("workspace", c.workspace.Location())
-	roster, err := c.provider.Init(ctxWithLogger, rawInjectorSpec)
+	roster, err := c.provider.Init(ctx, rawInjectorSpec)
 	if err != nil {
 		return err
 	}
@@ -158,17 +158,18 @@ func (c *Controller) startSession(ctx context.Context) error {
 		return err
 	}
 
+	// Start a new session
+	sessionName := time.Now().Format(time.RFC3339)
+	if err := c.workspace.CreateRun(ctx, sessionName); err != nil {
+		c.logger.Error().Err(err).Str("runName", sessionName).Msg("Encountered an error while creating session")
+		return err
+	}
+	c.logger.Info().Str("sessionName", sessionName).Msg("New session created")
+
 	persistorCtx, persistorCancelFunc := context.WithCancel(ctx)
 	c.persistorCancelFunc = persistorCancelFunc
 	c.persistorErrGroup, _ = errgroup.WithContext(persistorCtx)
-
-	// Start a new run
-	runName := time.Now().Format(time.RFC3339)
-	if err := c.workspace.CreateRun(ctx, runName); err != nil {
-		c.logger.Error().Err(err).Str("runName", runName).Msg("Encountered an error while creating run")
-		return err
-	}
-	c.logger.Info().Str("runName", runName).Msg("New run created")
+	persistor := c.workspace.CurrentRun().Persistor()
 
 	userQuotasByAgent := c.roster.SplitQuotasByWeight(c.profile.MaxSyntheticUsers())
 	for agentId, quota := range userQuotasByAgent {
@@ -178,7 +179,7 @@ func (c *Controller) startSession(ctx context.Context) error {
 			return errors.New("cannot find agent with ID " + agentId)
 		}
 		request := &BeginSessionRequest{
-			Name:      runName,
+			Name:      sessionName,
 			UserQuota: quota,
 			Archive: &WorkspaceArchive{
 				Content: workspaceArchive,
@@ -189,10 +190,14 @@ func (c *Controller) startSession(ctx context.Context) error {
 			return errors.New(fmt.Sprintf("cannot start session for agent %s: %s", agentId, err.Error()))
 		}
 
-		// Start one persistor for each agent
 		c.persistorErrGroup.Go(func() error {
-			persistor := c.workspace.CurrentRun().Persistor()
-			return persistor.Serve(persistorCtx, agentId, currentAgent.MetricsClient(), currentAgent.LogsClient(), currentAgent.SpawnerClient())
+			return persistor.Serve(
+				persistorCtx,
+				agentId,
+				currentAgent.MetricsClient(),
+				currentAgent.LogsClient(),
+				currentAgent.SpawnerClient(),
+			)
 		})
 	}
 

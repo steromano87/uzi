@@ -26,7 +26,7 @@ type Server struct {
 	samplesBuffer           chan *Sample
 	transactionsBuffer      chan *Transaction
 	iterationCountersBuffer chan *IterationCounters
-	logsBuffer              chan []byte
+	logsBuffer              chan *RawLog
 	hostMetricsBuffer       chan *HostMetrics
 	buffersMu               sync.RWMutex
 
@@ -44,7 +44,7 @@ func NewServer() *Server {
 	server.samplesBuffer = make(chan *Sample, config.Telemetry.LoadMetrics.BufferCapacity)
 	server.transactionsBuffer = make(chan *Transaction, config.Telemetry.LoadMetrics.BufferCapacity)
 	server.iterationCountersBuffer = make(chan *IterationCounters, config.Telemetry.LoadMetrics.BufferCapacity)
-	server.logsBuffer = make(chan []byte, config.Telemetry.Logs.BufferCapacity)
+	server.logsBuffer = make(chan *RawLog, config.Telemetry.Logs.BufferCapacity)
 	server.hostMetricsBuffer = make(chan *HostMetrics, config.Telemetry.HostMetrics.BufferCapacity)
 	server.streamSemaphore = semaphore.NewWeighted(semaphoreWeight)
 
@@ -65,7 +65,7 @@ func (s *Server) Reconfigure(config *configuration.Manifest) error {
 	s.samplesBuffer = make(chan *Sample, config.Telemetry.LoadMetrics.BufferCapacity)
 	s.transactionsBuffer = make(chan *Transaction, config.Telemetry.LoadMetrics.BufferCapacity)
 	s.iterationCountersBuffer = make(chan *IterationCounters, config.Telemetry.LoadMetrics.BufferCapacity)
-	s.logsBuffer = make(chan []byte, config.Telemetry.Logs.BufferCapacity)
+	s.logsBuffer = make(chan *RawLog, config.Telemetry.Logs.BufferCapacity)
 	s.hostMetricsBuffer = make(chan *HostMetrics, config.Telemetry.HostMetrics.BufferCapacity)
 
 	return nil
@@ -167,7 +167,20 @@ func (s *Server) StoreHostMetrics(agentMetrics *HostMetrics) error {
 	}
 }
 
-func (s *Server) StoreRawLog(data []byte) error {
+func (s *Server) Write(p []byte) (n int, err error) {
+	if !s.activeSession.Load() {
+		// Do not return an error if no sessions are in progress, but discard the log
+		return len(p), nil
+	}
+
+	if err := s.StoreRawLog(&RawLog{Entry: string(p)}); err != nil {
+		return 0, err
+	}
+
+	return len(p), nil
+}
+
+func (s *Server) StoreRawLog(entry *RawLog) error {
 	if !s.activeSession.Load() {
 		return harkErrors.NoSessionsInProgress
 	}
@@ -176,24 +189,12 @@ func (s *Server) StoreRawLog(data []byte) error {
 	defer s.buffersMu.RUnlock()
 
 	select {
-	case s.logsBuffer <- data:
+	case s.logsBuffer <- entry:
 		s.logger.Trace().Msg("Saved log entry")
 		return nil
 	default:
 		return ErrFullBuffer
 	}
-}
-
-func (s *Server) Write(p []byte) (n int, err error) {
-	if !s.activeSession.Load() {
-		return 0, harkErrors.NoSessionsInProgress
-	}
-
-	if err := s.StoreRawLog(p); err != nil {
-		return 0, err
-	}
-
-	return len(p), nil
 }
 
 /////////////////////////
@@ -338,10 +339,8 @@ func (s *Server) GetRawLogs(_ *LogEntriesStreamRequest, g grpc.ServerStreamingSe
 		select {
 		case logEntry := <-s.logsBuffer:
 			s.logger.Trace().Msg("Streaming log entry")
-			rawLog := &RawLog{
-				Entry: logEntry,
-			}
-			if err := g.Send(rawLog); err != nil {
+
+			if err := g.Send(logEntry); err != nil {
 				s.logger.Error().Err(err).Msg("Encountered an error while streaming log entry")
 				return err
 			}
