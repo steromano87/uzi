@@ -249,7 +249,11 @@ func (w *Workspace) SwitchRun(name string) error {
 		return err
 	}
 
-	w.currentRun = LoadRun(name, w.location)
+	currentRun, err := LoadRun(name, w.location)
+	if err != nil {
+		return err
+	}
+	w.currentRun = currentRun
 	return nil
 }
 

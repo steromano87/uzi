@@ -10,47 +10,44 @@ import (
 	"testing"
 )
 
-type AdapterTestSuite struct {
+type PersistorTestSuite struct {
 	suite.Suite
 	tempWorkingDir string
 }
 
-func (s *AdapterTestSuite) SetupTest() {
+func (s *PersistorTestSuite) SetupTest() {
 	s.tempWorkingDir = filet.TmpDir(s.T(), "")
 }
 
-func (s *AdapterTestSuite) TearDownTest() {
+func (s *PersistorTestSuite) TearDownTest() {
 	filet.CleanUp(s.T())
 }
 
-func (s *AdapterTestSuite) TestCreateNewSQLiteDBOnFile() {
-	adapter := db.NewAdapter(path.Join(s.tempWorkingDir, "results.db"))
-
-	err := adapter.Connect()
+func (s *PersistorTestSuite) TestCreateNewSQLiteDBOnFile() {
+	persistor, err := db.NewPersistor(path.Join(s.tempWorkingDir, "results.db"))
 
 	if assert.NoError(s.T(), err) {
+		assert.IsType(s.T(), &db.Persistor{}, persistor)
 		assert.FileExists(s.T(), path.Join(s.tempWorkingDir, "results.db"))
 	}
 }
 
-func (s *AdapterTestSuite) TestCreateNewSQLiteDBOnMemory() {
-	adapter := db.NewAdapter(db.SQLiteDSNForInMemoryDB)
+func (s *PersistorTestSuite) TestCreateNewSQLiteDBOnMemory() {
+	_, err := db.NewPersistor(db.SQLiteDSNForInMemoryDB)
 
-	err := adapter.Connect()
 	assert.NoError(s.T(), err)
 }
 
-func (s *AdapterTestSuite) TestAutoMigrate() {
-	adapter := db.NewAdapter(db.SQLiteDSNForInMemoryDB)
+func (s *PersistorTestSuite) TestAutoMigrate() {
+	persistor, err := db.NewPersistor(db.SQLiteDSNForInMemoryDB)
 
 	ctx := context.TODO()
-	err := adapter.Connect()
 
 	if assert.NoError(s.T(), err) {
-		err := adapter.MigrateAll(ctx)
+		err := persistor.AutoMigrate(ctx)
 		if assert.NoError(s.T(), err) {
 			var tables []string
-			err := adapter.Table("sqlite_schema").Where(
+			err := persistor.DB().Table("sqlite_schema").Where(
 				"name not like ?", "sqlite_%").Where(
 				"name not like ?", "idx_%").Pluck("name", &tables).Error
 			if assert.NoError(s.T(), err) {
@@ -67,5 +64,5 @@ func (s *AdapterTestSuite) TestAutoMigrate() {
 }
 
 func TestAdapterTestSuite(t *testing.T) {
-	suite.Run(t, new(AdapterTestSuite))
+	suite.Run(t, new(PersistorTestSuite))
 }

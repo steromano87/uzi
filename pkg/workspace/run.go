@@ -3,7 +3,6 @@ package workspace
 import (
 	"context"
 	"github.com/steromano87/harkonnen/v1/pkg/db"
-	"gorm.io/gorm"
 	"os"
 	"path"
 )
@@ -15,7 +14,7 @@ const (
 type Run struct {
 	name         string
 	parentFolder string
-	dbAdapter    *db.Adapter
+	persistor    *db.Persistor
 }
 
 func NewRun(ctx context.Context, name string, parentFolder string) (*Run, error) {
@@ -26,28 +25,32 @@ func NewRun(ctx context.Context, name string, parentFolder string) (*Run, error)
 		return nil, err
 	}
 
-	run.dbAdapter = db.NewAdapter(path.Join(parentFolder, RunsFolder, name, DBDataFile))
-
-	if err := run.dbAdapter.Connect(); err != nil {
+	persistor, err := db.NewPersistor(path.Join(parentFolder, RunsFolder, name, DBDataFile))
+	if err != nil {
 		return nil, err
 	}
+	run.persistor = persistor
 
-	if err := run.dbAdapter.MigrateAll(ctx); err != nil {
+	if err := run.persistor.AutoMigrate(ctx); err != nil {
 		return nil, err
 	}
 
 	return run, nil
 }
 
-func LoadRun(name string, parentFolder string) *Run {
+func LoadRun(name string, parentFolder string) (*Run, error) {
 	run := new(Run)
 	run.name = name
 	run.parentFolder = parentFolder
-	run.dbAdapter = db.NewAdapter(path.Join(parentFolder, RunsFolder, name, DBDataFile))
+	persistor, err := db.NewPersistor(path.Join(parentFolder, RunsFolder, name, DBDataFile))
+	if err != nil {
+		return nil, err
+	}
+	run.persistor = persistor
 
-	return run
+	return run, nil
 }
 
-func (r *Run) DB() *gorm.DB {
-	return r.dbAdapter.DB
+func (r *Run) Persistor() *db.Persistor {
+	return r.persistor
 }
