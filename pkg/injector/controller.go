@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rs/zerolog"
+	"github.com/steromano87/harkonnen/v1/pkg/db"
 	"github.com/steromano87/harkonnen/v1/pkg/injector/schedule"
 	"github.com/steromano87/harkonnen/v1/pkg/log"
 	"github.com/steromano87/harkonnen/v1/pkg/variables"
@@ -191,7 +192,8 @@ func (c *Controller) startSession(ctx context.Context) error {
 
 		// Start one persistor for each agent
 		c.persistorErrGroup.Go(func() error {
-			persistor := c.workspace.CurrentRun().Persistor()
+			DB := c.workspace.CurrentRun().DB()
+			persistor := db.NewPersistor(DB)
 			return persistor.Serve(persistorCtx, agentId, currentAgent.MetricsClient(), currentAgent.LogsClient(), currentAgent.SpawnerClient())
 		})
 	}

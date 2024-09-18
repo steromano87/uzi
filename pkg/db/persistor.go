@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"github.com/glebarez/sqlite"
 	"github.com/rs/zerolog"
 	"github.com/steromano87/harkonnen/v1/pkg/log"
 	"github.com/steromano87/harkonnen/v1/pkg/syntheticuser"
@@ -14,17 +13,7 @@ import (
 	"time"
 )
 
-const (
-	SQLiteDSNForInMemoryDB = "file::memory:?cache=shared"
-
-	syntheticUserPollInterval = 5 * time.Second
-)
-
-var autoMigrateRegisteredEntities []any
-
-func registerEntityForAutoMigration(entity any) {
-	autoMigrateRegisteredEntities = append(autoMigrateRegisteredEntities, entity)
-}
+const syntheticUserPollInterval = 5 * time.Second
 
 type Persistor struct {
 	db              *gorm.DB
@@ -32,49 +21,15 @@ type Persistor struct {
 	terminationChan chan struct{}
 }
 
-func NewPersistor(dsn string) (*Persistor, error) {
+func NewPersistor(db *gorm.DB) *Persistor {
 	persistor := new(Persistor)
-	DB, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{PrepareStmt: true})
-	if err != nil {
-		return nil, err
-	}
-
-	persistor.db = DB
+	persistor.db = db
 	persistor.terminationChan = make(chan struct{})
-
-	return persistor, nil
-}
-
-func (p *Persistor) AutoMigrate(ctx context.Context) error {
-	for _, element := range autoMigrateRegisteredEntities {
-		err := p.db.WithContext(ctx).AutoMigrate(element)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (p *Persistor) Close() error {
-	rawDB, err := p.db.DB()
-	if err != nil {
-		return err
-	}
-
-	return rawDB.Close()
-}
-
-func (p *Persistor) DB() *gorm.DB {
-	return p.db
+	return persistor
 }
 
 func (p *Persistor) Serve(ctx context.Context, agentId string, metricsClient telemetry.MetricsClient, logsClient telemetry.LogsClient, spawnerClient syntheticuser.SpawnerClient) error {
 	p.setLogger(zerolog.Ctx(ctx))
-
-	if err := p.AutoMigrate(ctx); err != nil {
-		return err
-	}
 
 	clientErrGroup, _ := errgroup.WithContext(ctx)
 	clientErrGroup.Go(func() error {
