@@ -185,8 +185,9 @@ func (s *Server) StoreRawLog(entry *RawLog) error {
 }
 
 func (s *Server) Write(p []byte) (n int, err error) {
+	// If no sessions are in progress, go no-op
 	if !s.activeSession.Load() {
-		return 0, harkErrors.NoSessionsInProgress
+		return len(p), nil
 	}
 
 	entry := &RawLog{
