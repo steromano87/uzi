@@ -58,7 +58,8 @@ func (c *Controller) Serve(ctx context.Context) error {
 		return err
 	}
 
-	if err := c.initProvider(ctxWithLogger); err != nil {
+	// Use bare logger for provider to avoid having a duplicate root key in logs in case of local agent
+	if err := c.initProvider(logger.WithContext(ctx)); err != nil {
 		return err
 	}
 
@@ -129,11 +130,10 @@ func (c *Controller) initProvider(ctx context.Context) error {
 	}
 
 	c.provider = provider
-	ctxWithLogger := c.childLogger.WithContext(ctx)
 
 	rawInjectorSpec := c.config.RawInjectorSpec()
 	rawInjectorSpec.Set("workspace", c.workspace.Location())
-	roster, err := c.provider.Init(ctxWithLogger, rawInjectorSpec)
+	roster, err := c.provider.Init(ctx, rawInjectorSpec)
 	if err != nil {
 		return err
 	}
