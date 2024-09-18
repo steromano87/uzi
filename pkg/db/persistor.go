@@ -209,7 +209,7 @@ func (p *Persistor) readHostMetrics(ctx context.Context, agentId string, metrics
 
 func (p *Persistor) readRawLogs(ctx context.Context, agentId string, logsClient telemetry.LogsClient) error {
 	defer p.sendTermination()
-	serverStream, err := logsClient.GetRawLogs(ctx, &telemetry.LogEntriesStreamRequest{})
+	serverStream, err := logsClient.GetLogEntries(ctx, &telemetry.LogEntriesStreamRequest{})
 	if err != nil {
 		return err
 	}

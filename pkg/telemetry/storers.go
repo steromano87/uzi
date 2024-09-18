@@ -14,5 +14,5 @@ type HostMetricsStorer interface {
 
 type LogStorer interface {
 	io.Writer
-	StoreRawLog(entry []byte) error
+	StoreLogEntry(entry *LogEntry) error
 }

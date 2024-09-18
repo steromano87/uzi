@@ -15,8 +15,8 @@ type RawLog struct {
 	RawData datatypes.JSON
 }
 
-func NewLogFromGrpc(log *telemetry.RawLog) RawLog {
+func NewLogFromGrpc(log *telemetry.LogEntry) RawLog {
 	return RawLog{
-		RawData: log.GetEntry(),
+		RawData: log.GetRawData(),
 	}
 }
