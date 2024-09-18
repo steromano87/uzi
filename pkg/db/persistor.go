@@ -13,25 +13,48 @@ import (
 	"time"
 )
 
-const syntheticUserPollInterval = 5 * time.Second
+const (
+	syntheticUserPollInterval             = 5 * time.Second
+	recordsChanSize                       = 2048
+	persistenceTransactionCommitInterval  = 5 * time.Second
+	persistenceTransactionCommitBatchSize = 100
+)
 
 type Persistor struct {
-	db              *gorm.DB
-	logger          zerolog.Logger
-	terminationChan chan struct{}
+	db                         *gorm.DB
+	logger                     zerolog.Logger
+	innerTerminationCancelFunc context.CancelFunc
+
+	samplesChan               chan Sample
+	transactionChan           chan Transaction
+	iterationCountersChan     chan IterationCounters
+	hostMetricsChan           chan HostMetric
+	rawLogsChan               chan RawLog
+	syntheticUserCountersChan chan SyntheticUserCounters
 }
 
 func NewPersistor(db *gorm.DB) *Persistor {
 	persistor := new(Persistor)
 	persistor.db = db
-	persistor.terminationChan = make(chan struct{})
+
+	persistor.samplesChan = make(chan Sample, recordsChanSize)
+	persistor.transactionChan = make(chan Transaction, recordsChanSize)
+	persistor.iterationCountersChan = make(chan IterationCounters, recordsChanSize)
+	persistor.hostMetricsChan = make(chan HostMetric, recordsChanSize)
+	persistor.rawLogsChan = make(chan RawLog, recordsChanSize)
+	persistor.syntheticUserCountersChan = make(chan SyntheticUserCounters, recordsChanSize)
 	return persistor
 }
 
 func (p *Persistor) Serve(ctx context.Context, agentId string, metricsClient telemetry.MetricsClient, logsClient telemetry.LogsClient, spawnerClient syntheticuser.SpawnerClient) error {
 	p.setLogger(zerolog.Ctx(ctx))
+	var innerTerminationCtx context.Context
+	innerTerminationCtx, p.innerTerminationCancelFunc = context.WithCancel(ctx)
 
 	clientErrGroup, _ := errgroup.WithContext(ctx)
+	clientErrGroup.Go(func() error {
+		return p.persistRecords(innerTerminationCtx)
+	})
 	clientErrGroup.Go(func() error {
 		return p.readSamples(ctx, agentId, metricsClient)
 	})
@@ -48,7 +71,7 @@ func (p *Persistor) Serve(ctx context.Context, agentId string, metricsClient tel
 		return p.readRawLogs(ctx, agentId, logsClient)
 	})
 	clientErrGroup.Go(func() error {
-		return p.readSyntheticUserCounters(ctx, agentId, spawnerClient)
+		return p.readSyntheticUserCounters(innerTerminationCtx, agentId, spawnerClient)
 	})
 
 	return clientErrGroup.Wait()
@@ -59,7 +82,7 @@ func (p *Persistor) setLogger(logger *zerolog.Logger) {
 }
 
 func (p *Persistor) readSamples(ctx context.Context, agentId string, metricsClient telemetry.MetricsClient) error {
-	defer p.sendTermination()
+	defer p.innerTerminationCancelFunc()
 	serverStream, err := metricsClient.GetSamples(ctx, &telemetry.SampleStreamRequest{})
 	if err != nil {
 		return err
@@ -77,15 +100,12 @@ func (p *Persistor) readSamples(ctx context.Context, agentId string, metricsClie
 
 		dbSample := NewSampleFromGrpc(sample)
 		dbSample.AgentId = agentId
-		p.logger.Trace().Str("name", dbSample.Name).Msg("Persisting sample")
-		if result := p.db.Save(&dbSample); result.Error != nil {
-			p.logger.Error().Err(result.Error).Msg("Failed to persist sample")
-		}
+		p.samplesChan <- dbSample
 	}
 }
 
 func (p *Persistor) readTransactions(ctx context.Context, agentId string, metricsClient telemetry.MetricsClient) error {
-	defer p.sendTermination()
+	defer p.innerTerminationCancelFunc()
 	serverStream, err := metricsClient.GetTransactions(ctx, &telemetry.TransactionStreamRequest{})
 	if err != nil {
 		return err
@@ -103,15 +123,12 @@ func (p *Persistor) readTransactions(ctx context.Context, agentId string, metric
 
 		dbTransaction := NewTransactionFromGrpc(transaction)
 		dbTransaction.AgentId = agentId
-		p.logger.Trace().Str("name", dbTransaction.Name).Msg("Persisting transaction")
-		if result := p.db.Save(&dbTransaction); result.Error != nil {
-			p.logger.Error().Err(result.Error).Msg("Failed to persist transaction")
-		}
+		p.transactionChan <- dbTransaction
 	}
 }
 
 func (p *Persistor) readIterationCounters(ctx context.Context, agentId string, metricsClient telemetry.MetricsClient) error {
-	defer p.sendTermination()
+	defer p.innerTerminationCancelFunc()
 	serverStream, err := metricsClient.GetIterationCounters(ctx, &telemetry.IterationCountersStreamRequest{})
 	if err != nil {
 		return err
@@ -129,15 +146,12 @@ func (p *Persistor) readIterationCounters(ctx context.Context, agentId string, m
 
 		dbCounters := NewIterationCountersFromGrpc(counters)
 		dbCounters.AgentId = agentId
-		p.logger.Trace().Str(log.AgentIdKey, dbCounters.AgentId).Msg("Persisting iteration counter")
-		if result := p.db.Save(&dbCounters); result.Error != nil {
-			p.logger.Error().Err(result.Error).Msg("Failed to persist iteration counter")
-		}
+		p.iterationCountersChan <- dbCounters
 	}
 }
 
 func (p *Persistor) readHostMetrics(ctx context.Context, agentId string, metricsClient telemetry.MetricsClient) error {
-	defer p.sendTermination()
+	defer p.innerTerminationCancelFunc()
 	serverStream, err := metricsClient.GetHostMetrics(ctx, &telemetry.HostMetricsStreamRequest{})
 	if err != nil {
 		return err
@@ -155,15 +169,12 @@ func (p *Persistor) readHostMetrics(ctx context.Context, agentId string, metrics
 
 		dbMetrics := NewHostMetricFromGrpc(metrics)
 		dbMetrics.AgentId = agentId
-		p.logger.Trace().Str(log.AgentIdKey, dbMetrics.AgentId).Msg("Persisting host metrics")
-		if result := p.db.Save(&dbMetrics); result.Error != nil {
-			p.logger.Error().Err(result.Error).Msg("Failed to persist host metrics")
-		}
+		p.hostMetricsChan <- dbMetrics
 	}
 }
 
 func (p *Persistor) readRawLogs(ctx context.Context, agentId string, logsClient telemetry.LogsClient) error {
-	defer p.sendTermination()
+	defer p.innerTerminationCancelFunc()
 	serverStream, err := logsClient.GetRawLogs(ctx, &telemetry.RawLogsStreamRequest{})
 	if err != nil {
 		return err
@@ -181,10 +192,7 @@ func (p *Persistor) readRawLogs(ctx context.Context, agentId string, logsClient 
 
 		dbLog := NewLogFromGrpc(logEntry)
 		dbLog.AgentId = agentId
-		p.logger.Trace().Str(log.AgentIdKey, dbLog.AgentId).Msg("Persisting raw log")
-		if result := p.db.Save(&dbLog); result.Error != nil {
-			p.logger.Error().Err(result.Error).Msg("Failed to persist raw log")
-		}
+		p.rawLogsChan <- dbLog
 	}
 }
 
@@ -194,10 +202,6 @@ func (p *Persistor) readSyntheticUserCounters(ctx context.Context, agentId strin
 
 	for {
 		select {
-		case <-p.terminationChan:
-			p.logger.Debug().Msg("Received termination signal, stopping synthetic user counters gathering")
-			return nil
-
 		case <-ctx.Done():
 			p.logger.Debug().Msg("Context canceled, stopping synthetic user counters gathering")
 			return nil
@@ -211,16 +215,124 @@ func (p *Persistor) readSyntheticUserCounters(ctx context.Context, agentId strin
 			dbCounters := NewSyntheticUserCountersFromGrpc(syntheticUserCounters)
 			dbCounters.AgentId = agentId
 			dbCounters.Timestamp = now
-			if result := p.db.Save(&dbCounters); result.Error != nil {
-				p.logger.Error().Err(result.Error).Msg("Failed to persist synthetic user counters")
-			}
+			p.syntheticUserCountersChan <- dbCounters
 		}
 	}
 }
 
-func (p *Persistor) sendTermination() {
-	select {
-	case p.terminationChan <- struct{}{}:
-	default:
+func (p *Persistor) persistRecords(ctx context.Context) error {
+	p.logger.Debug().Int("commitBatchSize", persistenceTransactionCommitBatchSize).Dur("commitMaxInterval", persistenceTransactionCommitInterval).Msg("Persistence goroutine started")
+	commitTicker := time.NewTicker(persistenceTransactionCommitInterval)
+	defer commitTicker.Stop()
+	transaction := p.db.Begin()
+	recordCount := 0
+	defer transaction.Commit()
+
+	for {
+		select {
+		case <-ctx.Done():
+			p.logger.Debug().Msg("Persistence goroutine shutdown requested, committing all remaining records")
+			for len(p.samplesChan) > 0 {
+				record := <-p.samplesChan
+				transaction.Create(&record)
+			}
+
+			for len(p.transactionChan) > 0 {
+				record := <-p.transactionChan
+				transaction.Create(&record)
+			}
+
+			for len(p.iterationCountersChan) > 0 {
+				record := <-p.iterationCountersChan
+				transaction.Create(&record)
+			}
+
+			for len(p.hostMetricsChan) > 0 {
+				record := <-p.hostMetricsChan
+				transaction.Create(&record)
+			}
+
+			for len(p.rawLogsChan) > 0 {
+				record := <-p.rawLogsChan
+				transaction.Create(&record)
+			}
+
+			for len(p.syntheticUserCountersChan) > 0 {
+				record := <-p.syntheticUserCountersChan
+				transaction.Create(&record)
+			}
+
+			p.logger.Debug().Msg("All pending records committed, stopping")
+			return nil
+
+		case record := <-p.samplesChan:
+			transaction.Create(&record)
+			recordCount++
+			if recordCount >= persistenceTransactionCommitBatchSize {
+				p.logger.Trace().Int("recordCount", recordCount).Msg("Records have reached the maximum batch size, committing")
+				transaction.Commit()
+				transaction = p.db.Begin()
+				recordCount = 0
+			}
+
+		case record := <-p.transactionChan:
+			transaction.Create(&record)
+			recordCount++
+			if recordCount >= persistenceTransactionCommitBatchSize {
+				p.logger.Trace().Int("recordCount", recordCount).Msg("Records have reached the maximum batch size, committing")
+				transaction.Commit()
+				transaction = p.db.Begin()
+				recordCount = 0
+			}
+
+		case record := <-p.iterationCountersChan:
+			transaction.Create(&record)
+			recordCount++
+			if recordCount >= persistenceTransactionCommitBatchSize {
+				p.logger.Trace().Int("recordCount", recordCount).Msg("Records have reached the maximum batch size, committing")
+				transaction.Commit()
+				transaction = p.db.Begin()
+				recordCount = 0
+			}
+
+		case record := <-p.hostMetricsChan:
+			transaction.Create(&record)
+			recordCount++
+			if recordCount >= persistenceTransactionCommitBatchSize {
+				p.logger.Trace().Int("recordCount", recordCount).Msg("Records have reached the maximum batch size, committing")
+				transaction.Commit()
+				transaction = p.db.Begin()
+				recordCount = 0
+			}
+
+		case record := <-p.rawLogsChan:
+			transaction.Create(&record)
+			recordCount++
+			if recordCount >= persistenceTransactionCommitBatchSize {
+				p.logger.Trace().Int("recordCount", recordCount).Msg("Records have reached the maximum batch size, committing")
+				transaction.Commit()
+				transaction = p.db.Begin()
+				recordCount = 0
+			}
+
+		case record := <-p.syntheticUserCountersChan:
+			transaction.Create(&record)
+			recordCount++
+			if recordCount >= persistenceTransactionCommitBatchSize {
+				p.logger.Trace().Int("recordCount", recordCount).Msg("Records have reached the maximum batch size, committing")
+				transaction.Commit()
+				transaction = p.db.Begin()
+				recordCount = 0
+			}
+
+		case <-commitTicker.C:
+			if recordCount == 0 {
+				p.logger.Trace().Msg("Skip transaction commit because no records have been added since last transaction start")
+				continue
+			}
+			transaction.Commit()
+			transaction = p.db.Begin()
+			recordCount = 0
+		}
 	}
 }
