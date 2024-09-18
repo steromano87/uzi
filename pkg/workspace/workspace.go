@@ -16,7 +16,7 @@ const (
 
 	TempFolderPrefix = "harkonnen_"
 	ScriptsFolder    = "scripts"
-	RunsFolder       = "runs"
+	SessionsFolder   = "sessions"
 	VariablesFolder  = "variables"
 	DataFolder       = "data"
 
@@ -25,9 +25,9 @@ const (
 )
 
 type Workspace struct {
-	location   string
-	currentRun *Run
-	logger     zerolog.Logger
+	location       string
+	currentSession *Session
+	logger         zerolog.Logger
 }
 
 func New(location string) Workspace {
@@ -63,7 +63,7 @@ func (w *Workspace) Hydrate() error {
 		return err
 	}
 
-	if err := w.createRunsFolder(); err != nil {
+	if err := w.createSessionsFolder(); err != nil {
 		return err
 	}
 
@@ -127,8 +127,8 @@ func (w *Workspace) createScriptsFolder() error {
 	return os.WriteFile(pipelinePath, []byte(DefaultPipelineContent), FilePerms)
 }
 
-func (w *Workspace) createRunsFolder() error {
-	return os.MkdirAll(path.Join(w.location, RunsFolder), FolderPerms)
+func (w *Workspace) createSessionsFolder() error {
+	return os.MkdirAll(path.Join(w.location, SessionsFolder), FolderPerms)
 }
 
 func (w *Workspace) createDataFolder() error {
@@ -218,8 +218,8 @@ func (w *Workspace) Pipeline() ([]byte, string, error) {
 	return pipelineContent, pipelinePath, nil
 }
 
-func (w *Workspace) Runs() ([]string, error) {
-	entries, err := os.ReadDir(w.location)
+func (w *Workspace) Sessions() ([]string, error) {
+	entries, err := os.ReadDir(path.Join(w.location, SessionsFolder))
 	if err != nil {
 		return nil, err
 	}
@@ -234,32 +234,32 @@ func (w *Workspace) Runs() ([]string, error) {
 	return runs, nil
 }
 
-func (w *Workspace) CreateRun(ctx context.Context, name string) error {
-	run, err := NewRun(ctx, name, w.location)
+func (w *Workspace) CreateSession(ctx context.Context, name string) error {
+	run, err := NewSession(ctx, name, w.location)
 	if err != nil {
 		return err
 	}
 
-	w.currentRun = run
+	w.currentSession = run
 	return nil
 }
 
-func (w *Workspace) SwitchRun(name string) error {
+func (w *Workspace) SwitchSession(name string) error {
 	if _, err := os.Stat(filepath.Join(w.location, name)); os.IsNotExist(err) {
 		return err
 	}
 
-	w.currentRun = LoadRun(name, w.location)
+	w.currentSession = LoadSession(name, w.location)
 	return nil
 }
 
-func (w *Workspace) DeleteRun(name string) error {
-	if w.currentRun != nil && w.currentRun.name == name {
-		w.currentRun = nil
+func (w *Workspace) DeleteSession(name string) error {
+	if w.currentSession != nil && w.currentSession.name == name {
+		w.currentSession = nil
 	}
 	return os.RemoveAll(path.Join(w.location, name))
 }
 
-func (w *Workspace) CurrentRun() *Run {
-	return w.currentRun
+func (w *Workspace) CurrentSession() *Session {
+	return w.currentSession
 }

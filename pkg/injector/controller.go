@@ -23,12 +23,13 @@ type Controller struct {
 	config    *configuration.Manifest
 	workspace workspace.Workspace
 
-	provider  Provider
-	roster    Roster
-	scheduler Scheduler
-	profile   schedule.Profile
+	provider          Provider
+	roster            Roster
+	profile           schedule.Profile
+	scheduler         Scheduler
+	schedulerErrGroup errgroup.Group
 
-	schedulerErrGroup   errgroup.Group
+	persistor           *db.Persistor
 	persistorErrGroup   *errgroup.Group
 	persistorCancelFunc context.CancelFunc
 }
@@ -159,17 +160,19 @@ func (c *Controller) startSession(ctx context.Context) error {
 		return err
 	}
 
+	// Start a new session
+	sessionName := time.Now().Format(time.RFC3339)
+	if err := c.workspace.CreateSession(ctx, sessionName); err != nil {
+		c.logger.Error().Err(err).Str("sessionName", sessionName).Msg("Encountered an error while creating run")
+		return err
+	}
+	c.logger.Info().Str("sessionName", sessionName).Msg("New run created")
+
+	// Create persistor
 	persistorCtx, persistorCancelFunc := context.WithCancel(ctx)
 	c.persistorCancelFunc = persistorCancelFunc
 	c.persistorErrGroup, _ = errgroup.WithContext(persistorCtx)
-
-	// Start a new run
-	runName := time.Now().Format(time.RFC3339)
-	if err := c.workspace.CreateRun(ctx, runName); err != nil {
-		c.logger.Error().Err(err).Str("runName", runName).Msg("Encountered an error while creating run")
-		return err
-	}
-	c.logger.Info().Str("runName", runName).Msg("New run created")
+	c.persistor = db.NewPersistor(c.workspace.CurrentSession().DB())
 
 	userQuotasByAgent := c.roster.SplitQuotasByWeight(c.profile.MaxSyntheticUsers())
 	for agentId, quota := range userQuotasByAgent {
@@ -179,7 +182,7 @@ func (c *Controller) startSession(ctx context.Context) error {
 			return errors.New("cannot find agent with ID " + agentId)
 		}
 		request := &BeginSessionRequest{
-			Name:      runName,
+			Name:      sessionName,
 			UserQuota: quota,
 			Archive: &WorkspaceArchive{
 				Content: workspaceArchive,
@@ -192,9 +195,7 @@ func (c *Controller) startSession(ctx context.Context) error {
 
 		// Start one persistor for each agent
 		c.persistorErrGroup.Go(func() error {
-			DB := c.workspace.CurrentRun().DB()
-			persistor := db.NewPersistor(DB)
-			return persistor.Serve(persistorCtx, agentId, currentAgent.MetricsClient(), currentAgent.LogsClient(), currentAgent.SpawnerClient())
+			return c.persistor.Serve(persistorCtx, agentId, currentAgent.MetricsClient(), currentAgent.LogsClient(), currentAgent.SpawnerClient())
 		})
 	}
 
