@@ -2,7 +2,6 @@ package db
 
 import (
 	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
-	"gorm.io/datatypes"
 )
 
 func init() {
@@ -12,11 +11,11 @@ func init() {
 type RawLog struct {
 	Id      uint   `gorm:"primaryKey;autoincrement"`
 	AgentId string `gorm:"index:idx_logs_agent"`
-	RawData datatypes.JSON
+	Content string
 }
 
-func NewLogFromGrpc(log *telemetry.LogEntry) RawLog {
+func NewLogFromGrpc(log *telemetry.RawLog) RawLog {
 	return RawLog{
-		RawData: log.GetRawData(),
+		Content: log.GetContent(),
 	}
 }

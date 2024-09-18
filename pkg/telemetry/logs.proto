@@ -5,15 +5,15 @@ option go_package = "github.com/steromano87/harkonnen/v1/pkg/telemetry";
 import "google/protobuf/empty.proto";
 
 service Logs {
-  rpc GetLogEntries(LogEntriesStreamRequest) returns (stream LogEntry) {}
+  rpc GetRawLogs(RawLogsStreamRequest) returns (stream RawLog) {}
 }
 
 //////////////////////////////////////////
 
-message LogEntriesStreamRequest {
+message RawLogsStreamRequest {
   google.protobuf.Empty _ = 1;
 }
 
-message LogEntry {
-  bytes rawData = 1;
+message RawLog {
+  string content = 1;
 }

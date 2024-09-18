@@ -26,7 +26,7 @@ type Server struct {
 	samplesBuffer           chan *Sample
 	transactionsBuffer      chan *Transaction
 	iterationCountersBuffer chan *IterationCounters
-	logsBuffer              chan *LogEntry
+	logsBuffer              chan *RawLog
 	hostMetricsBuffer       chan *HostMetrics
 	buffersMu               sync.RWMutex
 
@@ -44,7 +44,7 @@ func NewServer() *Server {
 	server.samplesBuffer = make(chan *Sample, config.Telemetry.LoadMetrics.BufferCapacity)
 	server.transactionsBuffer = make(chan *Transaction, config.Telemetry.LoadMetrics.BufferCapacity)
 	server.iterationCountersBuffer = make(chan *IterationCounters, config.Telemetry.LoadMetrics.BufferCapacity)
-	server.logsBuffer = make(chan *LogEntry, config.Telemetry.Logs.BufferCapacity)
+	server.logsBuffer = make(chan *RawLog, config.Telemetry.Logs.BufferCapacity)
 	server.hostMetricsBuffer = make(chan *HostMetrics, config.Telemetry.HostMetrics.BufferCapacity)
 	server.streamSemaphore = semaphore.NewWeighted(semaphoreWeight)
 
@@ -65,7 +65,7 @@ func (s *Server) Reconfigure(config *configuration.Manifest) error {
 	s.samplesBuffer = make(chan *Sample, config.Telemetry.LoadMetrics.BufferCapacity)
 	s.transactionsBuffer = make(chan *Transaction, config.Telemetry.LoadMetrics.BufferCapacity)
 	s.iterationCountersBuffer = make(chan *IterationCounters, config.Telemetry.LoadMetrics.BufferCapacity)
-	s.logsBuffer = make(chan *LogEntry, config.Telemetry.Logs.BufferCapacity)
+	s.logsBuffer = make(chan *RawLog, config.Telemetry.Logs.BufferCapacity)
 	s.hostMetricsBuffer = make(chan *HostMetrics, config.Telemetry.HostMetrics.BufferCapacity)
 
 	return nil
@@ -167,7 +167,7 @@ func (s *Server) StoreHostMetrics(agentMetrics *HostMetrics) error {
 	}
 }
 
-func (s *Server) StoreLogEntry(entry *LogEntry) error {
+func (s *Server) StoreRawLog(entry *RawLog) error {
 	if !s.activeSession.Load() {
 		return harkErrors.NoSessionsInProgress
 	}
@@ -189,10 +189,10 @@ func (s *Server) Write(p []byte) (n int, err error) {
 		return 0, harkErrors.NoSessionsInProgress
 	}
 
-	entry := &LogEntry{
-		RawData: p,
+	entry := &RawLog{
+		Content: string(p),
 	}
-	if err := s.StoreLogEntry(entry); err != nil {
+	if err := s.StoreRawLog(entry); err != nil {
 		return 0, err
 	}
 
@@ -323,7 +323,7 @@ func (s *Server) GetHostMetrics(_ *HostMetricsStreamRequest, g grpc.ServerStream
 	}
 }
 
-func (s *Server) GetLogEntries(_ *LogEntriesStreamRequest, g grpc.ServerStreamingServer[LogEntry]) error {
+func (s *Server) GetRawLogs(_ *RawLogsStreamRequest, g grpc.ServerStreamingServer[RawLog]) error {
 	if !s.activeSession.Load() {
 		s.logger.Error().Err(harkErrors.NoSessionsInProgress).Msg("Cannot start logs streaming")
 		return harkErrors.NoSessionsInProgress
