@@ -368,7 +368,8 @@ func (s *ServerTestSuite) TestStoreLogEntry_NoError() {
 		_ = server.ServeSession(s.ctx)
 	}()
 	time.Sleep(100 * time.Millisecond)
-	err := server.StoreRawLog("")
+	logEntry := make([]byte, 0)
+	err := server.StoreRawLog(logEntry)
 	assert.NoError(s.T(), err)
 }
 
@@ -381,8 +382,9 @@ func (s *ServerTestSuite) TestStoreLogEntry_Error() {
 	}()
 	time.Sleep(100 * time.Millisecond)
 
-	if assert.NoError(s.T(), server.StoreRawLog("")) {
-		err := server.StoreRawLog("")
+	logEntry := make([]byte, 0)
+	if assert.NoError(s.T(), server.StoreRawLog(logEntry)) {
+		err := server.StoreRawLog(logEntry)
 		if assert.Error(s.T(), err) {
 			assert.ErrorIs(s.T(), err, telemetry.ErrFullBuffer)
 		}
@@ -426,7 +428,7 @@ func (s *ServerTestSuite) TestWriteLogsAndRetrieveEntries() {
 
 		if assert.Len(s.T(), retrievedLogEntries, 1) {
 			assert.NotEmpty(s.T(), retrievedLogEntries[0].GetEntry())
-			assert.Contains(s.T(), retrievedLogEntries[0].GetEntry(), "test message")
+			assert.Contains(s.T(), string(retrievedLogEntries[0].GetEntry()), "test message")
 		}
 	}
 }

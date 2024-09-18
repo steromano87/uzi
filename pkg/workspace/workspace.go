@@ -16,7 +16,7 @@ const (
 
 	TempFolderPrefix = "harkonnen_"
 	ScriptsFolder    = "scripts"
-	SessionsFolder   = "sessions"
+	RunsFolder       = "runs"
 	VariablesFolder  = "variables"
 	DataFolder       = "data"
 
@@ -26,7 +26,7 @@ const (
 
 type Workspace struct {
 	location   string
-	currentRun *Session
+	currentRun *Run
 	logger     zerolog.Logger
 }
 
@@ -128,7 +128,7 @@ func (w *Workspace) createScriptsFolder() error {
 }
 
 func (w *Workspace) createRunsFolder() error {
-	return os.MkdirAll(path.Join(w.location, SessionsFolder), FolderPerms)
+	return os.MkdirAll(path.Join(w.location, RunsFolder), FolderPerms)
 }
 
 func (w *Workspace) createDataFolder() error {
@@ -235,7 +235,7 @@ func (w *Workspace) Runs() ([]string, error) {
 }
 
 func (w *Workspace) CreateRun(ctx context.Context, name string) error {
-	run, err := NewSession(ctx, name, w.location)
+	run, err := NewRun(ctx, name, w.location)
 	if err != nil {
 		return err
 	}
@@ -249,7 +249,7 @@ func (w *Workspace) SwitchRun(name string) error {
 		return err
 	}
 
-	currentRun, err := LoadSession(name, w.location)
+	currentRun, err := LoadRun(name, w.location)
 	if err != nil {
 		return err
 	}
@@ -264,6 +264,6 @@ func (w *Workspace) DeleteRun(name string) error {
 	return os.RemoveAll(path.Join(w.location, name))
 }
 
-func (w *Workspace) CurrentRun() *Session {
+func (w *Workspace) CurrentRun() *Run {
 	return w.currentRun
 }

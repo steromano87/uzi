@@ -123,7 +123,7 @@ func (p *Persistor) readSamples(ctx context.Context, agentId string, metricsClie
 		dbSample := NewSampleFromGrpc(sample)
 		dbSample.AgentId = agentId
 		p.logger.Trace().Str("name", dbSample.Name).Msg("Persisting sample")
-		if result := p.db.Create(&dbSample); result.Error != nil {
+		if result := p.db.Save(&dbSample); result.Error != nil {
 			p.logger.Error().Err(result.Error).Msg("Failed to persist sample")
 		}
 	}
@@ -149,7 +149,7 @@ func (p *Persistor) readTransactions(ctx context.Context, agentId string, metric
 		dbTransaction := NewTransactionFromGrpc(transaction)
 		dbTransaction.AgentId = agentId
 		p.logger.Trace().Str("name", dbTransaction.Name).Msg("Persisting transaction")
-		if result := p.db.Create(&dbTransaction); result.Error != nil {
+		if result := p.db.Save(&dbTransaction); result.Error != nil {
 			p.logger.Error().Err(result.Error).Msg("Failed to persist transaction")
 		}
 	}
@@ -175,7 +175,7 @@ func (p *Persistor) readIterationCounters(ctx context.Context, agentId string, m
 		dbCounters := NewIterationCountersFromGrpc(counters)
 		dbCounters.AgentId = agentId
 		p.logger.Trace().Str(log.AgentIdKey, dbCounters.AgentId).Msg("Persisting iteration counter")
-		if result := p.db.Create(&dbCounters); result.Error != nil {
+		if result := p.db.Save(&dbCounters); result.Error != nil {
 			p.logger.Error().Err(result.Error).Msg("Failed to persist iteration counter")
 		}
 	}
@@ -201,7 +201,7 @@ func (p *Persistor) readHostMetrics(ctx context.Context, agentId string, metrics
 		dbMetrics := NewHostMetricFromGrpc(metrics)
 		dbMetrics.AgentId = agentId
 		p.logger.Trace().Str(log.AgentIdKey, dbMetrics.AgentId).Msg("Persisting host metrics")
-		if result := p.db.Create(&dbMetrics); result.Error != nil {
+		if result := p.db.Save(&dbMetrics); result.Error != nil {
 			p.logger.Error().Err(result.Error).Msg("Failed to persist host metrics")
 		}
 	}
@@ -227,7 +227,7 @@ func (p *Persistor) readRawLogs(ctx context.Context, agentId string, logsClient 
 		dbLog := NewLogFromGrpc(logEntry)
 		dbLog.AgentId = agentId
 		p.logger.Trace().Str(log.AgentIdKey, dbLog.AgentId).Msg("Persisting raw log")
-		if result := p.db.Create(&dbLog); result.Error != nil {
+		if result := p.db.Save(&dbLog); result.Error != nil {
 			p.logger.Error().Err(result.Error).Msg("Failed to persist raw log")
 		}
 	}
@@ -256,7 +256,7 @@ func (p *Persistor) readSyntheticUserCounters(ctx context.Context, agentId strin
 			dbCounters := NewSyntheticUserCountersFromGrpc(syntheticUserCounters)
 			dbCounters.AgentId = agentId
 			dbCounters.Timestamp = now
-			if result := p.db.Create(&dbCounters); result.Error != nil {
+			if result := p.db.Save(&dbCounters); result.Error != nil {
 				p.logger.Error().Err(result.Error).Msg("Failed to persist synthetic user counters")
 			}
 		}
