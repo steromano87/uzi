@@ -67,6 +67,13 @@ func (a *Agent) setLogger(logger zerolog.Logger) {
 	a.workspace.SetLogger(logger)
 }
 
+func (a *Agent) attachMultiLevelWriter(logger zerolog.Logger) zerolog.Logger {
+	consoleWriter := zerolog.NewConsoleWriter()
+	consoleWriter.TimeFormat = "2006-01-02T15:04:05.000000"
+	mlw := zerolog.MultiLevelWriter(consoleWriter, a.telemetryServer)
+	return logger.Output(mlw)
+}
+
 func (a *Agent) setStatus(status Status) {
 	a.statusMu.Lock()
 	defer a.statusMu.Unlock()
@@ -75,12 +82,15 @@ func (a *Agent) setStatus(status Status) {
 
 func (a *Agent) Serve(ctx context.Context) error {
 	logger := zerolog.Ctx(ctx)
-	a.setLogger(*logger)
+	multiLogger := a.attachMultiLevelWriter(*logger)
+	multiLoggerCtx := multiLogger.WithContext(ctx)
+	a.setLogger(multiLogger)
+
 	if err := a.workspace.EnsureWorkspace(); err != nil {
 		a.logger.Error().Err(err).Msg("Cannot start agent, error when setting up workspace")
 	}
 
-	a.selfControlCtx, a.selfControlCancelCauseFunc = context.WithCancelCause(ctx)
+	a.selfControlCtx, a.selfControlCancelCauseFunc = context.WithCancelCause(multiLoggerCtx)
 	defer a.selfControlCancelCauseFunc(nil)
 
 	a.setStatus(Status_READY)
