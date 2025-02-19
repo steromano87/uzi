@@ -1,7 +1,7 @@
 package schedule_test
 
 import (
-	"github.com/steromano87/harkonnen/v1/pkg/injector/schedule"
+	"github.com/steromano87/uzi/v1/pkg/injector/schedule"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"

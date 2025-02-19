@@ -7,7 +7,7 @@ import (
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/net"
-	"github.com/steromano87/harkonnen/v1/pkg/log"
+	"github.com/steromano87/uzi/v1/pkg/log"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"runtime"
 	"time"

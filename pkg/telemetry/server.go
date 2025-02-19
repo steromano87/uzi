@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"github.com/rs/zerolog"
-	harkErrors "github.com/steromano87/harkonnen/v1/pkg/errors"
-	"github.com/steromano87/harkonnen/v1/pkg/log"
-	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
+	uziErrors "github.com/steromano87/uzi/v1/pkg/errors"
+	"github.com/steromano87/uzi/v1/pkg/log"
+	"github.com/steromano87/uzi/v1/pkg/workspace/configuration"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
 	"sync"
@@ -57,7 +57,7 @@ func NewServer() *Server {
 
 func (s *Server) Reconfigure(config *configuration.Manifest) error {
 	if s.activeSession.Load() {
-		return harkErrors.SessionAlreadyInProgress
+		return uziErrors.SessionAlreadyInProgress
 	}
 
 	s.buffersMu.Lock()
@@ -101,7 +101,7 @@ func (s *Server) WaitUntilReady() {
 
 func (s *Server) StoreSample(sample *Sample) error {
 	if !s.activeSession.Load() {
-		return harkErrors.NoSessionsInProgress
+		return uziErrors.NoSessionsInProgress
 	}
 
 	s.buffersMu.RLock()
@@ -118,7 +118,7 @@ func (s *Server) StoreSample(sample *Sample) error {
 
 func (s *Server) StoreTransaction(transaction *Transaction) error {
 	if !s.activeSession.Load() {
-		return harkErrors.NoSessionsInProgress
+		return uziErrors.NoSessionsInProgress
 	}
 
 	s.buffersMu.RLock()
@@ -135,7 +135,7 @@ func (s *Server) StoreTransaction(transaction *Transaction) error {
 
 func (s *Server) StoreIterationCounters(counters *IterationCounters) error {
 	if !s.activeSession.Load() {
-		return harkErrors.NoSessionsInProgress
+		return uziErrors.NoSessionsInProgress
 	}
 
 	s.buffersMu.RLock()
@@ -152,7 +152,7 @@ func (s *Server) StoreIterationCounters(counters *IterationCounters) error {
 
 func (s *Server) StoreHostMetrics(agentMetrics *HostMetrics) error {
 	if !s.activeSession.Load() {
-		return harkErrors.NoSessionsInProgress
+		return uziErrors.NoSessionsInProgress
 	}
 
 	s.buffersMu.RLock()
@@ -169,7 +169,7 @@ func (s *Server) StoreHostMetrics(agentMetrics *HostMetrics) error {
 
 func (s *Server) StoreRawLog(entry *RawLog) error {
 	if !s.activeSession.Load() {
-		return harkErrors.NoSessionsInProgress
+		return uziErrors.NoSessionsInProgress
 	}
 
 	s.buffersMu.RLock()
@@ -206,8 +206,8 @@ func (s *Server) Write(p []byte) (n int, err error) {
 
 func (s *Server) GetSamples(_ *SampleStreamRequest, g grpc.ServerStreamingServer[Sample]) error {
 	if !s.activeSession.Load() {
-		s.logger.Error().Err(harkErrors.NoSessionsInProgress).Msg("Cannot start sample streaming")
-		return harkErrors.NoSessionsInProgress
+		s.logger.Error().Err(uziErrors.NoSessionsInProgress).Msg("Cannot start sample streaming")
+		return uziErrors.NoSessionsInProgress
 	}
 
 	if err := s.streamSemaphore.Acquire(s.controlCtx, 1); err != nil {
@@ -236,8 +236,8 @@ func (s *Server) GetSamples(_ *SampleStreamRequest, g grpc.ServerStreamingServer
 
 func (s *Server) GetTransactions(_ *TransactionStreamRequest, g grpc.ServerStreamingServer[Transaction]) error {
 	if !s.activeSession.Load() {
-		s.logger.Error().Err(harkErrors.NoSessionsInProgress).Msg("Cannot start transaction streaming")
-		return harkErrors.NoSessionsInProgress
+		s.logger.Error().Err(uziErrors.NoSessionsInProgress).Msg("Cannot start transaction streaming")
+		return uziErrors.NoSessionsInProgress
 	}
 
 	if err := s.streamSemaphore.Acquire(s.controlCtx, 1); err != nil {
@@ -266,8 +266,8 @@ func (s *Server) GetTransactions(_ *TransactionStreamRequest, g grpc.ServerStrea
 
 func (s *Server) GetIterationCounters(_ *IterationCountersStreamRequest, g grpc.ServerStreamingServer[IterationCounters]) error {
 	if !s.activeSession.Load() {
-		s.logger.Error().Err(harkErrors.NoSessionsInProgress).Msg("Cannot start iteration counters streaming")
-		return harkErrors.NoSessionsInProgress
+		s.logger.Error().Err(uziErrors.NoSessionsInProgress).Msg("Cannot start iteration counters streaming")
+		return uziErrors.NoSessionsInProgress
 	}
 
 	if err := s.streamSemaphore.Acquire(s.controlCtx, 1); err != nil {
@@ -296,8 +296,8 @@ func (s *Server) GetIterationCounters(_ *IterationCountersStreamRequest, g grpc.
 
 func (s *Server) GetHostMetrics(_ *HostMetricsStreamRequest, g grpc.ServerStreamingServer[HostMetrics]) error {
 	if !s.activeSession.Load() {
-		s.logger.Error().Err(harkErrors.NoSessionsInProgress).Msg("Cannot start host metrics streaming")
-		return harkErrors.NoSessionsInProgress
+		s.logger.Error().Err(uziErrors.NoSessionsInProgress).Msg("Cannot start host metrics streaming")
+		return uziErrors.NoSessionsInProgress
 	}
 
 	if err := s.streamSemaphore.Acquire(s.controlCtx, 1); err != nil {
@@ -326,8 +326,8 @@ func (s *Server) GetHostMetrics(_ *HostMetricsStreamRequest, g grpc.ServerStream
 
 func (s *Server) GetRawLogs(_ *RawLogsStreamRequest, g grpc.ServerStreamingServer[RawLog]) error {
 	if !s.activeSession.Load() {
-		s.logger.Error().Err(harkErrors.NoSessionsInProgress).Msg("Cannot start logs streaming")
-		return harkErrors.NoSessionsInProgress
+		s.logger.Error().Err(uziErrors.NoSessionsInProgress).Msg("Cannot start logs streaming")
+		return uziErrors.NoSessionsInProgress
 	}
 
 	if err := s.streamSemaphore.Acquire(s.controlCtx, 1); err != nil {

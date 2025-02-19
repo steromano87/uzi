@@ -1,7 +1,7 @@
 package injector
 
 import (
-	"github.com/steromano87/harkonnen/v1/pkg/syntheticuser"
+	"github.com/steromano87/uzi/v1/pkg/syntheticuser"
 	"google.golang.org/grpc"
 )
 

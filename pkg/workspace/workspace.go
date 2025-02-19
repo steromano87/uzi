@@ -3,8 +3,8 @@ package workspace
 import (
 	"context"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/log"
-	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
+	"github.com/steromano87/uzi/v1/pkg/log"
+	"github.com/steromano87/uzi/v1/pkg/workspace/configuration"
 	"os"
 	"path"
 	"path/filepath"
@@ -14,13 +14,13 @@ const (
 	FolderPerms = 0755
 	FilePerms   = 0644
 
-	TempFolderPrefix = "harkonnen_"
+	TempFolderPrefix = "uzi_"
 	ScriptsFolder    = "scripts"
 	SessionsFolder   = "sessions"
 	VariablesFolder  = "variables"
 	DataFolder       = "data"
 
-	ManifestFile        = "harkonnen.yaml"
+	ManifestFile        = "uzi.yaml"
 	GlobalVariablesFile = "globals.yaml"
 )
 

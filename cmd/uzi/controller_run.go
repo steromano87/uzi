@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"github.com/spf13/cobra"
-	"github.com/steromano87/harkonnen/v1/pkg/errors"
-	"github.com/steromano87/harkonnen/v1/pkg/injector"
+	"github.com/steromano87/uzi/v1/pkg/errors"
+	"github.com/steromano87/uzi/v1/pkg/injector"
 	"os"
 	"os/signal"
 	"syscall"

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"github.com/mitchellh/hashstructure/v2"
 	"github.com/mitchellh/mapstructure"
-	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
+	"github.com/steromano87/uzi/v1/pkg/telemetry"
 	"time"
 )
 

@@ -2,7 +2,7 @@ package workspace
 
 import (
 	"context"
-	"github.com/steromano87/harkonnen/v1/pkg/db"
+	"github.com/steromano87/uzi/v1/pkg/db"
 	"gorm.io/gorm"
 	"os"
 	"path"

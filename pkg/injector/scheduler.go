@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rs/zerolog"
-	harkErrors "github.com/steromano87/harkonnen/v1/pkg/errors"
-	"github.com/steromano87/harkonnen/v1/pkg/injector/schedule"
-	"github.com/steromano87/harkonnen/v1/pkg/log"
-	"github.com/steromano87/harkonnen/v1/pkg/syntheticuser"
+	uziErrors "github.com/steromano87/uzi/v1/pkg/errors"
+	"github.com/steromano87/uzi/v1/pkg/injector/schedule"
+	"github.com/steromano87/uzi/v1/pkg/log"
+	"github.com/steromano87/uzi/v1/pkg/syntheticuser"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"time"
 )
@@ -65,10 +65,10 @@ func (s *Scheduler) Serve(ctx context.Context, updateInterval time.Duration) err
 
 		case <-ctx.Done():
 			switch {
-			case errors.Is(context.Cause(ctx), harkErrors.GracefulShutdownRequested):
+			case errors.Is(context.Cause(ctx), uziErrors.GracefulShutdownRequested):
 				s.logger.Info().Msg("Early graceful shutdown requested, scaling all users to zero")
 
-			case errors.Is(context.Cause(ctx), context.Canceled), errors.Is(context.Cause(ctx), harkErrors.ForcedShutdownRequested):
+			case errors.Is(context.Cause(ctx), context.Canceled), errors.Is(context.Cause(ctx), uziErrors.ForcedShutdownRequested):
 				s.logger.Warn().Msg("Forced shutdown requested, stopping all active users")
 			}
 

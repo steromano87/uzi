@@ -1,7 +1,7 @@
 package rest_test
 
 import (
-	"github.com/steromano87/harkonnen/v1/pkg/dsl/rest"
+	"github.com/steromano87/uzi/v1/pkg/dsl/rest"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

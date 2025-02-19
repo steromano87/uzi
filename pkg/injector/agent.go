@@ -5,15 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/dsl/pipeline"
-	harkErrors "github.com/steromano87/harkonnen/v1/pkg/errors"
-	"github.com/steromano87/harkonnen/v1/pkg/log"
-	"github.com/steromano87/harkonnen/v1/pkg/syntheticuser"
-	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
-	"github.com/steromano87/harkonnen/v1/pkg/variables"
-	"github.com/steromano87/harkonnen/v1/pkg/version"
-	"github.com/steromano87/harkonnen/v1/pkg/workspace"
-	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
+	"github.com/steromano87/uzi/v1/pkg/dsl/pipeline"
+	uziErrors "github.com/steromano87/uzi/v1/pkg/errors"
+	"github.com/steromano87/uzi/v1/pkg/log"
+	"github.com/steromano87/uzi/v1/pkg/syntheticuser"
+	"github.com/steromano87/uzi/v1/pkg/telemetry"
+	"github.com/steromano87/uzi/v1/pkg/variables"
+	"github.com/steromano87/uzi/v1/pkg/version"
+	"github.com/steromano87/uzi/v1/pkg/workspace"
+	"github.com/steromano87/uzi/v1/pkg/workspace/configuration"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -188,7 +188,7 @@ func (a *Agent) Handshake(_ context.Context, hello *Hello) (*Welcome, error) {
 func (a *Agent) BeginSession(_ context.Context, request *BeginSessionRequest) (*emptypb.Empty, error) {
 	a.logger.Info().Str(log.SessionNameKey, request.GetName()).Msg("Starting session")
 	if a.activeSession.Load() {
-		return nil, harkErrors.SessionAlreadyInProgress
+		return nil, uziErrors.SessionAlreadyInProgress
 	}
 
 	if err := a.InitializeFromArchive(request.GetArchive().GetContent()); err != nil {
@@ -253,7 +253,7 @@ func (a *Agent) BeginSession(_ context.Context, request *BeginSessionRequest) (*
 func (a *Agent) EndSession(_ context.Context, request *EndSessionRequest) (*emptypb.Empty, error) {
 	a.logger.Info().Str(log.SessionNameKey, request.GetName()).Msg("Ending session")
 	if !a.activeSession.Load() {
-		return nil, harkErrors.NoSessionsInProgress
+		return nil, uziErrors.NoSessionsInProgress
 	}
 
 	if err := a.spawner.EndSession(); err != nil {
@@ -292,7 +292,7 @@ func (a *Agent) Shutdown(requestCtx context.Context, request *ShutdownRequest) (
 
 	shutdownCtx, shutdownCancelFunc := context.WithTimeout(requestCtx, shutdownTimeout)
 	defer shutdownCancelFunc()
-	a.selfControlCancelCauseFunc(harkErrors.GracefulShutdownRequested)
+	a.selfControlCancelCauseFunc(uziErrors.GracefulShutdownRequested)
 
 	waitChan := make(chan error)
 	go func() {

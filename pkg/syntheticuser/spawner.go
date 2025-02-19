@@ -5,13 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/dsl"
-	"github.com/steromano87/harkonnen/v1/pkg/dsl/pipeline"
-	harkErrors "github.com/steromano87/harkonnen/v1/pkg/errors"
-	"github.com/steromano87/harkonnen/v1/pkg/log"
-	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
-	"github.com/steromano87/harkonnen/v1/pkg/variables"
-	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
+	"github.com/steromano87/uzi/v1/pkg/dsl"
+	"github.com/steromano87/uzi/v1/pkg/dsl/pipeline"
+	uziErrors "github.com/steromano87/uzi/v1/pkg/errors"
+	"github.com/steromano87/uzi/v1/pkg/log"
+	"github.com/steromano87/uzi/v1/pkg/telemetry"
+	"github.com/steromano87/uzi/v1/pkg/variables"
+	"github.com/steromano87/uzi/v1/pkg/workspace/configuration"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -81,13 +81,13 @@ func (s *Spawner) Serve(ctx context.Context) error {
 		}
 
 		switch {
-		case errors.Is(context.Cause(ctx), harkErrors.GracefulShutdownRequested):
+		case errors.Is(context.Cause(ctx), uziErrors.GracefulShutdownRequested):
 			s.mainLogger.Info().Msg("Graceful shutdown requested, ending current session")
 			if err := s.EndSession(); err != nil {
 				s.mainLogger.Error().Err(err).Msg("Error while ending session")
 			}
 
-		case errors.Is(context.Cause(ctx), context.Canceled), errors.Is(context.Cause(ctx), harkErrors.ForcedShutdownRequested):
+		case errors.Is(context.Cause(ctx), context.Canceled), errors.Is(context.Cause(ctx), uziErrors.ForcedShutdownRequested):
 			s.mainLogger.Warn().AnErr("reason", context.Cause(ctx)).Msg("Forced shutdown requested, stopping all running synthetic users")
 			s.activeSessionCancelFunc()
 		}
@@ -106,7 +106,7 @@ func (s *Spawner) WaitUntilReady() {
 
 func (s *Spawner) BeginSession(pip *pipeline.Pipeline, maxUserQuota uint64, config *configuration.Manifest) error {
 	if s.activeSession.Load() {
-		return harkErrors.SessionAlreadyInProgress
+		return uziErrors.SessionAlreadyInProgress
 	}
 
 	s.pipelineToRun = pip
@@ -129,7 +129,7 @@ func (s *Spawner) EndSession() error {
 	}()
 
 	if !s.activeSession.Load() {
-		return harkErrors.NoSessionsInProgress
+		return uziErrors.NoSessionsInProgress
 	}
 
 	if err := s.ReconcileActiveUsers(0); err != nil {
@@ -184,7 +184,7 @@ func (s *Spawner) setLogger(logger zerolog.Logger) {
 
 func (s *Spawner) ReconcileActiveUsers(requestedUsers uint64) error {
 	if !s.activeSession.Load() {
-		return harkErrors.NoSessionsInProgress
+		return uziErrors.NoSessionsInProgress
 	}
 
 	// If the lock cannot be acquired, return early with dedicated error

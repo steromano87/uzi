@@ -6,7 +6,7 @@ import (
 	"github.com/fullstorydev/grpchan/inprocgrpc"
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
-	"github.com/steromano87/harkonnen/v1/pkg/log"
+	"github.com/steromano87/uzi/v1/pkg/log"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/emptypb"

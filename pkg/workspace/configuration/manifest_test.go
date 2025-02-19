@@ -2,7 +2,7 @@ package configuration_test
 
 import (
 	"github.com/Flaque/filet"
-	"github.com/steromano87/harkonnen/v1/pkg/workspace/configuration"
+	"github.com/steromano87/uzi/v1/pkg/workspace/configuration"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -12,13 +12,13 @@ func TestNewDefaultConfiguration(t *testing.T) {
 		config := configuration.MustNewDefault()
 
 		assert.IsType(t, &configuration.Manifest{}, config)
-		assert.Equal(t, "all", config.HarkonnenVersion)
+		assert.Equal(t, "all", config.UziVersion)
 	})
 }
 
 func TestNewConfigurationFromFile(t *testing.T) {
 	tempDir := filet.TmpDir(t, "")
-	tempConfigFile := filet.TmpFile(t, tempDir, "harkonnenVersion: none")
+	tempConfigFile := filet.TmpFile(t, tempDir, "UziVersion: none")
 
 	defer filet.CleanUp(t)
 
@@ -26,6 +26,6 @@ func TestNewConfigurationFromFile(t *testing.T) {
 
 	if assert.NoError(t, err) {
 		assert.IsType(t, &configuration.Manifest{}, config)
-		assert.Equal(t, "none", config.HarkonnenVersion)
+		assert.Equal(t, "none", config.UziVersion)
 	}
 }

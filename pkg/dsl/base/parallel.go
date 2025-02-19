@@ -1,7 +1,7 @@
 package base
 
 import (
-	"github.com/steromano87/harkonnen/v1/pkg/dsl"
+	"github.com/steromano87/uzi/v1/pkg/dsl"
 	"golang.org/x/sync/errgroup"
 )
 

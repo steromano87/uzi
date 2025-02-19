@@ -3,9 +3,9 @@ package db
 import (
 	"context"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/log"
-	"github.com/steromano87/harkonnen/v1/pkg/syntheticuser"
-	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
+	"github.com/steromano87/uzi/v1/pkg/log"
+	"github.com/steromano87/uzi/v1/pkg/syntheticuser"
+	"github.com/steromano87/uzi/v1/pkg/telemetry"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"gorm.io/gorm"

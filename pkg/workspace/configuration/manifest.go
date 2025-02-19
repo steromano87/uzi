@@ -8,24 +8,24 @@ import (
 )
 
 const (
-	Name      = "harkonnen"
+	Name      = "uzi"
 	Format    = "yaml"
-	EnvPrefix = "HARK"
+	EnvPrefix = "UZI"
 )
 
 type Manifest struct {
 	*viper.Viper
 
-	WorkingFolder    string
-	Name             string
-	HarkonnenVersion string
-	Load             LoadConfiguration
-	Injector         InjectorConfiguration
-	Logging          LoggingConfiguration
-	Controller       ControllerConfiguration
-	Client           ClientConfiguration
-	Heartbeat        HeartbeatConfiguration
-	Telemetry        TelemetryConfiguration
+	WorkingFolder string
+	Name          string
+	UziVersion    string
+	Load          LoadConfiguration
+	Injector      InjectorConfiguration
+	Logging       LoggingConfiguration
+	Controller    ControllerConfiguration
+	Client        ClientConfiguration
+	Heartbeat     HeartbeatConfiguration
+	Telemetry     TelemetryConfiguration
 }
 
 func New(configFile string) (*Manifest, error) {

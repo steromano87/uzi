@@ -4,7 +4,7 @@ import (
 	"errors"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
-	"github.com/steromano87/harkonnen/v1/pkg/dsl"
+	"github.com/steromano87/uzi/v1/pkg/dsl"
 )
 
 func Decode(dslFileContent []byte, dslFilePath string) (*Pipeline, error) {

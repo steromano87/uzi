@@ -2,7 +2,7 @@ package rest
 
 import (
 	"bytes"
-	"github.com/steromano87/harkonnen/v1/pkg/dsl"
+	"github.com/steromano87/uzi/v1/pkg/dsl"
 	"io"
 	"net/http"
 	"net/url"

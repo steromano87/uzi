@@ -1,6 +1,6 @@
 syntax = "proto3";
 package syntheticuser;
-option go_package = "github.com/steromano87/harkonnen/v1/pkg/syntheticuser";
+option go_package = "github.com/steromano87/uzi/v1/pkg/syntheticuser";
 
 enum Status {
   READY = 0;

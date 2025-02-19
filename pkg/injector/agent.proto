@@ -1,6 +1,6 @@
 syntax = "proto3";
 package injector;
-option go_package = "github.com/steromano87/harkonnen/v1/pkg/injector";
+option go_package = "github.com/steromano87/uzi/v1/pkg/injector";
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/duration.proto";

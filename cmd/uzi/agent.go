@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/rs/xid"
 	"github.com/spf13/cobra"
-	"github.com/steromano87/harkonnen/v1/pkg/injector"
+	"github.com/steromano87/uzi/v1/pkg/injector"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"net"

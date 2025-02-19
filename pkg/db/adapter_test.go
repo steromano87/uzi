@@ -3,7 +3,7 @@ package db_test
 import (
 	"context"
 	"github.com/Flaque/filet"
-	"github.com/steromano87/harkonnen/v1/pkg/db"
+	"github.com/steromano87/uzi/v1/pkg/db"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"path"

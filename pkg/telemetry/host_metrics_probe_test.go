@@ -2,7 +2,7 @@ package telemetry_test
 
 import (
 	"context"
-	"github.com/steromano87/harkonnen/v1/pkg/telemetry"
+	"github.com/steromano87/uzi/v1/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"testing"

@@ -3,7 +3,7 @@ package base
 import (
 	"errors"
 	"github.com/hashicorp/hcl/v2"
-	"github.com/steromano87/harkonnen/v1/pkg/dsl"
+	"github.com/steromano87/uzi/v1/pkg/dsl"
 )
 
 func init() {

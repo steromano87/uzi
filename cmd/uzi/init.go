@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/spf13/cobra"
-	"github.com/steromano87/harkonnen/v1/pkg/workspace"
+	"github.com/steromano87/uzi/v1/pkg/workspace"
 	"io"
 	"os"
 	"path/filepath"

@@ -1,7 +1,7 @@
 package variables_test
 
 import (
-	"github.com/steromano87/harkonnen/v1/pkg/variables"
+	"github.com/steromano87/uzi/v1/pkg/variables"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

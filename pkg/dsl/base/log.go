@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/dsl"
+	"github.com/steromano87/uzi/v1/pkg/dsl"
 )
 
 type Log struct {

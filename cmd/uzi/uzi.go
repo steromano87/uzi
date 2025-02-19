@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
-	"github.com/steromano87/harkonnen/v1/pkg/version"
+	"github.com/steromano87/uzi/v1/pkg/version"
 )
 
 var (
@@ -13,10 +13,10 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use: "hark",
+	Use: "uzi",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Harkonnen Load Testing Engine - Version %s\n\n", version.Version)
-		println("Kind 'hark help' to show the available options\n")
+		fmt.Printf("Uzi Load Testing Engine - Version %s\n\n", version.Version)
+		println("Type 'uzi help' to show the available options\n")
 	},
 	Version: fmt.Sprintf("%s (%s)", version.Version, version.CommitHash),
 }

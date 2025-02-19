@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"github.com/rs/xid"
 	"github.com/rs/zerolog"
-	"github.com/steromano87/harkonnen/v1/pkg/dsl"
-	"github.com/steromano87/harkonnen/v1/pkg/dsl/pipeline"
-	"github.com/steromano87/harkonnen/v1/pkg/log"
+	"github.com/steromano87/uzi/v1/pkg/dsl"
+	"github.com/steromano87/uzi/v1/pkg/dsl/pipeline"
+	"github.com/steromano87/uzi/v1/pkg/log"
 )
 
 type SyntheticUser struct {
