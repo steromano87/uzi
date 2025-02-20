@@ -15,10 +15,10 @@ var (
 var rootCmd = &cobra.Command{
 	Use: "uzi",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Uzi Load Testing Engine - Version %s\n\n", version.Version)
+		fmt.Printf("Uzi Load Testing Engine - Version %s (%s, commit: %s)\n\n", version.Version, version.Date, version.Commit)
 		println("Type 'uzi help' to show the available options\n")
 	},
-	Version: fmt.Sprintf("%s (%s)", version.Version, version.CommitHash),
+	Version: fmt.Sprintf("%s (%s, commit: %s)", version.Version, version.Date, version.Commit),
 }
 
 func init() {

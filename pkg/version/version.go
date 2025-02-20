@@ -3,8 +3,9 @@ package version
 import "github.com/Masterminds/semver/v3"
 
 var (
-	Version    = "0.1.0"
-	CommitHash = "N/A"
+	Version = "0.1.0"
+	Commit  = "N/A"
+	Date    = "N/A"
 )
 
 func IsCompatible(myVersion string, otherVersion string) bool {

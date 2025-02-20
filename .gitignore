@@ -92,3 +92,5 @@ Temporary Items
 
 ### Protobuf
 *.pb.go
+
+dist/
